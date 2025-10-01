@@ -17,6 +17,22 @@ Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong
 
 ## Installation
 
+### 🐳 Docker (Empfohlen)
+
+```bash
+# Image bauen
+docker build -t gal:latest .
+
+# Direkt verwenden
+docker run --rm gal:latest list-providers
+
+# Mit Volume für Ausgabe
+docker run --rm -v $(pwd)/generated:/app/generated gal:latest \
+  generate --config examples/gateway-config.yaml --provider envoy --output generated/envoy.yaml
+```
+
+### 🐍 Python (Lokal)
+
 ```bash
 # Virtuelle Umgebung erstellen
 python3 -m venv venv
@@ -30,6 +46,24 @@ chmod +x gal-cli.py
 ```
 
 ## Schnellstart
+
+### 🐳 Mit Docker
+
+```bash
+# Alle Provider generieren
+docker run --rm -v $(pwd)/generated:/app/generated gal:latest \
+  generate-all --config examples/gateway-config.yaml --output-dir generated
+
+# Einzelnen Provider generieren
+docker run --rm -v $(pwd)/generated:/app/generated gal:latest \
+  generate --config examples/gateway-config.yaml --provider kong --output generated/kong.yaml
+
+# Mit Docker Compose
+docker-compose up gal-generate  # Generiert Envoy-Konfiguration
+PROVIDER=kong docker-compose up gal-generate  # Generiert Kong-Konfiguration
+```
+
+### 🐍 Mit Python
 
 ```bash
 # Envoy-Konfiguration generieren
@@ -106,6 +140,40 @@ python gal-cli.py info --config CONFIG
 # Verfügbare Provider auflisten
 python gal-cli.py list-providers
 ```
+
+## 🐳 Docker Deployment
+
+### Image bauen
+
+```bash
+# Standard-Build
+docker build -t gal:latest .
+
+# Mit spezifischer Version
+docker build -t gal:1.0.0 .
+```
+
+### Docker Compose Services
+
+```bash
+# Standard CLI (interaktiv)
+docker-compose up gal
+
+# Development mit Live-Reload
+docker-compose --profile dev up gal-dev
+
+# Konfiguration generieren
+docker-compose --profile generate up gal-generate
+
+# Konfiguration validieren
+CONFIG_FILE=examples/gateway-config.yaml docker-compose --profile validate up gal-validate
+```
+
+### Environment Variables
+
+- `PROVIDER`: Gateway-Provider (envoy, kong, apisix, traefik)
+- `CONFIG_FILE`: Pfad zur Konfigurationsdatei
+- `OUTPUT_DIR`: Ausgabeverzeichnis für generierte Configs
 
 ## Dokumentation
 

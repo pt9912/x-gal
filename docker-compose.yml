@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  gal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gal:latest
+    container_name: gal-cli
+    volumes:
+      # Mount custom configuration
+      - ./examples:/app/examples:ro
+      # Mount output directory for generated configs
+      - ./generated:/app/generated
+      # Optional: mount custom configs
+      - ./custom-configs:/app/custom-configs:ro
+    environment:
+      - PYTHONPATH=/app
+    # Override default command for interactive use
+    command: bash
+    stdin_open: true
+    tty: true
+
+  # Development service with live code reloading
+  gal-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: gal:dev
+    container_name: gal-dev
+    volumes:
+      # Mount source code for development
+      - .:/app
+      - /app/venv
+      - /app/__pycache__
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONDONTWRITEBYTECODE=1
+    command: bash
+    stdin_open: true
+    tty: true
+    profiles:
+      - dev
+
+  # Service for running specific provider generation
+  gal-generate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gal:latest
+    container_name: gal-generate
+    volumes:
+      - ./examples:/app/examples:ro
+      - ./generated:/app/generated
+    environment:
+      - PROVIDER=${PROVIDER:-envoy}
+      - CONFIG_FILE=${CONFIG_FILE:-examples/gateway-config.yaml}
+      - OUTPUT_DIR=${OUTPUT_DIR:-generated}
+    command: >
+      bash -c "
+        echo 'Generating configuration for provider: ${PROVIDER}' &&
+        python gal-cli.py generate
+          --config ${CONFIG_FILE}
+          --provider ${PROVIDER}
+          --output ${OUTPUT_DIR}/${PROVIDER}.yaml
+      "
+    profiles:
+      - generate
+
+  # Service for validation
+  gal-validate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gal:latest
+    container_name: gal-validate
+    volumes:
+      - ./examples:/app/examples:ro
+    environment:
+      - CONFIG_FILE=${CONFIG_FILE:-examples/gateway-config.yaml}
+    command: >
+      bash -c "
+        echo 'Validating configuration: ${CONFIG_FILE}' &&
+        python gal-cli.py validate --config ${CONFIG_FILE}
+      "
+    profiles:
+      - validate
+
+volumes:
+  # Named volume for generated configs (optional)
+  gal-generated:
+    driver: local
+
+networks:
+  default:
+    name: gal-network

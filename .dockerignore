@@ -1,0 +1,54 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+build
+*.egg-info
+venv
+.venv
+env
+.env
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated files (will be created in container)
+generated/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# Test files
+.pytest_cache
+.coverage
+htmlcov
+
+# Documentation build
+docs/_build
+
+# Development files
+README-v1.md
+create_gal_project.py
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
