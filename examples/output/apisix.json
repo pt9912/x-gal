@@ -1,0 +1,137 @@
+{
+  "routes": [
+    {
+      "uri": "/myapp.UserService/*",
+      "name": "user_service_route",
+      "service_id": "user_service"
+    },
+    {
+      "uri": "/myapp.OrderService/*",
+      "name": "order_service_route",
+      "service_id": "order_service"
+    },
+    {
+      "uri": "/myapp.NotificationService/*",
+      "name": "notification_service_route",
+      "service_id": "notification_service"
+    },
+    {
+      "uri": "/api/products/*",
+      "name": "product_service_route",
+      "service_id": "product_service",
+      "methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "DELETE"
+      ]
+    },
+    {
+      "uri": "/api/payments/*",
+      "name": "payment_service_route",
+      "service_id": "payment_service",
+      "methods": [
+        "POST"
+      ]
+    }
+  ],
+  "upstreams": [
+    {
+      "id": "user_service_upstream",
+      "type": "roundrobin",
+      "nodes": {
+        "user-service:9090": 1
+      }
+    },
+    {
+      "id": "order_service_upstream",
+      "type": "roundrobin",
+      "nodes": {
+        "order-service:9091": 1
+      }
+    },
+    {
+      "id": "notification_service_upstream",
+      "type": "roundrobin",
+      "nodes": {
+        "notification-service:9092": 1
+      }
+    },
+    {
+      "id": "product_service_upstream",
+      "type": "roundrobin",
+      "nodes": {
+        "product-service:8080": 1
+      }
+    },
+    {
+      "id": "payment_service_upstream",
+      "type": "roundrobin",
+      "nodes": {
+        "payment-service:8081": 1
+      }
+    }
+  ],
+  "services": [
+    {
+      "id": "user_service",
+      "upstream_id": "user_service_upstream",
+      "plugins": {
+        "serverless-pre-function": {
+          "phase": "rewrite",
+          "functions": [
+            "return function(conf, ctx)\n  local core = require('apisix.core')\n  local cjson = require('cjson.safe')\n  local body = core.request.get_body()\n  if body then\n    local json_body = cjson.decode(body)\n    if json_body then\n      json_body.role = json_body.role or 'user'\n      json_body.age = json_body.age or 0\n      json_body.active = json_body.active or True\n      if not json_body.user_id then\n        json_body.user_id = 'user_' .. core.utils.uuid()\n      end\n      if not json_body.created_at then\n        json_body.created_at = os.time()\n      end\n      ngx.req.set_body_data(cjson.encode(json_body))\n    end\n  end\nend"
+          ]
+        }
+      }
+    },
+    {
+      "id": "order_service",
+      "upstream_id": "order_service_upstream",
+      "plugins": {
+        "serverless-pre-function": {
+          "phase": "rewrite",
+          "functions": [
+            "return function(conf, ctx)\n  local core = require('apisix.core')\n  local cjson = require('cjson.safe')\n  local body = core.request.get_body()\n  if body then\n    local json_body = cjson.decode(body)\n    if json_body then\n      json_body.status = json_body.status or 'pending'\n      json_body.currency = json_body.currency or 'USD'\n      json_body.priority = json_body.priority or 5\n      if not json_body.order_id then\n        json_body.order_id = 'order_' .. core.utils.uuid()\n      end\n      if not json_body.timestamp then\n        json_body.timestamp = os.time()\n      end\n      ngx.req.set_body_data(cjson.encode(json_body))\n    end\n  end\nend"
+          ]
+        }
+      }
+    },
+    {
+      "id": "notification_service",
+      "upstream_id": "notification_service_upstream",
+      "plugins": {
+        "serverless-pre-function": {
+          "phase": "rewrite",
+          "functions": [
+            "return function(conf, ctx)\n  local core = require('apisix.core')\n  local cjson = require('cjson.safe')\n  local body = core.request.get_body()\n  if body then\n    local json_body = cjson.decode(body)\n    if json_body then\n      json_body.channel = json_body.channel or 'email'\n      json_body.priority = json_body.priority or 'medium'\n      json_body.retry_enabled = json_body.retry_enabled or True\n      json_body.max_retries = json_body.max_retries or 3\n      if not json_body.notification_id then\n        json_body.notification_id = 'notif_' .. core.utils.uuid()\n      end\n      if not json_body.scheduled_at then\n        json_body.scheduled_at = os.time()\n      end\n      ngx.req.set_body_data(cjson.encode(json_body))\n    end\n  end\nend"
+          ]
+        }
+      }
+    },
+    {
+      "id": "product_service",
+      "upstream_id": "product_service_upstream",
+      "plugins": {
+        "serverless-pre-function": {
+          "phase": "rewrite",
+          "functions": [
+            "return function(conf, ctx)\n  local core = require('apisix.core')\n  local cjson = require('cjson.safe')\n  local body = core.request.get_body()\n  if body then\n    local json_body = cjson.decode(body)\n    if json_body then\n      json_body.category = json_body.category or 'general'\n      json_body.currency = json_body.currency or 'USD'\n      json_body.stock = json_body.stock or 0\n      json_body.available = json_body.available or True\n      if not json_body.product_id then\n        json_body.product_id = 'prod_' .. core.utils.uuid()\n      end\n      if not json_body.created_at then\n        json_body.created_at = os.time()\n      end\n      ngx.req.set_body_data(cjson.encode(json_body))\n    end\n  end\nend"
+          ]
+        }
+      }
+    },
+    {
+      "id": "payment_service",
+      "upstream_id": "payment_service_upstream",
+      "plugins": {
+        "serverless-pre-function": {
+          "phase": "rewrite",
+          "functions": [
+            "return function(conf, ctx)\n  local core = require('apisix.core')\n  local cjson = require('cjson.safe')\n  local body = core.request.get_body()\n  if body then\n    local json_body = cjson.decode(body)\n    if json_body then\n      json_body.status = json_body.status or 'pending'\n      json_body.currency = json_body.currency or 'USD'\n      json_body.provider = json_body.provider or 'stripe'\n      if not json_body.payment_id then\n        json_body.payment_id = 'pay_' .. core.utils.uuid()\n      end\n      if not json_body.timestamp then\n        json_body.timestamp = os.time()\n      end\n      ngx.req.set_body_data(cjson.encode(json_body))\n    end\n  end\nend"
+          ]
+        }
+      }
+    }
+  ]
+}
