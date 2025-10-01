@@ -1,0 +1,135 @@
+version: "1.0"
+provider: envoy
+
+global:
+  host: 0.0.0.0
+  port: 10000
+  admin_port: 9901
+  timeout: 30s
+
+services:
+  # gRPC Service 1: User Service
+  - name: user_service
+    type: grpc
+    protocol: http2
+    upstream:
+      host: user-service
+      port: 9090
+    routes:
+      - path_prefix: /myapp.UserService
+    transformation:
+      enabled: true
+      defaults:
+        role: "user"
+        age: 0
+        active: true
+      computed_fields:
+        - field: user_id
+          generator: uuid
+          prefix: "user_"
+        - field: created_at
+          generator: timestamp
+
+  # gRPC Service 2: Order Service
+  - name: order_service
+    type: grpc
+    protocol: http2
+    upstream:
+      host: order-service
+      port: 9091
+    routes:
+      - path_prefix: /myapp.OrderService
+    transformation:
+      enabled: true
+      defaults:
+        status: "pending"
+        currency: "USD"
+        priority: 5
+      computed_fields:
+        - field: order_id
+          generator: uuid
+          prefix: "order_"
+        - field: timestamp
+          generator: timestamp
+
+  # gRPC Service 3: Notification Service
+  - name: notification_service
+    type: grpc
+    protocol: http2
+    upstream:
+      host: notification-service
+      port: 9092
+    routes:
+      - path_prefix: /myapp.NotificationService
+    transformation:
+      enabled: true
+      defaults:
+        channel: "email"
+        priority: "medium"
+        retry_enabled: true
+        max_retries: 3
+      computed_fields:
+        - field: notification_id
+          generator: uuid
+          prefix: "notif_"
+        - field: scheduled_at
+          generator: timestamp
+
+  # REST Service 1: Product API
+  - name: product_service
+    type: rest
+    protocol: http
+    upstream:
+      host: product-service
+      port: 8080
+    routes:
+      - path_prefix: /api/products
+        methods: [GET, POST, PUT, DELETE]
+    transformation:
+      enabled: true
+      defaults:
+        category: "general"
+        currency: "USD"
+        stock: 0
+        available: true
+      computed_fields:
+        - field: product_id
+          generator: uuid
+          prefix: "prod_"
+        - field: created_at
+          generator: timestamp
+      metadata:
+        enriched_by: "gateway"
+        service_name: "product_service"
+
+  # REST Service 2: Payment API
+  - name: payment_service
+    type: rest
+    protocol: http
+    upstream:
+      host: payment-service
+      port: 8081
+    routes:
+      - path_prefix: /api/payments
+        methods: [POST]
+    transformation:
+      enabled: true
+      defaults:
+        status: "pending"
+        currency: "USD"
+        provider: "stripe"
+      computed_fields:
+        - field: payment_id
+          generator: uuid
+          prefix: "pay_"
+        - field: timestamp
+          generator: timestamp
+      validation:
+        required_fields: [order_id, amount, method]
+
+plugins:
+  - name: rate_limiting
+    enabled: true
+    config:
+      requests_per_second: 100
+      burst: 200
