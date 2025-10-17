@@ -4,6 +4,9 @@ Tests for all provider implementations
 
 import pytest
 import json
+import os
+import tempfile
+from unittest.mock import patch, MagicMock
 from gal.providers.envoy import EnvoyProvider
 from gal.providers.kong import KongProvider
 from gal.providers.apisix import APISIXProvider
@@ -633,6 +636,203 @@ class TestTraefikProvider:
         return Config(
             version="1.0",
             provider="traefik",
+            global_config=global_config,
+            services=[service]
+        )
+
+
+class TestProviderDeployment:
+    """Test deployment methods for all providers"""
+
+    def test_envoy_deploy_file_based(self):
+        """Test Envoy file-based deployment"""
+        provider = EnvoyProvider()
+        config = self._create_basic_config("envoy")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_file = os.path.join(tmpdir, "envoy.yaml")
+            result = provider.deploy(config, output_file=output_file)
+
+            assert result is True
+            assert os.path.exists(output_file)
+
+            # Verify content
+            with open(output_file, 'r') as f:
+                content = f.read()
+                assert "static_resources:" in content
+                assert "test_service_cluster" in content
+
+    @patch('gal.providers.envoy.requests.get')
+    def test_envoy_deploy_with_admin_api(self, mock_get):
+        """Test Envoy deployment with Admin API check"""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_get.return_value = mock_response
+
+        provider = EnvoyProvider()
+        config = self._create_basic_config("envoy")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_file = os.path.join(tmpdir, "envoy.yaml")
+            result = provider.deploy(
+                config,
+                output_file=output_file,
+                admin_url="http://localhost:9901"
+            )
+
+            assert result is True
+            mock_get.assert_called_once_with("http://localhost:9901/ready", timeout=5)
+
+    def test_kong_deploy_file_based(self):
+        """Test Kong file-based deployment"""
+        provider = KongProvider()
+        config = self._create_basic_config("kong")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_file = os.path.join(tmpdir, "kong.yaml")
+            result = provider.deploy(config, output_file=output_file)
+
+            assert result is True
+            assert os.path.exists(output_file)
+
+            # Verify content
+            with open(output_file, 'r') as f:
+                content = f.read()
+                assert "_format_version: '3.0'" in content
+                assert "services:" in content
+
+    @patch('gal.providers.kong.requests.post')
+    @patch('gal.providers.kong.requests.get')
+    def test_kong_deploy_with_admin_api(self, mock_get, mock_post):
+        """Test Kong deployment via Admin API"""
+        mock_get.return_value = MagicMock(status_code=200)
+        mock_post.return_value = MagicMock(status_code=201)
+
+        provider = KongProvider()
+        config = self._create_basic_config("kong")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_file = os.path.join(tmpdir, "kong.yaml")
+            result = provider.deploy(
+                config,
+                output_file=output_file,
+                admin_url="http://localhost:8001"
+            )
+
+            assert result is True
+            mock_get.assert_called_once()
+            mock_post.assert_called_once()
+
+    def test_apisix_deploy_file_based(self):
+        """Test APISIX file-based deployment"""
+        provider = APISIXProvider()
+        config = self._create_basic_config("apisix")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_file = os.path.join(tmpdir, "apisix.json")
+            result = provider.deploy(config, output_file=output_file)
+
+            assert result is True
+            assert os.path.exists(output_file)
+
+            # Verify content
+            with open(output_file, 'r') as f:
+                content = json.load(f)
+                assert "routes" in content
+                assert "services" in content
+                assert "upstreams" in content
+
+    @patch('gal.providers.apisix.requests.put')
+    def test_apisix_deploy_with_admin_api(self, mock_put):
+        """Test APISIX deployment via Admin API"""
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_put.return_value = mock_response
+
+        provider = APISIXProvider()
+        config = self._create_basic_config("apisix")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_file = os.path.join(tmpdir, "apisix.json")
+            result = provider.deploy(
+                config,
+                output_file=output_file,
+                admin_url="http://localhost:9180",
+                api_key="test-key"
+            )
+
+            assert result is True
+            # Should have called PUT for upstream, service, and route
+            assert mock_put.call_count == 3
+
+    def test_traefik_deploy_file_based(self):
+        """Test Traefik file-based deployment"""
+        provider = TraefikProvider()
+        config = self._create_basic_config("traefik")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_file = os.path.join(tmpdir, "traefik.yaml")
+            result = provider.deploy(config, output_file=output_file)
+
+            assert result is True
+            assert os.path.exists(output_file)
+
+            # Verify content
+            with open(output_file, 'r') as f:
+                content = f.read()
+                assert "http:" in content
+                assert "routers:" in content
+                assert "services:" in content
+
+    @patch('gal.providers.traefik.requests.get')
+    def test_traefik_deploy_with_api_check(self, mock_get):
+        """Test Traefik deployment with API verification"""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_get.return_value = mock_response
+
+        provider = TraefikProvider()
+        config = self._create_basic_config("traefik")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_file = os.path.join(tmpdir, "traefik.yaml")
+            result = provider.deploy(
+                config,
+                output_file=output_file,
+                api_url="http://localhost:8080"
+            )
+
+            assert result is True
+            mock_get.assert_called_once()
+
+    def test_deploy_creates_directory(self):
+        """Test that deploy creates output directory if it doesn't exist"""
+        provider = EnvoyProvider()
+        config = self._create_basic_config("envoy")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_file = os.path.join(tmpdir, "subdir", "envoy.yaml")
+            result = provider.deploy(config, output_file=output_file)
+
+            assert result is True
+            assert os.path.exists(output_file)
+            assert os.path.exists(os.path.dirname(output_file))
+
+    def _create_basic_config(self, provider_name):
+        """Helper to create basic config"""
+        global_config = GlobalConfig()
+        upstream = Upstream(host="test.local", port=8080)
+        route = Route(path_prefix="/api")
+        service = Service(
+            name="test_service",
+            type="rest",
+            protocol="http",
+            upstream=upstream,
+            routes=[route]
+        )
+        return Config(
+            version="1.0",
+            provider=provider_name,
             global_config=global_config,
             services=[service]
         )

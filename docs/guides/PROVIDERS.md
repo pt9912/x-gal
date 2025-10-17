@@ -6,12 +6,12 @@ GAL unterstützt vier führende API-Gateway-Provider. Jeder Provider hat spezifi
 
 ## Unterstützte Provider
 
-| Provider | Output-Format | Transformations | gRPC | REST | Deployment |
-|----------|--------------|-----------------|------|------|------------|
-| Envoy | YAML | Lua Filters | ✅ | ✅ | Kubernetes, Docker |
-| Kong | YAML | Plugins | ✅ | ✅ | Cloud, On-Prem |
-| APISIX | JSON | Lua Serverless | ✅ | ✅ | Cloud Native |
-| Traefik | YAML | Middleware | ✅ | ✅ | Docker, K8s |
+| Provider | Output-Format | Transformations | gRPC | REST | GAL Deploy API |
+|----------|--------------|-----------------|------|------|----------------|
+| Envoy | YAML | Lua Filters | ✅ | ✅ | ✅ File + API check |
+| Kong | YAML | Plugins | ✅ | ✅ | ✅ File + Admin API |
+| APISIX | JSON | Lua Serverless | ✅ | ✅ | ✅ File + Admin API |
+| Traefik | YAML | Middleware | ✅ | ✅ | ✅ File + API verify |
 
 ## Envoy Proxy
 
@@ -100,6 +100,27 @@ clusters:
 ```
 
 ### Deployment
+
+GAL unterstützt direktes Deployment für Envoy:
+
+**Python API:**
+
+```python
+from gal import Manager
+from gal.providers.envoy import EnvoyProvider
+
+manager = Manager()
+provider = EnvoyProvider()
+config = manager.load_config("config.yaml")
+
+# File-based deployment
+provider.deploy(config, output_file="/etc/envoy/envoy.yaml")
+
+# Mit Admin API check
+provider.deploy(config,
+               output_file="envoy.yaml",
+               admin_url="http://localhost:9901")
+```
 
 **Docker:**
 
@@ -229,6 +250,24 @@ services:
 
 ### Deployment
 
+GAL unterstützt direktes Deployment für Kong via Admin API:
+
+**Python API:**
+
+```python
+from gal import Manager
+from gal.providers.kong import KongProvider
+
+manager = Manager()
+provider = KongProvider()
+config = manager.load_config("config.yaml")
+
+# Deployment via Admin API
+provider.deploy(config,
+               output_file="kong.yaml",
+               admin_url="http://localhost:8001")
+```
+
 **Docker:**
 
 ```bash
@@ -350,6 +389,25 @@ end
 
 ### Deployment
 
+GAL unterstützt direktes Deployment für APISIX via Admin API:
+
+**Python API:**
+
+```python
+from gal import Manager
+from gal.providers.apisix import APISIXProvider
+
+manager = Manager()
+provider = APISIXProvider()
+config = manager.load_config("config.yaml")
+
+# Deployment via Admin API
+provider.deploy(config,
+               output_file="apisix.json",
+               admin_url="http://localhost:9180",
+               api_key="your-api-key")
+```
+
 **Docker:**
 
 ```bash
@@ -434,6 +492,24 @@ middlewares:
 - Fokus auf Routing/Load Balancing
 
 ### Deployment
+
+GAL unterstützt direktes Deployment für Traefik (File-based):
+
+**Python API:**
+
+```python
+from gal import Manager
+from gal.providers.traefik import TraefikProvider
+
+manager = Manager()
+provider = TraefikProvider()
+config = manager.load_config("config.yaml")
+
+# File-based deployment mit API verification
+provider.deploy(config,
+               output_file="/etc/traefik/dynamic/gal.yaml",
+               api_url="http://localhost:8080")
+```
 
 **Docker Compose:**
 
