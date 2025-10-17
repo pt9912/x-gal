@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"SessionStart\", \"additionalContext\": \"Antworte ab jetzt ausschließlich auf Deutsch, es sei denn, der Nutzer bittet ausdrücklich um eine andere Sprache.\"}}'"
+          }
+        ]
+      }
+    ]
+  }
+}
