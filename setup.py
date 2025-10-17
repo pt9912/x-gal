@@ -1,23 +1,82 @@
+"""
+Setup configuration for GAL (Gateway Abstraction Layer)
+"""
+
 from setuptools import setup, find_packages
+from pathlib import Path
+
+# Read version from VERSION file
+version = Path("VERSION").read_text().strip()
+
+# Read long description from README
+long_description = Path("README.md").read_text(encoding="utf-8")
 
 setup(
-    name="gal",
-    version="1.0.0",
-    packages=find_packages(),
-    install_requires=[
-        "PyYAML>=6.0",
-        "Jinja2>=3.1.0",
-        "click>=8.1.0",
-        "pydantic>=2.0.0",
+    name="gal-gateway",
+    version=version,
+    author="Dietmar Burkard",
+    author_email="",
+    description="Gateway Abstraction Layer - Provider-agnostic API Gateway configuration system",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    url="https://github.com/pt9912/x-gal",
+    project_urls={
+        "Bug Tracker": "https://github.com/pt9912/x-gal/issues",
+        "Documentation": "https://github.com/pt9912/x-gal/blob/main/README.md",
+        "Source Code": "https://github.com/pt9912/x-gal",
+        "Changelog": "https://github.com/pt9912/x-gal/blob/main/CHANGELOG.md",
+    },
+    packages=find_packages(exclude=["tests", "tests.*", "examples", "docs"]),
+    classifiers=[
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Developers",
+        "Intended Audience :: System Administrators",
+        "Topic :: Software Development :: Code Generators",
+        "Topic :: System :: Networking",
+        "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Operating System :: OS Independent",
+        "Environment :: Console",
+        "Typing :: Typed",
     ],
-    entry_points={
-        "console_scripts": [
-            "gal=gal.cli:main",
+    keywords=[
+        "api-gateway",
+        "envoy",
+        "kong",
+        "apisix",
+        "traefik",
+        "gateway",
+        "configuration",
+        "abstraction",
+        "devops",
+        "infrastructure",
+    ],
+    python_requires=">=3.10",
+    install_requires=[
+        "click>=8.1.0",
+        "pyyaml>=6.0",
+        "requests>=2.31.0",
+    ],
+    extras_require={
+        "dev": [
+            "pytest>=8.0.0",
+            "pytest-cov>=4.1.0",
+            "black>=24.0.0",
+            "flake8>=7.0.0",
+            "isort>=5.13.0",
         ],
     },
-    author="Your Name",
-    description="Gateway Abstraction Layer - Provider-agnostic API Gateway configuration",
-    long_description=open("README.md").read(),
-    long_description_content_type="text/markdown",
-    python_requires=">=3.8",
+    entry_points={
+        "console_scripts": [
+            "gal=gal.cli:cli",
+        ],
+    },
+    include_package_data=True,
+    package_data={
+        "gal": ["py.typed"],
+    },
+    zip_safe=False,
 )
