@@ -63,6 +63,8 @@ class Route:
                  If None, all methods are allowed
         rate_limit: Optional rate limiting configuration for this route
         authentication: Optional authentication configuration for this route
+        headers: Optional header manipulation configuration for this route
+        cors: Optional CORS policy configuration for this route
 
     Example:
         >>> route = Route(path_prefix="/api/users", methods=["GET", "POST"])
@@ -73,6 +75,8 @@ class Route:
     methods: Optional[List[str]] = None
     rate_limit: Optional['RateLimitConfig'] = None
     authentication: Optional['AuthenticationConfig'] = None
+    headers: Optional['HeaderManipulation'] = None
+    cors: Optional['CORSPolicy'] = None
 
 
 @dataclass
@@ -276,11 +280,80 @@ class AuthenticationConfig:
 
 
 @dataclass
+class HeaderManipulation:
+    """HTTP header manipulation configuration.
+
+    Defines how request and response headers should be manipulated,
+    including adding, setting, and removing headers.
+
+    Attributes:
+        request_add: Headers to add to requests (keeps existing)
+        request_set: Headers to set on requests (overwrites existing)
+        request_remove: Header names to remove from requests
+        response_add: Headers to add to responses (keeps existing)
+        response_set: Headers to set on responses (overwrites existing)
+        response_remove: Header names to remove from responses
+
+    Example:
+        >>> headers = HeaderManipulation(
+        ...     request_add={"X-Custom-Header": "value"},
+        ...     request_remove=["X-Internal-Header"],
+        ...     response_set={"X-Response-Time": "100ms"}
+        ... )
+        >>> headers.request_add["X-Custom-Header"]
+        'value'
+    """
+    request_add: Dict[str, str] = field(default_factory=dict)
+    request_set: Dict[str, str] = field(default_factory=dict)
+    request_remove: List[str] = field(default_factory=list)
+    response_add: Dict[str, str] = field(default_factory=dict)
+    response_set: Dict[str, str] = field(default_factory=dict)
+    response_remove: List[str] = field(default_factory=list)
+
+
+@dataclass
+class CORSPolicy:
+    """CORS (Cross-Origin Resource Sharing) policy configuration.
+
+    Defines CORS policies to control cross-origin access to APIs,
+    including allowed origins, methods, headers, and credentials.
+
+    Attributes:
+        enabled: Whether CORS is enabled (default: True)
+        allowed_origins: List of allowed origin URLs (e.g., ["https://example.com"])
+                        Use ["*"] to allow all origins
+        allowed_methods: List of allowed HTTP methods (default: GET, POST, PUT, DELETE, OPTIONS)
+        allowed_headers: List of allowed request headers (default: Content-Type, Authorization)
+        expose_headers: List of headers to expose to browser (default: [])
+        allow_credentials: Whether to allow credentials (cookies, auth) (default: False)
+        max_age: Preflight cache duration in seconds (default: 86400 = 24 hours)
+
+    Example:
+        >>> cors = CORSPolicy(
+        ...     enabled=True,
+        ...     allowed_origins=["https://example.com", "https://app.example.com"],
+        ...     allowed_methods=["GET", "POST"],
+        ...     allow_credentials=True
+        ... )
+        >>> cors.allowed_origins[0]
+        'https://example.com'
+    """
+    enabled: bool = True
+    allowed_origins: List[str] = field(default_factory=lambda: ["*"])
+    allowed_methods: List[str] = field(default_factory=lambda: ["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+    allowed_headers: List[str] = field(default_factory=lambda: ["Content-Type", "Authorization"])
+    expose_headers: List[str] = field(default_factory=list)
+    allow_credentials: bool = False
+    max_age: int = 86400  # 24 hours
+
+
+@dataclass
 class Transformation:
     """Request payload transformation configuration.
 
     Defines how incoming request payloads should be transformed,
-    including default values, computed fields, and validation rules.
+    including default values, computed fields, validation rules,
+    and header manipulation.
 
     Attributes:
         enabled: Whether transformations are enabled (default: True)
@@ -288,6 +361,7 @@ class Transformation:
         computed_fields: List of fields to automatically generate
         metadata: Additional metadata to add to requests
         validation: Optional validation rules for requests
+        headers: Optional header manipulation configuration
 
     Example:
         >>> trans = Transformation(
@@ -296,7 +370,10 @@ class Transformation:
         ...     computed_fields=[
         ...         ComputedField(field="id", generator="uuid")
         ...     ],
-        ...     validation=Validation(required_fields=["email"])
+        ...     validation=Validation(required_fields=["email"]),
+        ...     headers=HeaderManipulation(
+        ...         request_add={"X-Service": "api"}
+        ...     )
         ... )
         >>> trans.defaults["status"]
         'active'
@@ -306,6 +383,7 @@ class Transformation:
     computed_fields: List[ComputedField] = field(default_factory=list)
     metadata: Dict[str, str] = field(default_factory=dict)
     validation: Optional[Validation] = None
+    headers: Optional[HeaderManipulation] = None
 
 
 @dataclass
@@ -442,7 +520,7 @@ class Config:
         for svc_data in data.get('services', []):
             upstream = Upstream(**svc_data['upstream'])
 
-            # Parse routes with optional rate limiting and authentication
+            # Parse routes with optional rate limiting, authentication, headers, and CORS
             routes = []
             for route_data in svc_data['routes']:
                 rate_limit = None
@@ -476,11 +554,23 @@ class Config:
                         fail_message=auth_data.get('fail_message', 'Unauthorized')
                     )
 
+                # Parse route-level headers
+                route_headers = None
+                if 'headers' in route_data:
+                    route_headers = HeaderManipulation(**route_data['headers'])
+
+                # Parse route-level CORS
+                cors_policy = None
+                if 'cors' in route_data:
+                    cors_policy = CORSPolicy(**route_data['cors'])
+
                 route = Route(
                     path_prefix=route_data['path_prefix'],
                     methods=route_data.get('methods'),
                     rate_limit=rate_limit,
-                    authentication=authentication
+                    authentication=authentication,
+                    headers=route_headers,
+                    cors=cors_policy
                 )
                 routes.append(route)
             
@@ -493,13 +583,19 @@ class Config:
                 validation = None
                 if 'validation' in trans_data:
                     validation = Validation(**trans_data['validation'])
-                
+
+                # Parse transformation headers
+                trans_headers = None
+                if 'headers' in trans_data:
+                    trans_headers = HeaderManipulation(**trans_data['headers'])
+
                 transformation = Transformation(
                     enabled=trans_data.get('enabled', True),
                     defaults=trans_data.get('defaults', {}),
                     computed_fields=computed_fields,
                     metadata=trans_data.get('metadata', {}),
-                    validation=validation
+                    validation=validation,
+                    headers=trans_headers
                 )
             
             service = Service(

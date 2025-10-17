@@ -20,7 +20,8 @@ from gal.config import (
     AuthenticationConfig,
     BasicAuthConfig,
     ApiKeyConfig,
-    JwtConfig
+    JwtConfig,
+    HeaderManipulation
 )
 
 
@@ -702,5 +703,384 @@ services:
             assert route2.rate_limit.burst == 100
             assert route2.rate_limit.key_type == "header"
             assert route2.rate_limit.key_header == "X-API-Key"
+        finally:
+            Path(temp_file).unlink()
+
+
+class TestHeaderManipulation:
+    """Test HeaderManipulation class"""
+
+    def test_header_manipulation_defaults(self):
+        """Test header manipulation with default values"""
+        headers = HeaderManipulation()
+        assert headers.request_add == {}
+        assert headers.request_set == {}
+        assert headers.request_remove == []
+        assert headers.response_add == {}
+        assert headers.response_set == {}
+        assert headers.response_remove == []
+
+    def test_header_manipulation_request_add(self):
+        """Test adding request headers"""
+        headers = HeaderManipulation(
+            request_add={"X-Custom": "value", "X-API-Version": "v1"}
+        )
+        assert len(headers.request_add) == 2
+        assert headers.request_add["X-Custom"] == "value"
+        assert headers.request_add["X-API-Version"] == "v1"
+
+    def test_header_manipulation_request_set(self):
+        """Test setting/replacing request headers"""
+        headers = HeaderManipulation(
+            request_set={"User-Agent": "GAL-Proxy"}
+        )
+        assert headers.request_set["User-Agent"] == "GAL-Proxy"
+
+    def test_header_manipulation_request_remove(self):
+        """Test removing request headers"""
+        headers = HeaderManipulation(
+            request_remove=["X-Debug", "X-Internal"]
+        )
+        assert len(headers.request_remove) == 2
+        assert "X-Debug" in headers.request_remove
+
+    def test_header_manipulation_response_add(self):
+        """Test adding response headers"""
+        headers = HeaderManipulation(
+            response_add={
+                "X-Response-Time": "100ms",
+                "X-Cache-Status": "HIT"
+            }
+        )
+        assert len(headers.response_add) == 2
+        assert headers.response_add["X-Cache-Status"] == "HIT"
+
+    def test_header_manipulation_response_set(self):
+        """Test setting/replacing response headers"""
+        headers = HeaderManipulation(
+            response_set={"Server": "GAL-Gateway"}
+        )
+        assert headers.response_set["Server"] == "GAL-Gateway"
+
+    def test_header_manipulation_response_remove(self):
+        """Test removing response headers"""
+        headers = HeaderManipulation(
+            response_remove=["Server", "X-Powered-By"]
+        )
+        assert len(headers.response_remove) == 2
+        assert "Server" in headers.response_remove
+
+    def test_header_manipulation_mixed(self):
+        """Test header manipulation with mixed operations"""
+        headers = HeaderManipulation(
+            request_add={"X-Request-ID": "abc123"},
+            request_remove=["X-Old-Header"],
+            response_add={"X-Response-ID": "xyz789"},
+            response_remove=["Server"]
+        )
+        assert len(headers.request_add) == 1
+        assert len(headers.request_remove) == 1
+        assert len(headers.response_add) == 1
+        assert len(headers.response_remove) == 1
+
+    def test_route_with_headers(self):
+        """Test route with header manipulation"""
+        headers = HeaderManipulation(
+            request_add={"X-Route": "api"}
+        )
+        route = Route(path_prefix="/api", headers=headers)
+
+        assert route.headers is not None
+        assert route.headers.request_add["X-Route"] == "api"
+
+    def test_transformation_with_headers(self):
+        """Test transformation with header manipulation"""
+        headers = HeaderManipulation(
+            request_add={"X-Service": "backend"},
+            response_add={"X-Version": "1.0"}
+        )
+        trans = Transformation(
+            enabled=True,
+            headers=headers
+        )
+
+        assert trans.headers is not None
+        assert trans.headers.request_add["X-Service"] == "backend"
+        assert trans.headers.response_add["X-Version"] == "1.0"
+
+    def test_security_headers_config(self):
+        """Test security headers configuration"""
+        headers = HeaderManipulation(
+            response_add={
+                "X-Frame-Options": "DENY",
+                "X-Content-Type-Options": "nosniff",
+                "X-XSS-Protection": "1; mode=block",
+                "Strict-Transport-Security": "max-age=31536000"
+            },
+            response_remove=["Server", "X-Powered-By"]
+        )
+
+        assert "X-Frame-Options" in headers.response_add
+        assert headers.response_add["X-Frame-Options"] == "DENY"
+        assert "Server" in headers.response_remove
+
+    def test_cors_headers_config(self):
+        """Test CORS headers configuration"""
+        headers = HeaderManipulation(
+            response_add={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization",
+                "Access-Control-Max-Age": "86400"
+            }
+        )
+
+        assert len(headers.response_add) == 4
+        assert "Access-Control-Allow-Origin" in headers.response_add
+        assert headers.response_add["Access-Control-Allow-Origin"] == "*"
+
+    def test_from_yaml_with_headers(self):
+        """Test loading YAML configuration with header manipulation"""
+        yaml_content = """
+version: "1.0"
+provider: kong
+
+services:
+  - name: api_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api.local
+      port: 8080
+    routes:
+      - path_prefix: /api/v1
+        headers:
+          request_add:
+            X-API-Version: v1
+            X-Request-ID: "{{uuid}}"
+          request_remove:
+            - X-Internal-Header
+          response_add:
+            X-Response-Time: 100ms
+          response_remove:
+            - Server
+"""
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(yaml_content)
+            temp_file = f.name
+
+        try:
+            config = Config.from_yaml(temp_file)
+
+            assert config.version == "1.0"
+            assert len(config.services) == 1
+
+            service = config.services[0]
+            assert len(service.routes) == 1
+
+            route = service.routes[0]
+            assert route.headers is not None
+            assert route.headers.request_add["X-API-Version"] == "v1"
+            assert "X-Internal-Header" in route.headers.request_remove
+            assert route.headers.response_add["X-Response-Time"] == "100ms"
+            assert "Server" in route.headers.response_remove
+        finally:
+            Path(temp_file).unlink()
+
+    def test_from_yaml_with_transformation_headers(self):
+        """Test loading YAML configuration with transformation-level headers"""
+        yaml_content = """
+version: "1.0"
+provider: apisix
+
+services:
+  - name: backend_service
+    type: rest
+    protocol: http
+    upstream:
+      host: backend.local
+      port: 8080
+    routes:
+      - path_prefix: /api
+    transformation:
+      enabled: true
+      defaults:
+        status: active
+      headers:
+        request_add:
+          X-Service-Name: backend_service
+        response_set:
+          X-API-Version: "2.0"
+"""
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(yaml_content)
+            temp_file = f.name
+
+        try:
+            config = Config.from_yaml(temp_file)
+
+            service = config.services[0]
+            assert service.transformation is not None
+            assert service.transformation.headers is not None
+            assert service.transformation.headers.request_add["X-Service-Name"] == "backend_service"
+            assert service.transformation.headers.response_set["X-API-Version"] == "2.0"
+        finally:
+            Path(temp_file).unlink()
+
+
+class TestCORSPolicy:
+    """Test CORSPolicy class"""
+
+    def test_cors_policy_defaults(self):
+        """Test CORS policy with default values"""
+        from gal.config import CORSPolicy
+        
+        cors = CORSPolicy()
+        assert cors.enabled is True
+        assert cors.allowed_origins == ["*"]
+        assert "GET" in cors.allowed_methods
+        assert "POST" in cors.allowed_methods
+        assert "Content-Type" in cors.allowed_headers
+        assert "Authorization" in cors.allowed_headers
+        assert cors.expose_headers == []
+        assert cors.allow_credentials is False
+        assert cors.max_age == 86400
+
+    def test_cors_policy_custom_values(self):
+        """Test CORS policy with custom values"""
+        from gal.config import CORSPolicy
+        
+        cors = CORSPolicy(
+            enabled=True,
+            allowed_origins=["https://example.com", "https://app.example.com"],
+            allowed_methods=["GET", "POST"],
+            allowed_headers=["Content-Type", "X-API-Key"],
+            expose_headers=["X-Request-ID", "X-Response-Time"],
+            allow_credentials=True,
+            max_age=7200
+        )
+        assert cors.enabled is True
+        assert len(cors.allowed_origins) == 2
+        assert "https://example.com" in cors.allowed_origins
+        assert len(cors.allowed_methods) == 2
+        assert cors.allow_credentials is True
+        assert cors.max_age == 7200
+
+    def test_cors_policy_wildcard_origin(self):
+        """Test CORS policy with wildcard origin"""
+        from gal.config import CORSPolicy
+        
+        cors = CORSPolicy(allowed_origins=["*"])
+        assert cors.allowed_origins == ["*"]
+
+    def test_route_with_cors(self):
+        """Test route with CORS policy"""
+        from gal.config import Route, CORSPolicy
+        
+        cors = CORSPolicy(
+            enabled=True,
+            allowed_origins=["https://example.com"]
+        )
+        route = Route(path_prefix="/api", cors=cors)
+
+        assert route.cors is not None
+        assert route.cors.enabled is True
+        assert "https://example.com" in route.cors.allowed_origins
+
+    def test_cors_disabled(self):
+        """Test disabled CORS policy"""
+        from gal.config import CORSPolicy
+        
+        cors = CORSPolicy(enabled=False)
+        assert cors.enabled is False
+
+    def test_from_yaml_with_cors(self):
+        """Test loading YAML configuration with CORS"""
+        yaml_content = """
+version: "1.0"
+provider: kong
+
+services:
+  - name: api_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api.local
+      port: 8080
+    routes:
+      - path_prefix: /api/public
+        methods: [GET, POST, OPTIONS]
+        cors:
+          enabled: true
+          allowed_origins:
+            - "https://example.com"
+            - "https://app.example.com"
+          allowed_methods: [GET, POST]
+          allowed_headers: [Content-Type, Authorization]
+          expose_headers: [X-Request-ID]
+          allow_credentials: true
+          max_age: 3600
+"""
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(yaml_content)
+            temp_file = f.name
+
+        try:
+            config = Config.from_yaml(temp_file)
+
+            assert config.version == "1.0"
+            assert len(config.services) == 1
+
+            service = config.services[0]
+            assert len(service.routes) == 1
+
+            route = service.routes[0]
+            assert route.cors is not None
+            assert route.cors.enabled is True
+            assert len(route.cors.allowed_origins) == 2
+            assert "https://example.com" in route.cors.allowed_origins
+            assert len(route.cors.allowed_methods) == 2
+            assert "Content-Type" in route.cors.allowed_headers
+            assert len(route.cors.expose_headers) == 1
+            assert route.cors.allow_credentials is True
+            assert route.cors.max_age == 3600
+        finally:
+            Path(temp_file).unlink()
+
+    def test_from_yaml_cors_defaults(self):
+        """Test loading YAML with minimal CORS configuration"""
+        yaml_content = """
+version: "1.0"
+provider: apisix
+
+services:
+  - name: api_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api.local
+      port: 8080
+    routes:
+      - path_prefix: /api
+        cors:
+          enabled: true
+"""
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(yaml_content)
+            temp_file = f.name
+
+        try:
+            config = Config.from_yaml(temp_file)
+            route = config.services[0].routes[0]
+            
+            # Check that defaults are applied
+            assert route.cors is not None
+            assert route.cors.enabled is True
+            assert route.cors.allowed_origins == ["*"]  # Default
+            assert "GET" in route.cors.allowed_methods  # Default
         finally:
             Path(temp_file).unlink()
