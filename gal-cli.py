@@ -5,16 +5,37 @@ GAL CLI Tool
 
 import click
 import sys
+import logging
 from pathlib import Path
 
 from gal.manager import Manager
 from gal.providers import EnvoyProvider, KongProvider, APISIXProvider, TraefikProvider
 
+# Configure logging
+logger = logging.getLogger()
+
+
+def setup_logging(log_level):
+    """Configure logging based on user-specified level."""
+    level = getattr(logging, log_level.upper(), logging.INFO)
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+
 
 @click.group()
-def cli():
+@click.option('--log-level', '-l',
+              type=click.Choice(['debug', 'info', 'warning', 'error'], case_sensitive=False),
+              default='warning',
+              help='Set logging level (default: warning)')
+@click.pass_context
+def cli(ctx, log_level):
     """Gateway Abstraction Layer (GAL) CLI"""
-    pass
+    ctx.ensure_object(dict)
+    ctx.obj['LOG_LEVEL'] = log_level
+    setup_logging(log_level)
 
 
 @cli.command()

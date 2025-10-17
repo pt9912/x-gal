@@ -4,7 +4,10 @@ Configuration models for GAL
 
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
+import logging
 import yaml
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -261,12 +264,21 @@ class Config:
             >>> len(config.services)
             5
         """
-        with open(filepath, 'r') as f:
-            data = yaml.safe_load(f)
-        
+        logger.debug(f"Loading configuration from {filepath}")
+        try:
+            with open(filepath, 'r') as f:
+                data = yaml.safe_load(f)
+        except FileNotFoundError as e:
+            logger.error(f"Configuration file not found: {filepath}")
+            raise
+        except yaml.YAMLError as e:
+            logger.error(f"Invalid YAML syntax in {filepath}: {e}")
+            raise
+
         # Parse global config
         global_data = data.get('global', {})
         global_config = GlobalConfig(**global_data)
+        logger.debug(f"Parsed global config: {global_config.host}:{global_config.port}")
         
         # Parse services
         services = []
@@ -307,7 +319,10 @@ class Config:
         for plugin_data in data.get('plugins', []):
             plugin = Plugin(**plugin_data)
             plugins.append(plugin)
-        
+
+        logger.debug(f"Parsed {len(services)} services and {len(plugins)} plugins")
+        logger.info(f"Configuration loaded: provider={data['provider']}, services={len(services)}")
+
         return cls(
             version=data['version'],
             provider=data['provider'],
