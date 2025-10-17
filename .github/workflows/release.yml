@@ -20,35 +20,10 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Generate changelog
-      id: changelog
-      uses: metcalfc/changelog-generator@v4.3.1
-      with:
-        myToken: ${{ secrets.GITHUB_TOKEN }}
-
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        body: |
-          ## What's Changed
-
-          ${{ steps.changelog.outputs.changelog }}
-
-          ## Installation
-
-          ### Docker
-          ```bash
-          docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}
-          ```
-
-          ### PyPI (coming soon)
-          ```bash
-          pip install gal-gateway
-          ```
-
-          ## Documentation
-
-          See [README.md](https://github.com/${{ github.repository }}/blob/main/README.md) for usage instructions.
+        body_path: RELEASE_NOTES.md
         draft: false
         prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
 
