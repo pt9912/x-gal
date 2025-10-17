@@ -61,6 +61,7 @@ class Route:
         path_prefix: URL path prefix to match (e.g., "/api/users")
         methods: Optional list of HTTP methods (e.g., ["GET", "POST"])
                  If None, all methods are allowed
+        rate_limit: Optional rate limiting configuration for this route
 
     Example:
         >>> route = Route(path_prefix="/api/users", methods=["GET", "POST"])
@@ -69,6 +70,7 @@ class Route:
     """
     path_prefix: str
     methods: Optional[List[str]] = None
+    rate_limit: Optional['RateLimitConfig'] = None
 
 
 @dataclass
@@ -116,6 +118,48 @@ class Validation:
         True
     """
     required_fields: List[str] = field(default_factory=list)
+
+
+@dataclass
+class RateLimitConfig:
+    """Rate limiting configuration for routes.
+
+    Defines rate limiting policies to protect APIs from abuse and ensure
+    fair resource usage across clients.
+
+    Attributes:
+        enabled: Whether rate limiting is enabled (default: True)
+        requests_per_second: Maximum requests allowed per second
+        burst: Maximum burst size for spike handling (default: 2x rate)
+        key_type: How to identify clients ("ip_address", "header", "jwt_claim")
+        key_header: Header name when key_type="header" (e.g., "X-API-Key")
+        key_claim: JWT claim when key_type="jwt_claim" (e.g., "sub")
+        response_status: HTTP status code for rate limited requests (default: 429)
+        response_message: Error message for rate limited requests
+
+    Example:
+        >>> rate_limit = RateLimitConfig(
+        ...     enabled=True,
+        ...     requests_per_second=100,
+        ...     burst=200,
+        ...     key_type="ip_address"
+        ... )
+        >>> rate_limit.requests_per_second
+        100
+    """
+    enabled: bool = True
+    requests_per_second: int = 100
+    burst: Optional[int] = None
+    key_type: str = "ip_address"  # ip_address, header, jwt_claim
+    key_header: Optional[str] = None
+    key_claim: Optional[str] = None
+    response_status: int = 429
+    response_message: str = "Rate limit exceeded"
+
+    def __post_init__(self):
+        """Set default burst value if not specified."""
+        if self.burst is None:
+            self.burst = self.requests_per_second * 2
 
 
 @dataclass
@@ -284,7 +328,20 @@ class Config:
         services = []
         for svc_data in data.get('services', []):
             upstream = Upstream(**svc_data['upstream'])
-            routes = [Route(**r) for r in svc_data['routes']]
+
+            # Parse routes with optional rate limiting
+            routes = []
+            for route_data in svc_data['routes']:
+                rate_limit = None
+                if 'rate_limit' in route_data:
+                    rate_limit = RateLimitConfig(**route_data['rate_limit'])
+
+                route = Route(
+                    path_prefix=route_data['path_prefix'],
+                    methods=route_data.get('methods'),
+                    rate_limit=rate_limit
+                )
+                routes.append(route)
             
             transformation = None
             if 'transformation' in svc_data:

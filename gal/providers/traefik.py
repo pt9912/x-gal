@@ -132,9 +132,20 @@ class TraefikProvider(Provider):
                 output.append(f"    {router_name}:")
                 output.append(f"      rule: 'PathPrefix(`{route.path_prefix}`)'")
                 output.append(f"      service: {service.name}_service")
+
+                # Collect middlewares for this route
+                middlewares = []
                 if service.transformation and service.transformation.enabled:
+                    middlewares.append(f"{service.name}_transform")
+                if route.rate_limit and route.rate_limit.enabled:
+                    middlewares.append(f"{router_name}_ratelimit")
+
+                # Add middlewares if any
+                if middlewares:
                     output.append("      middlewares:")
-                    output.append(f"        - {service.name}_transform")
+                    for mw in middlewares:
+                        output.append(f"        - {mw}")
+
                 output.append("")
         
         output.append("  services:")
@@ -145,10 +156,18 @@ class TraefikProvider(Provider):
             output.append(f"        - url: 'http://{service.upstream.host}:{service.upstream.port}'")
             output.append("")
         
-        # Middlewares for transformations
+        # Middlewares for transformations and rate limiting
         has_transformations = any(s.transformation and s.transformation.enabled for s in config.services)
-        if has_transformations:
+        has_rate_limits = any(
+            route.rate_limit and route.rate_limit.enabled
+            for service in config.services
+            for route in service.routes
+        )
+
+        if has_transformations or has_rate_limits:
             output.append("  middlewares:")
+
+            # Transformation middlewares
             for service in config.services:
                 if service.transformation and service.transformation.enabled:
                     output.append(f"    {service.name}_transform:")
@@ -158,6 +177,17 @@ class TraefikProvider(Provider):
                     for key, value in service.transformation.defaults.items():
                         output.append(f"            {key}: '{value}'")
                     output.append("")
+
+            # Rate limiting middlewares
+            for service in config.services:
+                for i, route in enumerate(service.routes):
+                    if route.rate_limit and route.rate_limit.enabled:
+                        router_name = f"{service.name}_router_{i}"
+                        output.append(f"    {router_name}_ratelimit:")
+                        output.append("      rateLimit:")
+                        output.append(f"        average: {route.rate_limit.requests_per_second}")
+                        output.append(f"        burst: {route.rate_limit.burst}")
+                        output.append("")
 
         result = "\n".join(output)
         logger.info(f"Traefik configuration generated: {len(result)} bytes, {len(config.services)} services")
