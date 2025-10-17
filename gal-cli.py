@@ -63,14 +63,16 @@ def validate(config):
         manager.register_provider(KongProvider())
         manager.register_provider(APISIXProvider())
         manager.register_provider(TraefikProvider())
-        
+
         cfg = manager.load_config(config)
+        manager.validate(cfg)  # Validate with provider-specific rules
+
         click.echo(f"✓ Configuration is valid")
         click.echo(f"  Provider: {cfg.provider}")
         click.echo(f"  Services: {len(cfg.services)}")
         click.echo(f"  gRPC services: {len(cfg.get_grpc_services())}")
         click.echo(f"  REST services: {len(cfg.get_rest_services())}")
-    
+
     except Exception as e:
         click.echo(f"✗ Configuration is invalid: {e}", err=True)
         sys.exit(1)

@@ -67,6 +67,34 @@ class Manager:
         """
         return Config.from_yaml(filepath)
 
+    def validate(self, config: Config) -> bool:
+        """Validate configuration for the specified provider.
+
+        Args:
+            config: Configuration object to validate
+
+        Returns:
+            True if configuration is valid
+
+        Raises:
+            ValueError: If provider not registered or validation fails
+
+        Example:
+            >>> manager = Manager()
+            >>> manager.register_provider(EnvoyProvider())
+            >>> config = manager.load_config("config.yaml")
+            >>> manager.validate(config)
+            True
+        """
+        provider = self.providers.get(config.provider)
+        if not provider:
+            raise ValueError(f"Provider '{config.provider}' not registered")
+
+        if not provider.validate(config):
+            raise ValueError(f"Configuration validation failed for {config.provider}")
+
+        return True
+
     def generate(self, config: Config) -> str:
         """Generate provider-specific configuration.
 
