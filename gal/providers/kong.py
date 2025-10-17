@@ -138,15 +138,71 @@ class KongProvider(Provider):
                     for method in route.methods:
                         output.append(f"    - {method}")
 
+                # Collect plugins for this route
+                route_plugins = []
+
+                # Add authentication plugin if configured
+                if route.authentication and route.authentication.enabled:
+                    auth = route.authentication
+                    if auth.type == "basic":
+                        route_plugins.append({
+                            "name": "basic-auth",
+                            "config": {
+                                "hide_credentials": True
+                            }
+                        })
+                    elif auth.type == "api_key":
+                        key_name = auth.api_key.key_name if auth.api_key else "X-API-Key"
+                        in_location = auth.api_key.in_location if auth.api_key else "header"
+                        route_plugins.append({
+                            "name": "key-auth",
+                            "config": {
+                                "key_names": [key_name],
+                                "key_in_header": in_location == "header",
+                                "key_in_query": in_location == "query",
+                                "hide_credentials": True
+                            }
+                        })
+                    elif auth.type == "jwt":
+                        jwt_config = {}
+                        if auth.jwt:
+                            if auth.jwt.issuer:
+                                jwt_config["claims_to_verify"] = ["iss"]
+                            if auth.jwt.audience:
+                                jwt_config["claims_to_verify"] = jwt_config.get("claims_to_verify", []) + ["aud"]
+                        route_plugins.append({
+                            "name": "jwt",
+                            "config": jwt_config if jwt_config else {}
+                        })
+
                 # Add rate limiting plugin if configured
                 if route.rate_limit and route.rate_limit.enabled:
+                    route_plugins.append({
+                        "name": "rate-limiting",
+                        "config": {
+                            "second": route.rate_limit.requests_per_second,
+                            "policy": "local",
+                            "fault_tolerant": True,
+                            "hide_client_headers": False
+                        }
+                    })
+
+                # Write all route plugins
+                if route_plugins:
                     output.append("    plugins:")
-                    output.append("    - name: rate-limiting")
-                    output.append("      config:")
-                    output.append(f"        second: {route.rate_limit.requests_per_second}")
-                    output.append("        policy: local")  # or 'cluster', 'redis'
-                    output.append("        fault_tolerant: true")
-                    output.append("        hide_client_headers: false")
+                    for plugin in route_plugins:
+                        output.append(f"    - name: {plugin['name']}")
+                        if plugin['config']:
+                            output.append("      config:")
+                            for key, value in plugin['config'].items():
+                                if isinstance(value, bool):
+                                    output.append(f"        {key}: {str(value).lower()}")
+                                elif isinstance(value, list):
+                                    output.append(f"        {key}:")
+                                    for item in value:
+                                        output.append(f"        - {item}")
+                                else:
+                                    output.append(f"        {key}: {value}")
 
             # Add transformation plugin if enabled
             if service.transformation and service.transformation.enabled:

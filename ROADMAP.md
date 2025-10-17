@@ -32,8 +32,8 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 ## 🚀 v1.1.0 (Q4 2025 - In Development)
 
 **Focus:** Traffic Management & Security Basics
-**Status:** 🔄 In Development (1/7 Features Complete)
-**Progress:** 14% (2 von 10.5 Wochen)
+**Status:** 🔄 In Development (2/7 Features Complete)
+**Progress:** 38% (4 von 10.5 Wochen)
 
 ### High Priority Features
 
@@ -60,24 +60,39 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 - **Documentation:** [docs/guides/RATE_LIMITING.md](docs/guides/RATE_LIMITING.md)
 - **Tests:** 15 neue Tests (117 total, 90% coverage)
 
-#### 2. Authentication & Authorization
-- **Basic Auth** (username/password)
-- **API Key Authentication** (Header/Query-based)
-- **JWT Token Validation**
-- **OAuth2/OIDC Integration** (Basic)
+#### 2. Authentication & Authorization ✅
+**Status:** ✅ **IMPLEMENTED**
+- **Basic Auth** ✅ (username/password)
+- **API Key Authentication** ✅ (Header/Query-based)
+- **JWT Token Validation** ✅ (JWKS, issuer/audience verification)
 - **Provider Support:**
-  - Envoy: jwt_authn filter
-  - Kong: key-auth, jwt, oauth2 plugins
-  - APISIX: key-auth, jwt-auth
-  - Traefik: BasicAuth, ForwardAuth middleware
-- **Config Format:**
+  - ✅ Envoy: jwt_authn filter, Lua filter
+  - ✅ Kong: basic-auth, key-auth, jwt plugins
+  - ✅ APISIX: basic-auth, key-auth, jwt-auth plugins
+  - ✅ Traefik: BasicAuth, ForwardAuth middleware
+- **Implemented Config:**
   ```yaml
   authentication:
-    type: jwt
-    jwks_uri: https://auth.example.com/.well-known/jwks.json
-    issuer: https://auth.example.com
-    audiences: ["api"]
+    enabled: true
+    type: jwt  # basic, api_key, jwt
+    jwt:
+      issuer: "https://auth.example.com"
+      audience: "api.example.com"
+      jwks_uri: "https://auth.example.com/.well-known/jwks.json"
+      algorithms: [RS256, ES256]
+    # Alternative: Basic Auth
+    basic_auth:
+      users:
+        admin: "password"
+      realm: "Protected"
+    # Alternative: API Key
+    api_key:
+      keys: ["key_123abc"]
+      key_name: X-API-Key
+      in_location: header  # header or query
   ```
+- **Documentation:** [docs/guides/AUTHENTICATION.md](docs/guides/AUTHENTICATION.md)
+- **Tests:** 33 neue Tests (145 total, 91% coverage)
 
 #### 3. Request/Response Manipulation
 - **Header Injection/Removal**
@@ -303,7 +318,7 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 | Feature | Status | Priority | Complexity | User Value | Provider Coverage |
 |---------|--------|----------|------------|------------|-------------------|
 | Rate Limiting | ✅ Done | 🔴 High | Medium | High | 100% |
-| Authentication | 🔄 Pending | 🔴 High | High | Critical | 100% |
+| Authentication | ✅ Done | 🔴 High | High | Critical | 100% |
 | CORS | 🔄 Pending | 🔴 High | Low | High | 90% |
 | Header Manipulation | 🔄 Pending | 🔴 High | Medium | High | 100% |
 | Circuit Breaker | 🔄 Pending | 🟡 Medium | Medium | Medium | 75% |

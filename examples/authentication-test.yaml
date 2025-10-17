@@ -1,0 +1,202 @@
+version: "1.0"
+provider: envoy
+
+global:
+  host: 0.0.0.0
+  port: 10000
+  admin_port: 9901
+  timeout: 30s
+
+services:
+  # Public API - No authentication
+  - name: public_api
+    type: rest
+    protocol: http
+    upstream:
+      host: public.svc.local
+      port: 8080
+    routes:
+      - path_prefix: /api/public
+        methods: [GET]
+        # No authentication required
+
+  # API Key Authentication - Header
+  - name: api_key_service
+    type: rest
+    protocol: http
+    upstream:
+      host: apikey.svc.local
+      port: 8080
+    routes:
+      - path_prefix: /api/protected
+        methods: [GET, POST]
+        authentication:
+          enabled: true
+          type: api_key
+          api_key:
+            keys:
+              - "key_123abc"
+              - "key_456def"
+              - "key_789ghi"
+            key_name: X-API-Key
+            in_location: header
+
+  # API Key Authentication - Query Parameter
+  - name: api_key_query_service
+    type: rest
+    protocol: http
+    upstream:
+      host: apiquery.svc.local
+      port: 8080
+    routes:
+      - path_prefix: /api/query-auth
+        methods: [GET]
+        authentication:
+          enabled: true
+          type: api_key
+          api_key:
+            keys:
+              - "query_key_123"
+            key_name: api_key
+            in_location: query
+
+  # Basic Authentication
+  - name: basic_auth_service
+    type: rest
+    protocol: http
+    upstream:
+      host: basic.svc.local
+      port: 8080
+    routes:
+      - path_prefix: /api/admin
+        methods: [GET, POST, PUT, DELETE]
+        authentication:
+          enabled: true
+          type: basic
+          basic_auth:
+            users:
+              admin: "admin_secret_password"
+              operator: "operator_password"
+              viewer: "viewer_password"
+            realm: "Admin API"
+
+  # JWT Authentication - Full Configuration
+  - name: jwt_auth_service
+    type: rest
+    protocol: http
+    upstream:
+      host: jwt.svc.local
+      port: 8080
+    routes:
+      - path_prefix: /api/user
+        methods: [GET, POST, PUT, DELETE]
+        authentication:
+          enabled: true
+          type: jwt
+          jwt:
+            issuer: "https://auth.example.com"
+            audience: "api.example.com"
+            jwks_uri: "https://auth.example.com/.well-known/jwks.json"
+            algorithms:
+              - RS256
+              - ES256
+            required_claims:
+              - sub
+              - email
+          fail_status: 401
+          fail_message: "Invalid or missing JWT token"
+
+  # Mixed Authentication - Multiple routes with different auth
+  - name: mixed_auth_service
+    type: rest
+    protocol: http
+    upstream:
+      host: mixed.svc.local
+      port: 8080
+    routes:
+      # Public endpoint - no auth
+      - path_prefix: /api/health
+        methods: [GET]
+
+      # API Key endpoint
+      - path_prefix: /api/data
+        methods: [GET]
+        authentication:
+          enabled: true
+          type: api_key
+          api_key:
+            keys: ["data_key_123"]
+            key_name: X-Data-Key
+            in_location: header
+
+      # Admin endpoint with Basic Auth
+      - path_prefix: /api/admin/settings
+        methods: [GET, POST]
+        authentication:
+          enabled: true
+          type: basic
+          basic_auth:
+            users:
+              admin: "super_secret"
+            realm: "Settings Admin"
+
+  # Authentication + Rate Limiting
+  - name: auth_and_ratelimit_service
+    type: rest
+    protocol: http
+    upstream:
+      host: combined.svc.local
+      port: 8080
+    routes:
+      - path_prefix: /api/premium
+        methods: [GET, POST]
+        authentication:
+          enabled: true
+          type: jwt
+          jwt:
+            issuer: "https://auth.example.com"
+            audience: "premium.example.com"
+            jwks_uri: "https://auth.example.com/.well-known/jwks.json"
+            algorithms: [RS256]
+        rate_limit:
+          enabled: true
+          requests_per_second: 1000
+          burst: 2000
+          key_type: jwt_claim
+          key_claim: sub
+          response_status: 429
+          response_message: "Premium rate limit exceeded"
+
+  # gRPC Service with JWT Authentication
+  - name: grpc_auth_service
+    type: grpc
+    protocol: http2
+    upstream:
+      host: grpc.svc.local
+      port: 9090
+    routes:
+      - path_prefix: /myapp.UserService
+        authentication:
+          enabled: true
+          type: jwt
+          jwt:
+            issuer: "https://auth.example.com"
+            audience: "grpc.example.com"
+            jwks_uri: "https://auth.example.com/.well-known/jwks.json"
+            algorithms: [RS256]
+
+  # Disabled Authentication Example
+  - name: disabled_auth_service
+    type: rest
+    protocol: http
+    upstream:
+      host: disabled.svc.local
+      port: 8080
+    routes:
+      - path_prefix: /api/disabled
+        methods: [GET]
+        authentication:
+          enabled: false  # Explicitly disabled
+          type: api_key
+          api_key:
+            keys: ["this_will_not_be_used"]

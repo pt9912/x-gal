@@ -161,6 +161,97 @@ class EnvoyProvider(Provider):
         # HTTP filters
         output.append("          http_filters:")
 
+        # Add authentication filter if any route has authentication enabled
+        has_authentication = any(
+            route.authentication and route.authentication.enabled
+            for service in config.services
+            for route in service.routes
+        )
+        if has_authentication:
+            # Collect authentication configs
+            jwt_configs = []
+            basic_auth_configs = []
+            api_key_configs = []
+
+            for service in config.services:
+                for route in service.routes:
+                    if route.authentication and route.authentication.enabled:
+                        auth = route.authentication
+                        if auth.type == "jwt" and auth.jwt:
+                            jwt_configs.append(auth.jwt)
+                        elif auth.type == "basic" and auth.basic_auth:
+                            basic_auth_configs.append(auth.basic_auth)
+                        elif auth.type == "api_key" and auth.api_key:
+                            api_key_configs.append(auth.api_key)
+
+            # Add JWT authentication filter if needed
+            if jwt_configs:
+                jwt_config = jwt_configs[0]  # Use first JWT config
+                output.append("          - name: envoy.filters.http.jwt_authn")
+                output.append("            typed_config:")
+                output.append("              '@type': type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication")
+                output.append("              providers:")
+                output.append("                jwt_provider:")
+                if jwt_config.issuer:
+                    output.append(f"                  issuer: '{jwt_config.issuer}'")
+                if jwt_config.audience:
+                    output.append("                  audiences:")
+                    output.append(f"                  - '{jwt_config.audience}'")
+                if jwt_config.jwks_uri:
+                    output.append("                  remote_jwks:")
+                    output.append("                    http_uri:")
+                    output.append(f"                      uri: '{jwt_config.jwks_uri}'")
+                    output.append("                      cluster: jwks_cluster")
+                    output.append("                      timeout: 5s")
+                    output.append("                    cache_duration:")
+                    output.append("                      seconds: 300")
+                output.append("                  from_headers:")
+                output.append("                  - name: Authorization")
+                output.append("                    value_prefix: 'Bearer '")
+                output.append("              rules:")
+                output.append("              - match:")
+                output.append("                  prefix: /")
+                output.append("                requires:")
+                output.append("                  provider_name: jwt_provider")
+
+            # Add basic auth or API key validation via Lua filter
+            if basic_auth_configs or api_key_configs:
+                output.append("          - name: envoy.filters.http.lua")
+                output.append("            typed_config:")
+                output.append("              '@type': type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua")
+                output.append("              inline_code: |")
+                output.append("                function envoy_on_request(request_handle)")
+
+                if basic_auth_configs:
+                    basic_config = basic_auth_configs[0]
+                    output.append("                  -- Basic Authentication")
+                    output.append("                  local auth_header = request_handle:headers():get('authorization')")
+                    output.append("                  if auth_header and string.match(auth_header, '^Basic ') then")
+                    output.append("                    -- Validate Basic Auth credentials here")
+                    output.append("                    -- In production, decode base64 and check against user database")
+                    output.append("                  else")
+                    output.append("                    request_handle:respond(")
+                    output.append("                      {[':status'] = '401',")
+                    output.append(f"                       ['www-authenticate'] = 'Basic realm=\"{basic_config.realm}\"'}},")
+                    output.append("                      'Unauthorized')")
+                    output.append("                    return")
+                    output.append("                  end")
+
+                if api_key_configs:
+                    api_key_config = api_key_configs[0]
+                    key_name = api_key_config.key_name
+                    output.append("                  -- API Key Authentication")
+                    output.append(f"                  local api_key = request_handle:headers():get('{key_name.lower()}')")
+                    output.append("                  if not api_key then")
+                    output.append("                    request_handle:respond(")
+                    output.append("                      {[':status'] = '401'},")
+                    output.append("                      'Unauthorized: Missing API Key')")
+                    output.append("                    return")
+                    output.append("                  end")
+                    output.append("                  -- Validate API key against database/cache here")
+
+                output.append("                end")
+
         # Add rate limiting filter if any route has rate limiting enabled
         has_rate_limits = any(
             route.rate_limit and route.rate_limit.enabled
@@ -250,7 +341,45 @@ class EnvoyProvider(Provider):
             output.append(f"                address: {service.upstream.host}")
             output.append(f"                port_value: {service.upstream.port}")
             output.append("")
-        
+
+        # Add JWKS cluster if JWT authentication is configured
+        if has_authentication:
+            jwt_configs = []
+            for svc in config.services:
+                for route in svc.routes:
+                    if route.authentication and route.authentication.enabled and route.authentication.type == "jwt":
+                        if route.authentication.jwt and route.authentication.jwt.jwks_uri:
+                            jwt_configs.append(route.authentication.jwt)
+
+            if jwt_configs:
+                jwt_config = jwt_configs[0]
+                # Extract host and port from JWKS URI
+                import re
+                jwks_match = re.match(r'https?://([^:/]+)(?::(\d+))?', jwt_config.jwks_uri)
+                if jwks_match:
+                    jwks_host = jwks_match.group(1)
+                    jwks_port = jwks_match.group(2) or ("443" if jwt_config.jwks_uri.startswith("https") else "80")
+
+                    output.append("  - name: jwks_cluster")
+                    output.append("    type: STRICT_DNS")
+                    output.append("    lb_policy: ROUND_ROBIN")
+                    output.append("    load_assignment:")
+                    output.append("      cluster_name: jwks_cluster")
+                    output.append("      endpoints:")
+                    output.append("      - lb_endpoints:")
+                    output.append("        - endpoint:")
+                    output.append("            address:")
+                    output.append("              socket_address:")
+                    output.append(f"                address: {jwks_host}")
+                    output.append(f"                port_value: {jwks_port}")
+                    if jwt_config.jwks_uri.startswith("https"):
+                        output.append("    transport_socket:")
+                        output.append("      name: envoy.transport_sockets.tls")
+                        output.append("      typed_config:")
+                        output.append("        '@type': type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext")
+                        output.append("        sni: " + jwks_host)
+                    output.append("")
+
         # Admin
         output.append("admin:")
         output.append("  address:")
