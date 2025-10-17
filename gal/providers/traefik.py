@@ -5,6 +5,9 @@ Generates Traefik dynamic configuration in YAML format with support
 for HTTP routers, services, and middleware plugins.
 """
 
+import os
+import requests
+from typing import Optional
 from ..provider import Provider
 from ..config import Config
 
@@ -150,5 +153,84 @@ class TraefikProvider(Provider):
                     for key, value in service.transformation.defaults.items():
                         output.append(f"            {key}: '{value}'")
                     output.append("")
-        
+
         return "\n".join(output)
+
+    def deploy(self, config: Config, output_file: Optional[str] = None,
+               api_url: Optional[str] = None) -> bool:
+        """Deploy Traefik configuration.
+
+        Deploys configuration via file-based approach (Traefik File Provider).
+        Optionally checks if Traefik API is reachable for verification.
+
+        Deployment Methods:
+            1. File Provider (standard): Write dynamic config to file
+            2. API check (optional): Verify Traefik can access the config
+
+        Args:
+            config: Configuration to deploy
+            output_file: Path to write config file (default: traefik.yaml)
+            api_url: Traefik API/Dashboard URL for verification
+                    (default: http://localhost:8080)
+
+        Returns:
+            True if deployment successful
+
+        Raises:
+            IOError: If file write fails
+
+        Example:
+            >>> provider = TraefikProvider()
+            >>> config = Config.from_yaml("config.yaml")
+            >>> # File-based deployment
+            >>> provider.deploy(config, output_file="/etc/traefik/dynamic/gal.yaml")
+            True
+            >>> # With API verification
+            >>> provider.deploy(config, api_url="http://traefik:8080")
+            True
+
+        Note:
+            Traefik automatically reloads configuration from file providers.
+            No API call needed for deployment - just write the file!
+        """
+        # Generate configuration
+        generated_config = self.generate(config)
+
+        # Determine output file
+        if output_file is None:
+            output_file = "traefik.yaml"
+
+        # Write configuration to file
+        try:
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(output_file) or ".", exist_ok=True)
+
+            with open(output_file, 'w') as f:
+                f.write(generated_config)
+
+            print(f"✓ Traefik configuration written to {output_file}")
+            print("  Traefik will auto-reload this file if configured with File Provider")
+        except IOError as e:
+            print(f"✗ Failed to write config file: {e}")
+            return False
+
+        # Optionally verify Traefik API is reachable
+        if api_url:
+            api_url = api_url.rstrip('/')
+            try:
+                # Check if Traefik API/Dashboard is reachable
+                response = requests.get(f"{api_url}/api/overview", timeout=5)
+
+                if response.status_code == 200:
+                    print(f"✓ Traefik API is reachable at {api_url}")
+                    print(f"  Dashboard: {api_url}/dashboard/")
+                else:
+                    print(f"⚠ Traefik API returned status {response.status_code}")
+
+            except requests.RequestException as e:
+                print(f"⚠ Could not reach Traefik API: {e}")
+                print(f"  Config written to {output_file}")
+                print("  Ensure Traefik File Provider is configured:")
+                print(f"    --providers.file.filename={output_file}")
+
+        return True

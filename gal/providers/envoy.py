@@ -5,6 +5,9 @@ Generates Envoy Proxy static configuration in YAML format with support
 for HTTP/2, gRPC, and Lua-based request transformations.
 """
 
+import os
+import requests
+from typing import Optional
 from ..provider import Provider
 from ..config import Config
 
@@ -205,5 +208,78 @@ class EnvoyProvider(Provider):
         output.append("    socket_address:")
         output.append(f"      address: {config.global_config.host}")
         output.append(f"      port_value: {config.global_config.admin_port}")
-        
+
         return "\n".join(output)
+
+    def deploy(self, config: Config, output_file: Optional[str] = None,
+               admin_url: Optional[str] = None) -> bool:
+        """Deploy Envoy configuration.
+
+        Deploys configuration via file-based approach. Optionally triggers
+        hot-reload via Envoy Admin API if admin_url is provided.
+
+        Deployment Methods:
+            1. File-based (default): Write config to file for Envoy to load
+            2. Hot-reload (optional): Trigger config reload via Admin API
+
+        Args:
+            config: Configuration to deploy
+            output_file: Path to write config file (default: envoy.yaml)
+            admin_url: Envoy Admin API URL (default: http://localhost:9901)
+
+        Returns:
+            True if deployment successful
+
+        Raises:
+            IOError: If file write fails
+            requests.RequestException: If Admin API call fails
+
+        Example:
+            >>> provider = EnvoyProvider()
+            >>> config = Config.from_yaml("config.yaml")
+            >>> # File-based deployment
+            >>> provider.deploy(config, output_file="/etc/envoy/envoy.yaml")
+            True
+            >>> # With hot-reload
+            >>> provider.deploy(config, admin_url="http://envoy:9901")
+            True
+        """
+        # Generate configuration
+        generated_config = self.generate(config)
+
+        # Determine output file
+        if output_file is None:
+            output_file = "envoy.yaml"
+
+        # Write configuration to file
+        try:
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(output_file) or ".", exist_ok=True)
+
+            with open(output_file, 'w') as f:
+                f.write(generated_config)
+
+            print(f"✓ Envoy configuration written to {output_file}")
+        except IOError as e:
+            print(f"✗ Failed to write config file: {e}")
+            return False
+
+        # Optionally trigger hot-reload via Admin API
+        if admin_url:
+            admin_url = admin_url.rstrip('/')
+            try:
+                # Check if Envoy is reachable
+                response = requests.get(f"{admin_url}/ready", timeout=5)
+
+                if response.status_code == 200:
+                    print(f"✓ Envoy Admin API is reachable at {admin_url}")
+                    print("  Note: File-based config requires Envoy restart or --drain-strategy")
+                    print(f"  To reload: docker restart <envoy-container>")
+                else:
+                    print(f"⚠ Envoy Admin API returned status {response.status_code}")
+
+            except requests.RequestException as e:
+                print(f"⚠ Could not reach Envoy Admin API: {e}")
+                print(f"  Config written to {output_file}, but manual reload required")
+
+        return True

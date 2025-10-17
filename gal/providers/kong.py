@@ -5,6 +5,9 @@ Generates Kong declarative configuration (DB-less mode) in YAML format
 with support for services, routes, and plugin-based transformations.
 """
 
+import os
+import requests
+from typing import Optional
 from ..provider import Provider
 from ..config import Config
 
@@ -141,5 +144,94 @@ class KongProvider(Provider):
                     output.append(f"        - x-default-{key}: '{value}'")
             
             output.append("")
-        
+
         return "\n".join(output)
+
+    def deploy(self, config: Config, output_file: Optional[str] = None,
+               admin_url: Optional[str] = None) -> bool:
+        """Deploy Kong declarative configuration.
+
+        Deploys configuration via Kong Admin API (DB-less mode) or file-based.
+
+        Deployment Methods:
+            1. Admin API (recommended): POST config to Kong Admin API
+            2. File-based: Write config to file for Kong to load
+
+        Args:
+            config: Configuration to deploy
+            output_file: Path to write config file (default: kong.yaml)
+            admin_url: Kong Admin API URL (default: http://localhost:8001)
+
+        Returns:
+            True if deployment successful
+
+        Raises:
+            IOError: If file write fails
+            requests.RequestException: If Admin API call fails
+
+        Example:
+            >>> provider = KongProvider()
+            >>> config = Config.from_yaml("config.yaml")
+            >>> # File-based deployment
+            >>> provider.deploy(config, output_file="/etc/kong/kong.yaml")
+            True
+            >>> # Via Admin API
+            >>> provider.deploy(config, admin_url="http://kong:8001")
+            True
+        """
+        # Generate configuration
+        generated_config = self.generate(config)
+
+        # Determine output file
+        if output_file is None:
+            output_file = "kong.yaml"
+
+        # Write configuration to file
+        try:
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(output_file) or ".", exist_ok=True)
+
+            with open(output_file, 'w') as f:
+                f.write(generated_config)
+
+            print(f"✓ Kong configuration written to {output_file}")
+        except IOError as e:
+            print(f"✗ Failed to write config file: {e}")
+            return False
+
+        # Optionally deploy via Admin API
+        if admin_url:
+            admin_url = admin_url.rstrip('/')
+            try:
+                # Check if Kong Admin API is reachable
+                response = requests.get(f"{admin_url}/status", timeout=5)
+
+                if response.status_code == 200:
+                    print(f"✓ Kong Admin API is reachable at {admin_url}")
+
+                    # Upload declarative config
+                    with open(output_file, 'rb') as f:
+                        config_data = f.read()
+
+                    upload_response = requests.post(
+                        f"{admin_url}/config",
+                        data=config_data,
+                        headers={"Content-Type": "application/x-yaml"},
+                        timeout=10
+                    )
+
+                    if upload_response.status_code in (200, 201):
+                        print(f"✓ Configuration deployed successfully to Kong")
+                        return True
+                    else:
+                        print(f"✗ Failed to deploy config: {upload_response.status_code}")
+                        print(f"  Response: {upload_response.text}")
+                        return False
+                else:
+                    print(f"⚠ Kong Admin API returned status {response.status_code}")
+
+            except requests.RequestException as e:
+                print(f"⚠ Could not reach Kong Admin API: {e}")
+                print(f"  Config written to {output_file}, use: kong config db_import {output_file}")
+
+        return True

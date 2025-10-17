@@ -6,6 +6,9 @@ serverless functions (Lua) for request transformations.
 """
 
 import json
+import os
+import requests
+from typing import Optional
 from ..provider import Provider
 from ..config import Config
 
@@ -214,5 +217,135 @@ class APISIXProvider(Provider):
         lua_code.append("    end")
         lua_code.append("  end")
         lua_code.append("end")
-        
+
         return "\n".join(lua_code)
+
+    def deploy(self, config: Config, output_file: Optional[str] = None,
+               admin_url: Optional[str] = None, api_key: Optional[str] = None) -> bool:
+        """Deploy APISIX configuration.
+
+        Deploys configuration via APISIX Admin API or standalone file.
+
+        Deployment Methods:
+            1. Admin API (recommended): Upload routes/services/upstreams via REST API
+            2. Standalone mode: Write config.yaml for APISIX standalone
+
+        Args:
+            config: Configuration to deploy
+            output_file: Path to write config file (default: apisix.json)
+            admin_url: APISIX Admin API URL (default: http://localhost:9180)
+            api_key: Admin API key (default: edd1c9f034335f136f87ad84b625c8f1)
+
+        Returns:
+            True if deployment successful
+
+        Raises:
+            IOError: If file write fails
+            requests.RequestException: If Admin API call fails
+
+        Example:
+            >>> provider = APISIXProvider()
+            >>> config = Config.from_yaml("config.yaml")
+            >>> # File-based deployment
+            >>> provider.deploy(config, output_file="/etc/apisix/config.json")
+            True
+            >>> # Via Admin API
+            >>> provider.deploy(config, admin_url="http://apisix:9180",
+            ...                 api_key="your-api-key")
+            True
+        """
+        # Generate configuration
+        generated_config = self.generate(config)
+
+        # Determine output file
+        if output_file is None:
+            output_file = "apisix.json"
+
+        # Write configuration to file
+        try:
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(output_file) or ".", exist_ok=True)
+
+            with open(output_file, 'w') as f:
+                f.write(generated_config)
+
+            print(f"✓ APISIX configuration written to {output_file}")
+        except IOError as e:
+            print(f"✗ Failed to write config file: {e}")
+            return False
+
+        # Optionally deploy via Admin API
+        if admin_url:
+            admin_url = admin_url.rstrip('/')
+            if api_key is None:
+                api_key = "edd1c9f034335f136f87ad84b625c8f1"  # Default APISIX API key
+
+            headers = {
+                "X-API-KEY": api_key,
+                "Content-Type": "application/json"
+            }
+
+            try:
+                # Load generated config
+                apisix_data = json.loads(generated_config)
+
+                # Deploy upstreams
+                for upstream in apisix_data.get("upstreams", []):
+                    upstream_id = upstream["id"]
+                    response = requests.put(
+                        f"{admin_url}/apisix/admin/upstreams/{upstream_id}",
+                        json=upstream,
+                        headers=headers,
+                        timeout=10
+                    )
+                    if response.status_code in (200, 201):
+                        print(f"✓ Deployed upstream: {upstream_id}")
+                    else:
+                        print(f"✗ Failed to deploy upstream {upstream_id}: {response.status_code}")
+                        print(f"  Response: {response.text}")
+                        return False
+
+                # Deploy services
+                for service in apisix_data.get("services", []):
+                    service_id = service["id"]
+                    response = requests.put(
+                        f"{admin_url}/apisix/admin/services/{service_id}",
+                        json=service,
+                        headers=headers,
+                        timeout=10
+                    )
+                    if response.status_code in (200, 201):
+                        print(f"✓ Deployed service: {service_id}")
+                    else:
+                        print(f"✗ Failed to deploy service {service_id}: {response.status_code}")
+                        print(f"  Response: {response.text}")
+                        return False
+
+                # Deploy routes
+                for i, route in enumerate(apisix_data.get("routes", []), 1):
+                    route_id = str(i)
+                    response = requests.put(
+                        f"{admin_url}/apisix/admin/routes/{route_id}",
+                        json=route,
+                        headers=headers,
+                        timeout=10
+                    )
+                    if response.status_code in (200, 201):
+                        print(f"✓ Deployed route: {route.get('name', route_id)}")
+                    else:
+                        print(f"✗ Failed to deploy route {route_id}: {response.status_code}")
+                        print(f"  Response: {response.text}")
+                        return False
+
+                print(f"✓ All configuration deployed successfully to APISIX")
+                return True
+
+            except requests.RequestException as e:
+                print(f"⚠ Could not reach APISIX Admin API: {e}")
+                print(f"  Config written to {output_file}")
+                return False
+            except json.JSONDecodeError as e:
+                print(f"✗ Invalid JSON configuration: {e}")
+                return False
+
+        return True
