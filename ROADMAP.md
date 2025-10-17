@@ -29,28 +29,36 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 
 ---
 
-## 🚀 v1.1.0 (Q4 2025 - Geplant)
+## 🚀 v1.1.0 (Q4 2025 - In Development)
 
 **Focus:** Traffic Management & Security Basics
-**Status:** In Planning
+**Status:** 🔄 In Development (1/7 Features Complete)
+**Progress:** 14% (2 von 10.5 Wochen)
 
 ### High Priority Features
 
-#### 1. Rate Limiting & Throttling
+#### 1. Rate Limiting & Throttling ✅
+**Status:** ✅ **IMPLEMENTED** (Commit: `6a67803`)
 - **Use Case:** API-Schutz vor Überlastung
 - **Provider Support:**
-  - Envoy: rate_limit filter
-  - Kong: rate-limiting plugin
-  - APISIX: limit-req/limit-count
-  - Traefik: RateLimit middleware
-- **Config Format:**
+  - ✅ Envoy: local_ratelimit filter
+  - ✅ Kong: rate-limiting plugin
+  - ✅ APISIX: limit-count plugin
+  - ✅ Traefik: RateLimit middleware
+- **Implemented Config:**
   ```yaml
-  rate_limits:
-    - name: api_limit
-      requests_per_second: 100
-      burst: 200
-      key: $remote_addr
+  routes:
+    - path_prefix: /api/v1
+      rate_limit:
+        enabled: true
+        requests_per_second: 100
+        burst: 200
+        key_type: ip_address  # ip_address, header, jwt_claim
+        response_status: 429
+        response_message: "Rate limit exceeded"
   ```
+- **Documentation:** [docs/guides/RATE_LIMITING.md](docs/guides/RATE_LIMITING.md)
+- **Tests:** 15 neue Tests (117 total, 90% coverage)
 
 #### 2. Authentication & Authorization
 - **Basic Auth** (username/password)
@@ -292,18 +300,23 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 
 ## 📊 Feature Priority Matrix
 
-| Feature | Priority | Complexity | User Value | Provider Coverage |
-|---------|----------|------------|------------|-------------------|
-| Rate Limiting | 🔴 High | Medium | High | 100% |
-| Authentication | 🔴 High | High | Critical | 100% |
-| CORS | 🔴 High | Low | High | 90% |
-| Header Manipulation | 🔴 High | Medium | High | 100% |
-| Circuit Breaker | 🟡 Medium | Medium | Medium | 75% |
-| Health Checks | 🟡 Medium | Medium | High | 90% |
-| Caching | 🟢 Low | Medium | Medium | 60% |
-| AWS API Gateway | 🟡 Medium | High | High | N/A |
-| Web UI | 🟢 Low | Very High | Medium | N/A |
-| Plugin System | 🟢 Low | Very High | High | 50% |
+| Feature | Status | Priority | Complexity | User Value | Provider Coverage |
+|---------|--------|----------|------------|------------|-------------------|
+| Rate Limiting | ✅ Done | 🔴 High | Medium | High | 100% |
+| Authentication | 🔄 Pending | 🔴 High | High | Critical | 100% |
+| CORS | 🔄 Pending | 🔴 High | Low | High | 90% |
+| Header Manipulation | 🔄 Pending | 🔴 High | Medium | High | 100% |
+| Circuit Breaker | 🔄 Pending | 🟡 Medium | Medium | Medium | 75% |
+| Health Checks | 🔄 Pending | 🟡 Medium | Medium | High | 90% |
+| Caching | 🔄 Pending | 🟢 Low | Medium | Medium | 60% |
+| AWS API Gateway | 🔄 Pending | 🟡 Medium | High | High | N/A |
+| Web UI | 🔄 Pending | 🟢 Low | Very High | Medium | N/A |
+| Plugin System | 🔄 Pending | 🟢 Low | Very High | High | 50% |
+
+### Status Legend:
+- ✅ **Done**: Implementiert und getestet
+- 🔄 **Pending**: Noch nicht begonnen
+- 🚧 **In Progress**: Aktiv in Entwicklung
 
 ### Priority Legend:
 - 🔴 **High Priority**: v1.1.0
