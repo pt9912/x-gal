@@ -136,16 +136,43 @@ class APISIXProvider(Provider):
                 "id": service.name,
                 "upstream_id": f"{service.name}_upstream"
             }
-            
+
             if service.transformation and service.transformation.enabled:
-                svc_config["plugins"] = {
-                    "serverless-pre-function": {
+                svc_config["plugins"] = {}
+
+                # Add body transformation if needed
+                if service.transformation.defaults or service.transformation.computed_fields:
+                    svc_config["plugins"]["serverless-pre-function"] = {
                         "phase": "rewrite",
                         "functions": [
                             self._generate_lua_transformation(service)
                         ]
                     }
-                }
+
+                # Add service-level header manipulation
+                if service.transformation.headers:
+                    headers = service.transformation.headers
+                    # Request headers
+                    if headers.request_add or headers.request_set or headers.request_remove:
+                        proxy_rewrite_config = {"headers": {}}
+                        if headers.request_set:
+                            proxy_rewrite_config["headers"]["set"] = headers.request_set
+                        if headers.request_add:
+                            proxy_rewrite_config["headers"]["add"] = headers.request_add
+                        if headers.request_remove:
+                            proxy_rewrite_config["headers"]["remove"] = headers.request_remove
+                        svc_config["plugins"]["proxy-rewrite"] = proxy_rewrite_config
+
+                    # Response headers
+                    if headers.response_add or headers.response_set or headers.response_remove:
+                        response_rewrite_config = {"headers": {}}
+                        if headers.response_set:
+                            response_rewrite_config["headers"]["set"] = headers.response_set
+                        if headers.response_add:
+                            response_rewrite_config["headers"]["add"] = headers.response_add
+                        if headers.response_remove:
+                            response_rewrite_config["headers"]["remove"] = headers.response_remove
+                        svc_config["plugins"]["response-rewrite"] = response_rewrite_config
             
             apisix_config["services"].append(svc_config)
             
@@ -161,7 +188,7 @@ class APISIXProvider(Provider):
                     route_config["methods"] = route.methods
 
                 # Initialize plugins dict if needed
-                if (route.rate_limit and route.rate_limit.enabled) or (route.authentication and route.authentication.enabled):
+                if (route.rate_limit and route.rate_limit.enabled) or (route.authentication and route.authentication.enabled) or route.headers:
                     if "plugins" not in route_config:
                         route_config["plugins"] = {}
 
@@ -200,6 +227,51 @@ class APISIXProvider(Provider):
                         "key": "remote_addr",  # or 'consumer_name', 'server_addr'
                         "policy": "local"
                     }
+
+                # Add header manipulation plugin if configured
+                if route.headers:
+                    headers = route.headers
+                    proxy_rewrite_config = {}
+
+                    # Request headers
+                    if headers.request_add or headers.request_set or headers.request_remove:
+                        proxy_rewrite_config["headers"] = {}
+                        if headers.request_set:
+                            proxy_rewrite_config["headers"]["set"] = headers.request_set
+                        if headers.request_add:
+                            proxy_rewrite_config["headers"]["add"] = headers.request_add
+                        if headers.request_remove:
+                            proxy_rewrite_config["headers"]["remove"] = headers.request_remove
+
+                    if proxy_rewrite_config:
+                        route_config["plugins"]["proxy-rewrite"] = proxy_rewrite_config
+
+                    # Response headers (using response-rewrite plugin)
+                    if headers.response_add or headers.response_set or headers.response_remove:
+                        response_rewrite_config = {"headers": {}}
+                        if headers.response_set:
+                            response_rewrite_config["headers"]["set"] = headers.response_set
+                        if headers.response_add:
+                            response_rewrite_config["headers"]["add"] = headers.response_add
+                        if headers.response_remove:
+                            response_rewrite_config["headers"]["remove"] = headers.response_remove
+                        route_config["plugins"]["response-rewrite"] = response_rewrite_config
+
+                # Add CORS plugin if configured
+                if route.cors and route.cors.enabled:
+                    if "plugins" not in route_config:
+                        route_config["plugins"] = {}
+                    cors = route.cors
+                    cors_config = {
+                        "allow_origins": ",".join(cors.allowed_origins),
+                        "allow_methods": ",".join(cors.allowed_methods),
+                        "allow_headers": ",".join(cors.allowed_headers),
+                        "allow_credential": cors.allow_credentials,
+                        "max_age": cors.max_age
+                    }
+                    if cors.expose_headers:
+                        cors_config["expose_headers"] = ",".join(cors.expose_headers)
+                    route_config["plugins"]["cors"] = cors_config
 
                 apisix_config["routes"].append(route_config)
 

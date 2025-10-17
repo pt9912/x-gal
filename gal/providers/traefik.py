@@ -141,6 +141,10 @@ class TraefikProvider(Provider):
                     middlewares.append(f"{service.name}_transform")
                 if route.rate_limit and route.rate_limit.enabled:
                     middlewares.append(f"{router_name}_ratelimit")
+                if route.headers:
+                    middlewares.append(f"{router_name}_headers")
+                if route.cors and route.cors.enabled:
+                    middlewares.append(f"{router_name}_cors")
 
                 # Add middlewares if any
                 if middlewares:
@@ -158,7 +162,7 @@ class TraefikProvider(Provider):
             output.append(f"        - url: 'http://{service.upstream.host}:{service.upstream.port}'")
             output.append("")
         
-        # Middlewares for authentication, transformations, and rate limiting
+        # Middlewares for authentication, transformations, rate limiting, headers, and CORS
         has_authentication = any(
             route.authentication and route.authentication.enabled
             for service in config.services
@@ -170,8 +174,18 @@ class TraefikProvider(Provider):
             for service in config.services
             for route in service.routes
         )
+        has_headers = any(
+            route.headers
+            for service in config.services
+            for route in service.routes
+        )
+        has_cors = any(
+            route.cors and route.cors.enabled
+            for service in config.services
+            for route in service.routes
+        )
 
-        if has_authentication or has_transformations or has_rate_limits:
+        if has_authentication or has_transformations or has_rate_limits or has_headers or has_cors:
             output.append("  middlewares:")
 
             # Authentication middlewares
@@ -236,6 +250,90 @@ class TraefikProvider(Provider):
                         output.append("      rateLimit:")
                         output.append(f"        average: {route.rate_limit.requests_per_second}")
                         output.append(f"        burst: {route.rate_limit.burst}")
+                        output.append("")
+
+            # Header manipulation middlewares (route-level)
+            for service in config.services:
+                for i, route in enumerate(service.routes):
+                    if route.headers:
+                        router_name = f"{service.name}_router_{i}"
+                        headers = route.headers
+                        output.append(f"    {router_name}_headers:")
+                        output.append("      headers:")
+
+                        # Request headers
+                        if headers.request_add:
+                            output.append("        customRequestHeaders:")
+                            for key, value in headers.request_add.items():
+                                output.append(f"          {key}: '{value}'")
+                        if headers.request_remove:
+                            output.append("        customRequestHeaders:")
+                            for header_name in headers.request_remove:
+                                output.append(f"          {header_name}: ''")  # Empty value removes header
+
+                        # Response headers
+                        if headers.response_add:
+                            output.append("        customResponseHeaders:")
+                            for key, value in headers.response_add.items():
+                                output.append(f"          {key}: '{value}'")
+                        if headers.response_remove:
+                            output.append("        customResponseHeaders:")
+                            for header_name in headers.response_remove:
+                                output.append(f"          {header_name}: ''")  # Empty value removes header
+                        output.append("")
+
+            # Service-level header manipulation
+            for service in config.services:
+                if service.transformation and service.transformation.enabled and service.transformation.headers:
+                    headers = service.transformation.headers
+                    output.append(f"    {service.name}_headers:")
+                    output.append("      headers:")
+
+                    # Request headers
+                    if headers.request_add:
+                        output.append("        customRequestHeaders:")
+                        for key, value in headers.request_add.items():
+                            output.append(f"          {key}: '{value}'")
+                    if headers.request_remove:
+                        output.append("        customRequestHeaders:")
+                        for header_name in headers.request_remove:
+                            output.append(f"          {header_name}: ''")
+
+                    # Response headers
+                    if headers.response_add:
+                        output.append("        customResponseHeaders:")
+                        for key, value in headers.response_add.items():
+                            output.append(f"          {key}: '{value}'")
+                    if headers.response_remove:
+                        output.append("        customResponseHeaders:")
+                        for header_name in headers.response_remove:
+                            output.append(f"          {header_name}: ''")
+                    output.append("")
+
+            # CORS middlewares (route-level)
+            for service in config.services:
+                for i, route in enumerate(service.routes):
+                    if route.cors and route.cors.enabled:
+                        router_name = f"{service.name}_router_{i}"
+                        cors = route.cors
+                        output.append(f"    {router_name}_cors:")
+                        output.append("      headers:")
+                        output.append("        accessControlAllowMethods:")
+                        for method in cors.allowed_methods:
+                            output.append(f"          - {method}")
+                        output.append("        accessControlAllowOriginList:")
+                        for origin in cors.allowed_origins:
+                            output.append(f"          - '{origin}'")
+                        if cors.allowed_headers:
+                            output.append("        accessControlAllowHeaders:")
+                            for header in cors.allowed_headers:
+                                output.append(f"          - {header}")
+                        if cors.expose_headers:
+                            output.append("        accessControlExposeHeaders:")
+                            for header in cors.expose_headers:
+                                output.append(f"          - {header}")
+                        output.append(f"        accessControlAllowCredentials: {str(cors.allow_credentials).lower()}")
+                        output.append(f"        accessControlMaxAge: {cors.max_age}")
                         output.append("")
 
         result = "\n".join(output)

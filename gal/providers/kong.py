@@ -187,6 +187,54 @@ class KongProvider(Provider):
                         }
                     })
 
+                # Add header manipulation plugins if configured
+                if route.headers:
+                    headers = route.headers
+                    # Request header manipulation
+                    if headers.request_add or headers.request_set or headers.request_remove:
+                        req_config = {}
+                        if headers.request_add:
+                            req_config["add"] = {"headers": [f"{k}:{v}" for k, v in headers.request_add.items()]}
+                        if headers.request_set:
+                            req_config["replace"] = {"headers": [f"{k}:{v}" for k, v in headers.request_set.items()]}
+                        if headers.request_remove:
+                            req_config["remove"] = {"headers": headers.request_remove}
+                        route_plugins.append({
+                            "name": "request-transformer",
+                            "config": req_config
+                        })
+
+                    # Response header manipulation
+                    if headers.response_add or headers.response_set or headers.response_remove:
+                        resp_config = {}
+                        if headers.response_add:
+                            resp_config["add"] = {"headers": [f"{k}:{v}" for k, v in headers.response_add.items()]}
+                        if headers.response_set:
+                            resp_config["replace"] = {"headers": [f"{k}:{v}" for k, v in headers.response_set.items()]}
+                        if headers.response_remove:
+                            resp_config["remove"] = {"headers": headers.response_remove}
+                        route_plugins.append({
+                            "name": "response-transformer",
+                            "config": resp_config
+                        })
+
+                # Add CORS plugin if configured
+                if route.cors and route.cors.enabled:
+                    cors = route.cors
+                    cors_config = {
+                        "origins": cors.allowed_origins,
+                        "methods": cors.allowed_methods,
+                        "headers": cors.allowed_headers,
+                        "credentials": cors.allow_credentials,
+                        "max_age": cors.max_age
+                    }
+                    if cors.expose_headers:
+                        cors_config["exposed_headers"] = cors.expose_headers
+                    route_plugins.append({
+                        "name": "cors",
+                        "config": cors_config
+                    })
+
                 # Write all route plugins
                 if route_plugins:
                     output.append("    plugins:")
@@ -204,15 +252,61 @@ class KongProvider(Provider):
                                 else:
                                     output.append(f"        {key}: {value}")
 
-            # Add transformation plugin if enabled
+            # Add transformation plugins if enabled
             if service.transformation and service.transformation.enabled:
                 output.append("  plugins:")
-                output.append("  - name: request-transformer")
-                output.append("    config:")
-                output.append("      add:")
-                output.append("        headers:")
-                for key, value in service.transformation.defaults.items():
-                    output.append(f"        - x-default-{key}: '{value}'")
+
+                # Handle defaults (legacy behavior - add as headers)
+                if service.transformation.defaults:
+                    output.append("  - name: request-transformer")
+                    output.append("    config:")
+                    output.append("      add:")
+                    output.append("        headers:")
+                    for key, value in service.transformation.defaults.items():
+                        output.append(f"        - x-default-{key}: '{value}'")
+
+                # Handle service-level header manipulation
+                if service.transformation.headers:
+                    headers = service.transformation.headers
+                    # Request header manipulation
+                    if headers.request_add or headers.request_set or headers.request_remove:
+                        output.append("  - name: request-transformer")
+                        output.append("    config:")
+                        if headers.request_add:
+                            output.append("      add:")
+                            output.append("        headers:")
+                            for key, value in headers.request_add.items():
+                                output.append(f"        - {key}: '{value}'")
+                        if headers.request_set:
+                            output.append("      replace:")
+                            output.append("        headers:")
+                            for key, value in headers.request_set.items():
+                                output.append(f"        - {key}: '{value}'")
+                        if headers.request_remove:
+                            output.append("      remove:")
+                            output.append("        headers:")
+                            for header_name in headers.request_remove:
+                                output.append(f"        - {header_name}")
+
+                    # Response header manipulation
+                    if headers.response_add or headers.response_set or headers.response_remove:
+                        output.append("  - name: response-transformer")
+                        output.append("    config:")
+                        if headers.response_add:
+                            output.append("      add:")
+                            output.append("        headers:")
+                            for key, value in headers.response_add.items():
+                                output.append(f"        - {key}: '{value}'")
+                        if headers.response_set:
+                            output.append("      replace:")
+                            output.append("        headers:")
+                            for key, value in headers.response_set.items():
+                                output.append(f"        - {key}: '{value}'")
+                        if headers.response_remove:
+                            output.append("      remove:")
+                            output.append("        headers:")
+                            for header_name in headers.response_remove:
+                                output.append(f"        - {header_name}")
             
             output.append("")
 

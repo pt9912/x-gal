@@ -157,7 +157,107 @@ class EnvoyProvider(Provider):
                     output.append("                  grpc: {}")
                 output.append("                route:")
                 output.append(f"                  cluster: {service.name}_cluster")
-        
+
+                # Add route-level header manipulation
+                if route.headers:
+                    headers = route.headers
+                    # Request headers
+                    if headers.request_add or headers.request_set:
+                        output.append("                request_headers_to_add:")
+                        # Add headers (append: true keeps existing)
+                        for key, value in headers.request_add.items():
+                            output.append("                - header:")
+                            output.append(f"                    key: {key}")
+                            output.append(f"                    value: '{value}'")
+                            output.append("                  append: true")
+                        # Set headers (append: false overwrites existing)
+                        for key, value in headers.request_set.items():
+                            output.append("                - header:")
+                            output.append(f"                    key: {key}")
+                            output.append(f"                    value: '{value}'")
+                            output.append("                  append: false")
+                    if headers.request_remove:
+                        output.append("                request_headers_to_remove:")
+                        for header_name in headers.request_remove:
+                            output.append(f"                - {header_name}")
+
+                    # Response headers
+                    if headers.response_add or headers.response_set:
+                        output.append("                response_headers_to_add:")
+                        # Add headers
+                        for key, value in headers.response_add.items():
+                            output.append("                - header:")
+                            output.append(f"                    key: {key}")
+                            output.append(f"                    value: '{value}'")
+                            output.append("                  append: true")
+                        # Set headers
+                        for key, value in headers.response_set.items():
+                            output.append("                - header:")
+                            output.append(f"                    key: {key}")
+                            output.append(f"                    value: '{value}'")
+                            output.append("                  append: false")
+                    if headers.response_remove:
+                        output.append("                response_headers_to_remove:")
+                        for header_name in headers.response_remove:
+                            output.append(f"                - {header_name}")
+
+                # Add service-level header manipulation if configured
+                elif service.transformation and service.transformation.enabled and service.transformation.headers:
+                    headers = service.transformation.headers
+                    # Request headers
+                    if headers.request_add or headers.request_set:
+                        output.append("                request_headers_to_add:")
+                        for key, value in headers.request_add.items():
+                            output.append("                - header:")
+                            output.append(f"                    key: {key}")
+                            output.append(f"                    value: '{value}'")
+                            output.append("                  append: true")
+                        for key, value in headers.request_set.items():
+                            output.append("                - header:")
+                            output.append(f"                    key: {key}")
+                            output.append(f"                    value: '{value}'")
+                            output.append("                  append: false")
+                    if headers.request_remove:
+                        output.append("                request_headers_to_remove:")
+                        for header_name in headers.request_remove:
+                            output.append(f"                - {header_name}")
+
+                    # Response headers
+                    if headers.response_add or headers.response_set:
+                        output.append("                response_headers_to_add:")
+                        for key, value in headers.response_add.items():
+                            output.append("                - header:")
+                            output.append(f"                    key: {key}")
+                            output.append(f"                    value: '{value}'")
+                            output.append("                  append: true")
+                        for key, value in headers.response_set.items():
+                            output.append("                - header:")
+                            output.append(f"                    key: {key}")
+                            output.append(f"                    value: '{value}'")
+                            output.append("                  append: false")
+                    if headers.response_remove:
+                        output.append("                response_headers_to_remove:")
+                        for header_name in headers.response_remove:
+                            output.append(f"                - {header_name}")
+
+                # Add CORS policy if configured
+                if route.cors and route.cors.enabled:
+                    cors = route.cors
+                    output.append("                cors:")
+                    output.append("                  allow_origin_string_match:")
+                    for origin in cors.allowed_origins:
+                        if origin == "*":
+                            output.append("                  - safe_regex:")
+                            output.append("                      regex: '.*'")
+                        else:
+                            output.append("                  - exact: '{}'".format(origin))
+                    output.append("                  allow_methods: '{}'".format(", ".join(cors.allowed_methods)))
+                    output.append("                  allow_headers: '{}'".format(", ".join(cors.allowed_headers)))
+                    if cors.expose_headers:
+                        output.append("                  expose_headers: '{}'".format(", ".join(cors.expose_headers)))
+                    output.append("                  allow_credentials: {}".format(str(cors.allow_credentials).lower()))
+                    output.append("                  max_age: '{}'".format(cors.max_age))
+
         # HTTP filters
         output.append("          http_filters:")
 
