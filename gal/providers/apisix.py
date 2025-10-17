@@ -1,5 +1,8 @@
 """
-Apache APISIX provider implementation
+Apache APISIX provider implementation.
+
+Generates APISIX configuration in JSON format with support for
+serverless functions (Lua) for request transformations.
 """
 
 import json
@@ -8,17 +11,101 @@ from ..config import Config
 
 
 class APISIXProvider(Provider):
-    """Apache APISIX provider"""
-    
+    """Apache APISIX gateway provider.
+
+    Generates configuration for Apache APISIX, a cloud-native API gateway
+    with dynamic configuration and high performance. Uses etcd for
+    configuration storage (or standalone mode).
+
+    Output Format:
+        JSON file containing:
+        - routes: Route definitions with URI matching
+        - services: Service definitions with upstream references
+        - upstreams: Backend service endpoints with load balancing
+        - plugins: Serverless functions for transformations
+
+    Transformations:
+        Implemented using serverless-pre-function plugin with Lua code.
+        Full support for:
+        - Setting default field values
+        - Generating UUIDs with core.utils.uuid()
+        - Timestamp generation with os.time()
+        - Request body manipulation with cjson
+
+    gRPC Support:
+        Native gRPC protocol support in routes and upstreams.
+        Automatic HTTP/2 handling.
+
+    Load Balancing:
+        Uses roundrobin load balancing by default.
+        Supports multiple upstream nodes with weights.
+
+    Example:
+        >>> provider = APISIXProvider()
+        >>> provider.name()
+        'apisix'
+        >>> config = Config.from_yaml("gateway.yaml")
+        >>> output = provider.generate(config)
+        >>> json.loads(output)
+        {'routes': [...], 'services': [...], 'upstreams': [...]}
+
+    See Also:
+        https://apisix.apache.org/docs/apisix/getting-started/
+    """
+
     def name(self) -> str:
+        """Return provider name.
+
+        Returns:
+            str: "apisix"
+        """
         return "apisix"
-    
+
     def validate(self, config: Config) -> bool:
-        """Validate APISIX configuration"""
+        """Validate configuration for APISIX.
+
+        APISIX has minimal validation requirements at config generation time.
+        Most validation occurs when config is applied to APISIX.
+
+        Args:
+            config: Configuration to validate
+
+        Returns:
+            True (APISIX validates at runtime)
+
+        Example:
+            >>> provider = APISIXProvider()
+            >>> config = Config(...)
+            >>> provider.validate(config)
+            True
+        """
         return True
-    
+
     def generate(self, config: Config) -> str:
-        """Generate APISIX configuration as JSON"""
+        """Generate APISIX configuration in JSON format.
+
+        Creates complete APISIX configuration with routes, services,
+        upstreams, and serverless transformation functions.
+
+        Configuration Structure (JSON):
+            - routes: URI-based routing with service references
+            - services: Service definitions with plugins
+            - upstreams: Backend endpoints with load balancing
+
+        Args:
+            config: Configuration object containing services
+
+        Returns:
+            Complete APISIX JSON configuration as string
+
+        Example:
+            >>> provider = APISIXProvider()
+            >>> config = Config.from_yaml("config.yaml")
+            >>> json_output = provider.generate(config)
+            >>> data = json.loads(json_output)
+            >>> 'routes' in data and 'services' in data
+            True
+        """
         apisix_config = {
             "routes": [],
             "upstreams": [],
@@ -70,7 +157,32 @@ class APISIXProvider(Provider):
         return json.dumps(apisix_config, indent=2)
     
     def _generate_lua_transformation(self, service) -> str:
-        """Generate Lua transformation script"""
+        """Generate Lua transformation script for APISIX serverless plugin.
+
+        Creates Lua code for the serverless-pre-function plugin that:
+        - Parses request body as JSON
+        - Applies default values for missing fields
+        - Generates computed fields (UUID, timestamp)
+        - Re-encodes modified body
+
+        Args:
+            service: Service object with transformation configuration
+
+        Returns:
+            Complete Lua function as string
+
+        Example:
+            >>> provider = APISIXProvider()
+            >>> service = Service(
+            ...     transformation=Transformation(
+            ...         defaults={"status": "active"},
+            ...         computed_fields=[ComputedField(field="id", generator="uuid")]
+            ...     )
+            ... )
+            >>> lua = provider._generate_lua_transformation(service)
+            >>> "return function(conf, ctx)" in lua
+            True
+        """
         lua_code = []
         lua_code.append("return function(conf, ctx)")
         lua_code.append("  local core = require('apisix.core')")
