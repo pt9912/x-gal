@@ -1,0 +1,92 @@
+version: "1.0"
+provider: envoy
+
+global:
+  host: 0.0.0.0
+  port: 10000
+  admin_port: 9901
+  timeout: 30s
+
+services:
+  # Public API - Niedriges Rate Limit
+  - name: public_api
+    type: rest
+    protocol: http
+    upstream:
+      host: public-api.internal
+      port: 8080
+    routes:
+      - path_prefix: /api/public
+        methods: [GET]
+        rate_limit:
+          enabled: true
+          requests_per_second: 10
+          burst: 20
+          key_type: ip_address
+          response_status: 429
+          response_message: "Public API rate limit exceeded. Max 10 requests per second."
+
+  # Authenticated API - Höheres Limit mit API Key
+  - name: auth_api
+    type: rest
+    protocol: http
+    upstream:
+      host: auth-api.internal
+      port: 8080
+    routes:
+      - path_prefix: /api/private
+        methods: [GET, POST, PUT, DELETE]
+        rate_limit:
+          enabled: true
+          requests_per_second: 100
+          burst: 200
+          key_type: header
+          key_header: X-API-Key
+          response_status: 429
+          response_message: "API key rate limit exceeded"
+
+  # Premium API - Sehr hohes Limit
+  - name: premium_api
+    type: rest
+    protocol: http
+    upstream:
+      host: premium-api.internal
+      port: 8080
+    routes:
+      - path_prefix: /api/premium
+        methods: [GET, POST]
+        rate_limit:
+          enabled: true
+          requests_per_second: 1000
+          burst: 2000
+          key_type: header
+          key_header: X-Premium-Token
+          response_status: 503
+          response_message: "Service temporarily unavailable - rate limit exceeded"
+
+  # Unrestricted API - Kein Rate Limit
+  - name: internal_api
+    type: rest
+    protocol: http
+    upstream:
+      host: internal-api.local
+      port: 8080
+    routes:
+      - path_prefix: /api/internal
+        methods: [GET, POST]
+        # Kein rate_limit - zeigt dass es optional ist
+
+  # gRPC Service mit Rate Limiting
+  - name: grpc_service
+    type: grpc
+    protocol: http2
+    upstream:
+      host: grpc.internal
+      port: 9090
+    routes:
+      - path_prefix: /myapp.UserService
+        rate_limit:
+          enabled: true
+          requests_per_second: 50
+          burst: 100
+          key_type: ip_address
