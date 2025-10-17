@@ -12,10 +12,11 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy pyproject.toml and VERSION for dependency installation
+# Copy pyproject.toml, VERSION, and source code for installation
 COPY pyproject.toml VERSION ./
+COPY gal/ ./gal/
 
-# Install Python dependencies from pyproject.toml
+# Install Python dependencies and package from pyproject.toml
 RUN pip install --no-cache-dir --user .
 
 # Production stage
