@@ -140,16 +140,35 @@ Keine - Dies ist die erste stabile Version.
 2. **Provider Features**: Nicht alle Gateway-spezifischen Features sind abgebildet (nur Basis-Routing + Transformationen)
 3. **Dokumentation**: Einige erweiterte Guides fehlen noch
 
-## 🔜 Roadmap (v1.1.0)
+## 🔜 Roadmap
 
+Siehe [**ROADMAP.md**](ROADMAP.md) für die vollständige Feature-Planung über alle Releases.
+
+### v1.1.0 (Q4 2025) - High Priority
+- [ ] Rate Limiting & Throttling
+- [ ] Authentication (Basic Auth, API Key, JWT)
+- [ ] Request/Response Header Manipulation
+- [ ] CORS Policies
 - [ ] PyPI Publication
-- [ ] Rate Limiting Konfiguration
-- [ ] Authentication/Authorization Policies
-- [ ] Erweiterte Monitoring-Integration
-- [ ] gRPC-Web Support
-- [ ] Provider: AWS API Gateway
-- [ ] Provider: Azure API Management
-- [ ] Web UI für Konfigurationsvisualisierung
+- [ ] Circuit Breaker Pattern (Optional)
+- [ ] Health Checks & Load Balancing (Optional)
+
+**Details:** [v1.1.0 Implementierungsplan](docs/v1.1.0-PLAN.md)
+
+### v1.2.0 (Q1 2026) - Cloud & Advanced Traffic
+- AWS API Gateway Support
+- Azure API Management Support
+- A/B Testing & Canary Deployments
+- gRPC-Web & Transcoding
+- GraphQL Support
+- WebSocket Routing
+
+### v1.3.0 (Q2 2026) - Enterprise & Developer Experience
+- Web UI / Dashboard
+- Service Mesh Integration (Istio, Linkerd)
+- Full OpenTelemetry Support
+- Multi-Tenant Support
+- API Versioning
 
 ## 📚 Dokumentation
 
