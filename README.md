@@ -68,7 +68,8 @@ python3 -m venv venv
 source venv/bin/activate  # Unter Windows: venv\Scripts\activate
 
 # Abhängigkeiten installieren
-pip install -r requirements.txt
+pip install -e .         # Runtime dependencies
+pip install -e .[dev]    # Mit Dev-Tools (pytest, black, flake8, isort)
 
 # CLI ausführbar machen
 chmod +x gal-cli.py
