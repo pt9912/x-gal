@@ -52,14 +52,17 @@ jobs:
 
     - name: Create archive
       run: |
+        cd ..
         tar -czf gal-${{ github.ref_name }}.tar.gz \
-          --exclude='.git' \
-          --exclude='venv' \
-          --exclude='__pycache__' \
-          --exclude='*.pyc' \
-          --exclude='.pytest_cache' \
-          --exclude='.coverage' \
-          .
+          --exclude='x-gal/.git' \
+          --exclude='x-gal/venv' \
+          --exclude='x-gal/__pycache__' \
+          --exclude='x-gal/*.pyc' \
+          --exclude='x-gal/.pytest_cache' \
+          --exclude='x-gal/.coverage' \
+          --exclude='x-gal/dist' \
+          x-gal
+        mv gal-${{ github.ref_name }}.tar.gz x-gal/
 
     - name: Upload artifacts to release
       uses: softprops/action-gh-release@v1
