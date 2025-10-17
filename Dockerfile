@@ -66,8 +66,13 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 ENTRYPOINT ["python", "gal-cli.py"]
 CMD ["--help"]
 
-# Labels for metadata
-LABEL maintainer="GAL Team"
-LABEL description="Gateway Abstraction Layer - Provider-agnostic API Gateway configuration system"
-LABEL version="1.0.0"
+# OCI Standard Labels
+LABEL org.opencontainers.image.title="GAL - Gateway Abstraction Layer"
+LABEL org.opencontainers.image.description="Provider-agnostic API Gateway configuration system supporting Envoy, Kong, APISIX, and Traefik"
+LABEL org.opencontainers.image.version="1.0.0"
+LABEL org.opencontainers.image.authors="Dietmar Burkard"
+LABEL org.opencontainers.image.url="https://github.com/pt9912/x-gal"
+LABEL org.opencontainers.image.documentation="https://github.com/pt9912/x-gal/blob/main/README.md"
 LABEL org.opencontainers.image.source="https://github.com/pt9912/x-gal"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.vendor="Dietmar Burkard"
