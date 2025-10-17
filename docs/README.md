@@ -20,6 +20,7 @@ Praktische Anleitungen für häufige Aufgaben und Use Cases:
 |-------|--------------|---------|
 | [Schnellstart](guides/QUICKSTART.md) | Installation und erste Schritte | Alle Nutzer |
 | [Provider-Dokumentation](guides/PROVIDERS.md) | Details zu jedem Gateway-Provider | DevOps, Architects |
+| [Transformations-Guide](guides/TRANSFORMATIONS.md) | Request-Transformationen und Best Practices | Developers, Architects |
 | [Entwickler-Guide](guides/DEVELOPMENT.md) | Beitragen zum Projekt | Contributors |
 
 ### 🔧 API-Referenz
@@ -30,6 +31,7 @@ Vollständige technische Referenzdokumentation:
 |----------|--------|
 | [CLI-Referenz](api/CLI_REFERENCE.md) | Alle Befehle, Optionen und Beispiele |
 | [Konfigurationsreferenz](api/CONFIGURATION.md) | YAML-Schema und alle Optionen |
+| [Python-API](guides/PROVIDERS.md#python-api-referenz) | Docstrings, Klassen, Methoden |
 
 ### 🏗️ Architektur
 
@@ -96,7 +98,8 @@ gal-cli.py generate -c config.yaml -p traefik
 
 1. [Entwickler-Guide](guides/DEVELOPMENT.md) - Setup und Contribution
 2. [Architektur](architecture/ARCHITECTURE.md) - System-Design
-3. [Tests schreiben](guides/DEVELOPMENT.md#testing) - Test-Best-Practices
+3. [Python-API-Referenz](guides/PROVIDERS.md#python-api-referenz) - Klassen und Docstrings
+4. [Tests schreiben](guides/DEVELOPMENT.md#testing) - Test-Best-Practices
 
 ### Für DevOps
 

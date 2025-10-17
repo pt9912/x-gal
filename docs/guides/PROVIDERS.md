@@ -19,6 +19,8 @@ GAL unterstützt vier führende API-Gateway-Provider. Jeder Provider hat spezifi
 
 Envoy ist ein Cloud-native High-Performance Edge/Service Proxy, entwickelt für moderne Service-Mesh-Architekturen.
 
+> **💡 API-Referenz:** Für technische Details zur Implementierung siehe `gal/providers/envoy.py:12-49` (EnvoyProvider Klassen-Docstring)
+
 **Stärken:**
 - Extrem performant (C++)
 - Umfangreiche Observability
@@ -152,6 +154,8 @@ spec:
 
 Kong ist ein weit verbreitetes, plugin-basiertes API-Gateway mit umfangreichem Enterprise-Funktionsumfang.
 
+> **💡 API-Referenz:** Für technische Details zur Implementierung siehe `gal/providers/kong.py:12-52` (KongProvider Klassen-Docstring)
+
 **Stärken:**
 - Großes Plugin-Ökosystem
 - Developer Portal
@@ -255,6 +259,8 @@ kubectl create configmap kong-config --from-file=kong.yaml
 ### Übersicht
 
 APISIX ist ein Cloud-native, High-Performance API-Gateway mit dynamischer Konfiguration und Plugin-Verwaltung.
+
+> **💡 API-Referenz:** Für technische Details zur Implementierung siehe `gal/providers/apisix.py:13-54` (APISIXProvider Klassen-Docstring) und `apisix.py:159-218` (_generate_lua_transformation Methode)
 
 **Stärken:**
 - Sehr hohe Performance
@@ -363,6 +369,8 @@ docker run -d \
 ### Übersicht
 
 Traefik ist ein moderner HTTP Reverse Proxy und Load Balancer für Microservices mit automatischer Service Discovery.
+
+> **💡 API-Referenz:** Für technische Details zur Implementierung siehe `gal/providers/traefik.py:12-58` (TraefikProvider Klassen-Docstring)
 
 **Stärken:**
 - Automatische Service Discovery
@@ -558,6 +566,53 @@ open http://localhost:8080/dashboard/
 # Config validieren
 traefik healthcheck --configFile=traefik.yaml
 ```
+
+## Python API-Referenz
+
+Alle Provider-Implementierungen enthalten umfassende Google-style Docstrings mit detaillierten Erklärungen, Beispielen und Codebeispielen.
+
+### Klassen-Dokumentation
+
+| Modul | Zeilen | Inhalt |
+|-------|--------|--------|
+| `gal/provider.py:13-127` | Provider ABC | Basis-Interface für alle Provider |
+| `gal/providers/envoy.py:12-209` | EnvoyProvider | Envoy Static Config Generator |
+| `gal/providers/kong.py:12-146` | KongProvider | Kong Declarative Config Generator |
+| `gal/providers/apisix.py:13-219` | APISIXProvider | APISIX JSON Config Generator |
+| `gal/providers/traefik.py:12-155` | TraefikProvider | Traefik Dynamic Config Generator |
+
+### Methoden-Dokumentation
+
+Jeder Provider implementiert:
+
+- **`name() -> str`**: Eindeutiger Provider-Name
+- **`validate(config: Config) -> bool`**: Provider-spezifische Validierung
+- **`generate(config: Config) -> str`**: Config-zu-Output Transformation
+
+**Beispiel:** `gal/providers/envoy.py:86-112` zeigt die vollständige `generate()` Methode mit allen Parametern und Rückgabewerten.
+
+### Konfigurations-Modelle
+
+Für Details zu Datenstrukturen siehe:
+
+- `gal/config.py:10-42` - GlobalConfig Dataclass
+- `gal/config.py:45-68` - Upstream Dataclass
+- `gal/config.py:71-98` - Route Dataclass
+- `gal/config.py:101-134` - ComputedField Dataclass
+- `gal/config.py:137-163` - Validation Dataclass
+- `gal/config.py:166-200` - Transformation Dataclass
+- `gal/config.py:203-255` - Service Dataclass
+- `gal/config.py:258-279` - Plugin Dataclass
+- `gal/config.py:282-371` - Config Dataclass (Haupt-Container)
+
+### Transformation Engine
+
+Spezielle Methoden für Lua-Script-Generierung:
+
+- `gal/providers/apisix.py:159-218` - `_generate_lua_transformation()` für APISIX
+- `gal/providers/envoy.py:155-177` - Inline Lua für Envoy
+
+Diese Methoden zeigen, wie GAL automatisch Lua-Code für Payload-Transformationen generiert.
 
 ## Siehe auch
 
