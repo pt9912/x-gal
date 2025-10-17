@@ -19,7 +19,8 @@ from gal.config import (
     GlobalConfig,
     Transformation,
     ComputedField,
-    Validation
+    Validation,
+    RateLimitConfig
 )
 
 

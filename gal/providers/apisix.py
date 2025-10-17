@@ -156,10 +156,24 @@ class APISIXProvider(Provider):
                     "name": f"{service.name}_route",
                     "service_id": service.name
                 }
-                
+
                 if route.methods:
                     route_config["methods"] = route.methods
-                
+
+                # Add rate limiting plugin if configured
+                if route.rate_limit and route.rate_limit.enabled:
+                    if "plugins" not in route_config:
+                        route_config["plugins"] = {}
+
+                    route_config["plugins"]["limit-count"] = {
+                        "count": route.rate_limit.requests_per_second,
+                        "time_window": 1,
+                        "rejected_code": route.rate_limit.response_status,
+                        "rejected_msg": route.rate_limit.response_message,
+                        "key": "remote_addr",  # or 'consumer_name', 'server_addr'
+                        "policy": "local"
+                    }
+
                 apisix_config["routes"].append(route_config)
 
         result = json.dumps(apisix_config, indent=2)

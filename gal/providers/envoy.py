@@ -160,7 +160,49 @@ class EnvoyProvider(Provider):
         
         # HTTP filters
         output.append("          http_filters:")
-        
+
+        # Add rate limiting filter if any route has rate limiting enabled
+        has_rate_limits = any(
+            route.rate_limit and route.rate_limit.enabled
+            for service in config.services
+            for route in service.routes
+        )
+        if has_rate_limits:
+            # Find the first rate limit config to use as defaults
+            first_rate_limit = None
+            for service in config.services:
+                for route in service.routes:
+                    if route.rate_limit and route.rate_limit.enabled:
+                        first_rate_limit = route.rate_limit
+                        break
+                if first_rate_limit:
+                    break
+
+            output.append("          - name: envoy.filters.http.local_ratelimit")
+            output.append("            typed_config:")
+            output.append("              '@type': type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit")
+            output.append("              stat_prefix: http_local_rate_limiter")
+            output.append("              token_bucket:")
+            output.append(f"                max_tokens: {first_rate_limit.burst}")
+            output.append(f"                tokens_per_fill: {first_rate_limit.requests_per_second}")
+            output.append("                fill_interval: 1s")
+            output.append("              filter_enabled:")
+            output.append("                runtime_key: local_rate_limit_enabled")
+            output.append("                default_value:")
+            output.append("                  numerator: 100")
+            output.append("                  denominator: HUNDRED")
+            output.append("              filter_enforced:")
+            output.append("                runtime_key: local_rate_limit_enforced")
+            output.append("                default_value:")
+            output.append("                  numerator: 100")
+            output.append("                  denominator: HUNDRED")
+            output.append("              response_headers_to_add:")
+            output.append("                - append: false")
+            output.append("                  header:")
+            output.append("                    key: x-local-rate-limit")
+            output.append("                    value: 'true'")
+            output.append(f"              status_code: {first_rate_limit.response_status}")
+
         # Add transformation filter if any service has transformations
         has_transformations = any(s.transformation and s.transformation.enabled for s in config.services)
         if has_transformations:

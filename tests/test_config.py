@@ -15,7 +15,8 @@ from gal.config import (
     Transformation,
     ComputedField,
     Validation,
-    Plugin
+    Plugin,
+    RateLimitConfig
 )
 
 
@@ -62,12 +63,84 @@ class TestRoute:
         route = Route(path_prefix="/api/v1")
         assert route.path_prefix == "/api/v1"
         assert route.methods is None
+        assert route.rate_limit is None
 
     def test_route_with_methods(self):
         """Test route with HTTP methods"""
         route = Route(path_prefix="/api/v1", methods=["GET", "POST"])
         assert route.path_prefix == "/api/v1"
         assert route.methods == ["GET", "POST"]
+
+    def test_route_with_rate_limit(self):
+        """Test route with rate limiting"""
+        rate_limit = RateLimitConfig(
+            enabled=True,
+            requests_per_second=100,
+            burst=200
+        )
+        route = Route(
+            path_prefix="/api/v1",
+            methods=["GET", "POST"],
+            rate_limit=rate_limit
+        )
+        assert route.path_prefix == "/api/v1"
+        assert route.rate_limit is not None
+        assert route.rate_limit.requests_per_second == 100
+        assert route.rate_limit.burst == 200
+
+
+class TestRateLimitConfig:
+    """Test RateLimitConfig class"""
+
+    def test_rate_limit_defaults(self):
+        """Test rate limit configuration with default values"""
+        rate_limit = RateLimitConfig()
+        assert rate_limit.enabled is True
+        assert rate_limit.requests_per_second == 100
+        assert rate_limit.burst == 200  # Auto-calculated as 2x rate
+        assert rate_limit.key_type == "ip_address"
+        assert rate_limit.key_header is None
+        assert rate_limit.key_claim is None
+        assert rate_limit.response_status == 429
+        assert rate_limit.response_message == "Rate limit exceeded"
+
+    def test_rate_limit_custom_values(self):
+        """Test rate limit configuration with custom values"""
+        rate_limit = RateLimitConfig(
+            enabled=True,
+            requests_per_second=50,
+            burst=150,
+            key_type="header",
+            key_header="X-API-Key",
+            response_status=503,
+            response_message="Too many requests"
+        )
+        assert rate_limit.enabled is True
+        assert rate_limit.requests_per_second == 50
+        assert rate_limit.burst == 150
+        assert rate_limit.key_type == "header"
+        assert rate_limit.key_header == "X-API-Key"
+        assert rate_limit.response_status == 503
+        assert rate_limit.response_message == "Too many requests"
+
+    def test_rate_limit_burst_auto_calculation(self):
+        """Test automatic burst calculation (2x rate)"""
+        rate_limit = RateLimitConfig(requests_per_second=200)
+        assert rate_limit.burst == 400  # Should be 2x
+
+    def test_rate_limit_jwt_claim(self):
+        """Test rate limit with JWT claim key"""
+        rate_limit = RateLimitConfig(
+            key_type="jwt_claim",
+            key_claim="sub"
+        )
+        assert rate_limit.key_type == "jwt_claim"
+        assert rate_limit.key_claim == "sub"
+
+    def test_rate_limit_disabled(self):
+        """Test rate limit configuration when disabled"""
+        rate_limit = RateLimitConfig(enabled=False)
+        assert rate_limit.enabled is False
 
 
 class TestComputedField:
@@ -446,5 +519,76 @@ services:
             assert config.global_config.host == "0.0.0.0"  # Default value
             assert len(config.services) == 1
             assert len(config.plugins) == 0
+        finally:
+            Path(temp_file).unlink()
+
+    def test_from_yaml_with_rate_limiting(self):
+        """Test loading YAML configuration with rate limiting"""
+        yaml_content = """
+version: "1.0"
+provider: kong
+
+services:
+  - name: api_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api.local
+      port: 8080
+    routes:
+      - path_prefix: /api/public
+        methods: [GET, POST]
+        rate_limit:
+          enabled: true
+          requests_per_second: 100
+          burst: 200
+          key_type: ip_address
+          response_status: 429
+          response_message: "Rate limit exceeded"
+      - path_prefix: /api/private
+        methods: [GET, POST, PUT, DELETE]
+        rate_limit:
+          enabled: true
+          requests_per_second: 50
+          burst: 100
+          key_type: header
+          key_header: X-API-Key
+"""
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write(yaml_content)
+            temp_file = f.name
+
+        try:
+            config = Config.from_yaml(temp_file)
+
+            assert config.version == "1.0"
+            assert config.provider == "kong"
+            assert len(config.services) == 1
+
+            service = config.services[0]
+            assert service.name == "api_service"
+            assert len(service.routes) == 2
+
+            # Test first route with rate limiting
+            route1 = service.routes[0]
+            assert route1.path_prefix == "/api/public"
+            assert route1.rate_limit is not None
+            assert route1.rate_limit.enabled is True
+            assert route1.rate_limit.requests_per_second == 100
+            assert route1.rate_limit.burst == 200
+            assert route1.rate_limit.key_type == "ip_address"
+            assert route1.rate_limit.response_status == 429
+            assert route1.rate_limit.response_message == "Rate limit exceeded"
+
+            # Test second route with different rate limiting
+            route2 = service.routes[1]
+            assert route2.path_prefix == "/api/private"
+            assert route2.rate_limit is not None
+            assert route2.rate_limit.enabled is True
+            assert route2.rate_limit.requests_per_second == 50
+            assert route2.rate_limit.burst == 100
+            assert route2.rate_limit.key_type == "header"
+            assert route2.rate_limit.key_header == "X-API-Key"
         finally:
             Path(temp_file).unlink()

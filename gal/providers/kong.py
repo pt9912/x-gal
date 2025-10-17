@@ -137,7 +137,17 @@ class KongProvider(Provider):
                     output.append("    methods:")
                     for method in route.methods:
                         output.append(f"    - {method}")
-            
+
+                # Add rate limiting plugin if configured
+                if route.rate_limit and route.rate_limit.enabled:
+                    output.append("    plugins:")
+                    output.append("    - name: rate-limiting")
+                    output.append("      config:")
+                    output.append(f"        second: {route.rate_limit.requests_per_second}")
+                    output.append("        policy: local")  # or 'cluster', 'redis'
+                    output.append("        fault_tolerant: true")
+                    output.append("        hide_client_headers: false")
+
             # Add transformation plugin if enabled
             if service.transformation and service.transformation.enabled:
                 output.append("  plugins:")
