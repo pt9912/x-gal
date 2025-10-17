@@ -32,8 +32,8 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 ## 🚀 v1.1.0 (Q4 2025 - In Development)
 
 **Focus:** Traffic Management & Security Basics
-**Status:** 🔄 In Development (2/7 Features Complete)
-**Progress:** 38% (4 von 10.5 Wochen)
+**Status:** 🔄 In Development (3/7 Features Complete)
+**Progress:** 52% (5.5 von 10.5 Wochen)
 
 ### High Priority Features
 
@@ -94,22 +94,39 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 - **Documentation:** [docs/guides/AUTHENTICATION.md](docs/guides/AUTHENTICATION.md)
 - **Tests:** 33 neue Tests (145 total, 91% coverage)
 
-#### 3. Request/Response Manipulation
-- **Header Injection/Removal**
-- **Query Parameter Manipulation**
-- **Request/Response Body Filtering**
-- **Config Format:**
+#### 3. Request/Response Header Manipulation ✅
+**Status:** ✅ **IMPLEMENTED**
+- **Header Add/Set/Remove** ✅ (Request & Response)
+- **Route-Level Configuration** ✅
+- **Service-Level Configuration** ✅
+- **Provider Support:**
+  - ✅ Envoy: Native route-level header manipulation
+  - ✅ Kong: request-transformer, response-transformer plugins
+  - ✅ APISIX: proxy-rewrite, response-rewrite plugins
+  - ✅ Traefik: headers middleware
+- **Implemented Config:**
   ```yaml
-  transformations:
-    request:
-      add_headers:
-        X-Request-ID: "{{ uuid }}"
-        X-Forwarded-By: "GAL"
-      remove_headers: ["X-Internal-Token"]
-    response:
-      add_headers:
-        X-Response-Time: "{{ response_time_ms }}"
+  headers:
+    # Request headers
+    request_add:
+      X-Request-ID: "{{uuid}}"
+      X-Gateway: "GAL"
+    request_set:
+      User-Agent: "GAL-Gateway/1.0"
+    request_remove:
+      - X-Internal-Token
+      - X-Debug
+    # Response headers
+    response_add:
+      X-Frame-Options: "DENY"
+      X-Content-Type-Options: "nosniff"
+    response_set:
+      Server: "GAL-Gateway"
+    response_remove:
+      - X-Powered-By
   ```
+- **Documentation:** [docs/guides/HEADERS.md](docs/guides/HEADERS.md)
+- **Tests:** 30 neue Tests (175 total, 85% coverage)
 
 #### 4. CORS Policies
 - **Origin Whitelisting**
@@ -319,8 +336,8 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 |---------|--------|----------|------------|------------|-------------------|
 | Rate Limiting | ✅ Done | 🔴 High | Medium | High | 100% |
 | Authentication | ✅ Done | 🔴 High | High | Critical | 100% |
+| Header Manipulation | ✅ Done | 🔴 High | Medium | High | 100% |
 | CORS | 🔄 Pending | 🔴 High | Low | High | 90% |
-| Header Manipulation | 🔄 Pending | 🔴 High | Medium | High | 100% |
 | Circuit Breaker | 🔄 Pending | 🟡 Medium | Medium | Medium | 75% |
 | Health Checks | 🔄 Pending | 🟡 Medium | Medium | High | 90% |
 | Caching | 🔄 Pending | 🟢 Low | Medium | Medium | 60% |
