@@ -243,6 +243,8 @@ CONFIG_FILE=examples/gateway-config.yaml docker-compose --profile validate up ga
 - [Provider-Details](docs/guides/PROVIDERS.md)
 - [Transformations-Anleitung](docs/guides/TRANSFORMATIONS.md)
 - [Docker-Anleitung](docs/guides/DOCKER.md)
+- [**Roadmap**](ROADMAP.md) - Geplante Features und Releases
+- [**v1.1.0 Plan**](docs/v1.1.0-PLAN.md) - Detaillierter Implementierungsplan
 - [Changelog](CHANGELOG.md)
 
 ## Testing & Development
