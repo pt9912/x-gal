@@ -1,0 +1,303 @@
+# GAL Header Manipulation Example Configuration
+#
+# This example demonstrates all header manipulation capabilities:
+# - Request header manipulation (add, set, remove)
+# - Response header manipulation (add, set, remove)
+# - Route-level and service-level configuration
+# - Security headers, CORS headers, custom headers
+# - Multiple routes with different header configurations
+#
+# Compatible with all providers: Kong, APISIX, Traefik, Envoy
+
+version: "1.0"
+provider: kong  # Change to: kong, apisix, traefik, or envoy
+
+global:
+  host: 0.0.0.0
+  port: 10000
+  admin_port: 9901
+  timeout: 30s
+
+services:
+  # 1. Public API - Security headers and CORS
+  - name: public_api
+    type: rest
+    protocol: http
+    upstream:
+      host: api.example.com
+      port: 8080
+    routes:
+      - path_prefix: /api/public
+        methods: [GET, POST, OPTIONS]
+        headers:
+          # Add security headers to responses
+          response_add:
+            # Prevent clickjacking
+            X-Frame-Options: DENY
+
+            # Prevent MIME type sniffing
+            X-Content-Type-Options: nosniff
+
+            # Enable XSS protection
+            X-XSS-Protection: "1; mode=block"
+
+            # HTTP Strict Transport Security
+            Strict-Transport-Security: "max-age=31536000; includeSubDomains"
+
+            # Content Security Policy
+            Content-Security-Policy: "default-src 'self'"
+
+            # CORS headers
+            Access-Control-Allow-Origin: "*"
+            Access-Control-Allow-Methods: "GET, POST, OPTIONS"
+            Access-Control-Allow-Headers: "Content-Type, Authorization"
+            Access-Control-Max-Age: "86400"
+
+            # Caching headers
+            Cache-Control: "public, max-age=3600"
+            Vary: "Accept-Encoding"
+
+          # Remove backend disclosure headers
+          response_remove:
+            - Server
+            - X-Powered-By
+            - X-AspNet-Version
+
+  # 2. Private API - Request identification and backend communication
+  - name: private_api
+    type: rest
+    protocol: http
+    upstream:
+      host: backend.internal.com
+      port: 8080
+    routes:
+      - path_prefix: /api/private
+        methods: [GET, POST, PUT, DELETE]
+        headers:
+          # Add request headers for backend
+          request_add:
+            X-Request-ID: "req-{{uuid}}"
+            X-Correlation-ID: "corr-{{uuid}}"
+            X-Gateway-Version: "1.0"
+            X-Client-IP: "{{client_ip}}"
+            X-Forwarded-Proto: "https"
+
+          # Override/set specific headers
+          request_set:
+            User-Agent: "GAL-Gateway/1.0"
+
+          # Remove client-provided headers for security
+          request_remove:
+            - X-Internal-Token
+            - X-Admin-Secret
+            - X-Debug-Mode
+
+          # Add response headers
+          response_add:
+            X-Response-Time: "100ms"
+            X-API-Version: "v1"
+            Cache-Control: "private, no-cache, no-store, must-revalidate"
+            Pragma: "no-cache"
+            Expires: "0"
+
+          # Remove sensitive backend headers
+          response_remove:
+            - X-Database-Host
+            - X-Internal-Service
+            - Server
+
+  # 3. API Versioning - Different headers per version
+  - name: versioned_api
+    type: rest
+    protocol: http
+    upstream:
+      host: api-v2.example.com
+      port: 8080
+    routes:
+      # API v1 - Legacy
+      - path_prefix: /api/v1
+        headers:
+          request_add:
+            X-API-Version: "v1"
+            X-Legacy-Mode: "true"
+          response_add:
+            X-API-Version: "v1"
+            X-Deprecated: "true"
+            X-Upgrade-Available: "v2"
+
+      # API v2 - Current
+      - path_prefix: /api/v2
+        headers:
+          request_add:
+            X-API-Version: "v2"
+          response_add:
+            X-API-Version: "v2"
+            X-Deprecated: "false"
+
+  # 4. Service-level headers (applies to all routes)
+  - name: backend_service
+    type: rest
+    protocol: http
+    upstream:
+      host: backend.local
+      port: 8080
+    routes:
+      - path_prefix: /service/endpoint1
+      - path_prefix: /service/endpoint2
+      - path_prefix: /service/endpoint3
+    transformation:
+      enabled: true
+      defaults:
+        status: active
+      headers:
+        # These headers apply to ALL routes in this service
+        request_add:
+          X-Service-Name: "backend_service"
+          X-Service-Version: "2.0"
+          X-Environment: "production"
+
+        response_add:
+          X-Service-ID: "backend-001"
+          X-Served-By: "GAL-Gateway"
+
+  # 5. gRPC Service with headers
+  - name: grpc_service
+    type: grpc
+    protocol: http2
+    upstream:
+      host: grpc.example.com
+      port: 9090
+    routes:
+      - path_prefix: /grpc.Service
+        headers:
+          # gRPC-specific headers
+          request_add:
+            grpc-timeout: "30S"
+            X-Trace-ID: "{{uuid}}"
+
+          response_add:
+            X-gRPC-Gateway: "GAL"
+
+  # 6. Multi-tenant API - Tenant-specific headers
+  - name: multi_tenant_api
+    type: rest
+    protocol: http
+    upstream:
+      host: tenant-router.local
+      port: 8080
+    routes:
+      # Tenant: ACME Corp
+      - path_prefix: /tenant/acme
+        headers:
+          request_add:
+            X-Tenant-ID: "acme"
+            X-Tenant-Region: "us-west"
+            X-Tenant-Tier: "premium"
+
+      # Tenant: Widgets Inc
+      - path_prefix: /tenant/widgets
+        headers:
+          request_add:
+            X-Tenant-ID: "widgets"
+            X-Tenant-Region: "eu-central"
+            X-Tenant-Tier: "standard"
+
+  # 7. Combined: Rate Limiting + Authentication + Headers
+  - name: protected_api
+    type: rest
+    protocol: http
+    upstream:
+      host: protected.example.com
+      port: 8080
+    routes:
+      - path_prefix: /api/protected
+        methods: [GET, POST]
+
+        # Rate limiting
+        rate_limit:
+          enabled: true
+          requests_per_second: 100
+          burst: 200
+          key_type: header
+          key_header: X-API-Key
+
+        # Authentication
+        authentication:
+          enabled: true
+          type: jwt
+          jwt:
+            issuer: "https://auth.example.com"
+            audience: "api.example.com"
+            jwks_uri: "https://auth.example.com/.well-known/jwks.json"
+            algorithms: [RS256]
+
+        # Headers
+        headers:
+          request_add:
+            X-Protected-Resource: "true"
+            X-Auth-Required: "jwt"
+
+          response_add:
+            X-RateLimit-Limit: "100"
+            X-Protected: "true"
+
+  # 8. Static Assets - Aggressive caching headers
+  - name: static_assets
+    type: rest
+    protocol: http
+    upstream:
+      host: cdn.example.com
+      port: 80
+    routes:
+      - path_prefix: /static
+        headers:
+          response_add:
+            # Long-term caching
+            Cache-Control: "public, max-age=31536000, immutable"
+            Vary: "Accept-Encoding"
+
+            # CORS for CDN
+            Access-Control-Allow-Origin: "*"
+
+          response_remove:
+            # Remove unnecessary headers
+            - Set-Cookie
+            - Server
+
+  # 9. Monitoring/Health Endpoints - Minimal headers
+  - name: monitoring
+    type: rest
+    protocol: http
+    upstream:
+      host: monitor.local
+      port: 8080
+    routes:
+      - path_prefix: /health
+        headers:
+          response_add:
+            Cache-Control: "no-cache, no-store, must-revalidate"
+            X-Health-Check: "true"
+
+          response_remove:
+            - Server
+            - X-Powered-By
+            - X-AspNet-Version
+            - Via
+
+  # 10. WebSocket Service - Connection upgrade headers
+  - name: websocket_service
+    type: rest
+    protocol: http
+    upstream:
+      host: ws.example.com
+      port: 8080
+    routes:
+      - path_prefix: /ws
+        headers:
+          request_add:
+            X-WebSocket-Gateway: "GAL"
+
+          # Don't remove WebSocket headers
+          # Upgrade, Connection: upgrade are required
+
+plugins: []
