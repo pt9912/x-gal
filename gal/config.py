@@ -62,6 +62,7 @@ class Route:
         methods: Optional list of HTTP methods (e.g., ["GET", "POST"])
                  If None, all methods are allowed
         rate_limit: Optional rate limiting configuration for this route
+        authentication: Optional authentication configuration for this route
 
     Example:
         >>> route = Route(path_prefix="/api/users", methods=["GET", "POST"])
@@ -71,6 +72,7 @@ class Route:
     path_prefix: str
     methods: Optional[List[str]] = None
     rate_limit: Optional['RateLimitConfig'] = None
+    authentication: Optional['AuthenticationConfig'] = None
 
 
 @dataclass
@@ -160,6 +162,117 @@ class RateLimitConfig:
         """Set default burst value if not specified."""
         if self.burst is None:
             self.burst = self.requests_per_second * 2
+
+
+@dataclass
+class BasicAuthConfig:
+    """Basic Authentication configuration.
+
+    Defines HTTP Basic Authentication with username/password credentials.
+
+    Attributes:
+        users: Dictionary mapping usernames to passwords
+        realm: Authentication realm (default: "Protected")
+
+    Example:
+        >>> basic_auth = BasicAuthConfig(
+        ...     users={"admin": "secret123", "user": "pass456"},
+        ...     realm="API Gateway"
+        ... )
+        >>> "admin" in basic_auth.users
+        True
+    """
+    users: Dict[str, str] = field(default_factory=dict)
+    realm: str = "Protected"
+
+
+@dataclass
+class ApiKeyConfig:
+    """API Key Authentication configuration.
+
+    Defines API key-based authentication using headers or query parameters.
+
+    Attributes:
+        keys: List of valid API keys
+        key_name: Name of header or query parameter (default: "X-API-Key")
+        in_location: Where to look for key ("header" or "query", default: "header")
+
+    Example:
+        >>> api_key = ApiKeyConfig(
+        ...     keys=["key123", "key456"],
+        ...     key_name="X-API-Key",
+        ...     in_location="header"
+        ... )
+        >>> len(api_key.keys)
+        2
+    """
+    keys: List[str] = field(default_factory=list)
+    key_name: str = "X-API-Key"
+    in_location: str = "header"  # header or query
+
+
+@dataclass
+class JwtConfig:
+    """JWT (JSON Web Token) Authentication configuration.
+
+    Defines JWT-based authentication with support for JWKS and multiple issuers.
+
+    Attributes:
+        issuer: JWT issuer (iss claim)
+        audience: JWT audience (aud claim)
+        jwks_uri: JWKS endpoint URL for key discovery
+        algorithms: List of allowed signing algorithms (default: ["RS256"])
+        required_claims: List of required JWT claims (default: [])
+
+    Example:
+        >>> jwt = JwtConfig(
+        ...     issuer="https://auth.example.com",
+        ...     audience="api.example.com",
+        ...     jwks_uri="https://auth.example.com/.well-known/jwks.json",
+        ...     algorithms=["RS256", "ES256"]
+        ... )
+        >>> jwt.issuer
+        'https://auth.example.com'
+    """
+    issuer: str = ""
+    audience: str = ""
+    jwks_uri: str = ""
+    algorithms: List[str] = field(default_factory=lambda: ["RS256"])
+    required_claims: List[str] = field(default_factory=list)
+
+
+@dataclass
+class AuthenticationConfig:
+    """Authentication configuration for routes.
+
+    Defines authentication requirements for protecting routes with
+    various authentication mechanisms.
+
+    Attributes:
+        enabled: Whether authentication is enabled (default: True)
+        type: Authentication type ("basic", "api_key", or "jwt")
+        basic_auth: Basic Auth configuration (when type="basic")
+        api_key: API Key configuration (when type="api_key")
+        jwt: JWT configuration (when type="jwt")
+        fail_status: HTTP status code for auth failures (default: 401)
+        fail_message: Error message for auth failures
+
+    Example:
+        >>> auth = AuthenticationConfig(
+        ...     enabled=True,
+        ...     type="api_key",
+        ...     api_key=ApiKeyConfig(keys=["key123"])
+        ... )
+        >>> auth.type
+        'api_key'
+    """
+    enabled: bool = True
+    type: str = "api_key"  # basic, api_key, jwt
+    basic_auth: Optional[BasicAuthConfig] = None
+    api_key: Optional[ApiKeyConfig] = None
+    jwt: Optional[JwtConfig] = None
+    fail_status: int = 401
+    fail_message: str = "Unauthorized"
 
 
 @dataclass
@@ -329,17 +442,45 @@ class Config:
         for svc_data in data.get('services', []):
             upstream = Upstream(**svc_data['upstream'])
 
-            # Parse routes with optional rate limiting
+            # Parse routes with optional rate limiting and authentication
             routes = []
             for route_data in svc_data['routes']:
                 rate_limit = None
                 if 'rate_limit' in route_data:
                     rate_limit = RateLimitConfig(**route_data['rate_limit'])
 
+                authentication = None
+                if 'authentication' in route_data:
+                    auth_data = route_data['authentication']
+                    auth_type = auth_data.get('type', 'api_key')
+
+                    # Parse type-specific configuration
+                    basic_auth = None
+                    api_key = None
+                    jwt = None
+
+                    if auth_type == 'basic' and 'basic_auth' in auth_data:
+                        basic_auth = BasicAuthConfig(**auth_data['basic_auth'])
+                    elif auth_type == 'api_key' and 'api_key' in auth_data:
+                        api_key = ApiKeyConfig(**auth_data['api_key'])
+                    elif auth_type == 'jwt' and 'jwt' in auth_data:
+                        jwt = JwtConfig(**auth_data['jwt'])
+
+                    authentication = AuthenticationConfig(
+                        enabled=auth_data.get('enabled', True),
+                        type=auth_type,
+                        basic_auth=basic_auth,
+                        api_key=api_key,
+                        jwt=jwt,
+                        fail_status=auth_data.get('fail_status', 401),
+                        fail_message=auth_data.get('fail_message', 'Unauthorized')
+                    )
+
                 route = Route(
                     path_prefix=route_data['path_prefix'],
                     methods=route_data.get('methods'),
-                    rate_limit=rate_limit
+                    rate_limit=rate_limit,
+                    authentication=authentication
                 )
                 routes.append(route)
             

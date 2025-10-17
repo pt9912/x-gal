@@ -16,7 +16,11 @@ from gal.config import (
     ComputedField,
     Validation,
     Plugin,
-    RateLimitConfig
+    RateLimitConfig,
+    AuthenticationConfig,
+    BasicAuthConfig,
+    ApiKeyConfig,
+    JwtConfig
 )
 
 
@@ -141,6 +145,114 @@ class TestRateLimitConfig:
         """Test rate limit configuration when disabled"""
         rate_limit = RateLimitConfig(enabled=False)
         assert rate_limit.enabled is False
+
+
+class TestAuthenticationConfig:
+    """Test AuthenticationConfig class"""
+
+    def test_auth_defaults(self):
+        """Test authentication configuration with default values"""
+        auth = AuthenticationConfig()
+        assert auth.enabled is True
+        assert auth.type == "api_key"
+        assert auth.basic_auth is None
+        assert auth.api_key is None
+        assert auth.jwt is None
+        assert auth.fail_status == 401
+        assert auth.fail_message == "Unauthorized"
+
+    def test_basic_auth_config(self):
+        """Test basic authentication configuration"""
+        basic = BasicAuthConfig(
+            users={"admin": "secret123", "user": "pass456"},
+            realm="Admin Area"
+        )
+        assert len(basic.users) == 2
+        assert basic.users["admin"] == "secret123"
+        assert basic.realm == "Admin Area"
+
+    def test_api_key_config(self):
+        """Test API key configuration"""
+        api_key = ApiKeyConfig(
+            keys=["key1", "key2", "key3"],
+            key_name="X-Custom-Key",
+            in_location="header"
+        )
+        assert len(api_key.keys) == 3
+        assert api_key.key_name == "X-Custom-Key"
+        assert api_key.in_location == "header"
+
+    def test_api_key_config_query(self):
+        """Test API key configuration via query parameter"""
+        api_key = ApiKeyConfig(
+            keys=["key123"],
+            key_name="api_key",
+            in_location="query"
+        )
+        assert api_key.key_name == "api_key"
+        assert api_key.in_location == "query"
+
+    def test_jwt_config(self):
+        """Test JWT configuration"""
+        jwt = JwtConfig(
+            issuer="https://auth.example.com",
+            audience="api.example.com",
+            jwks_uri="https://auth.example.com/.well-known/jwks.json",
+            algorithms=["RS256", "ES256"],
+            required_claims=["sub", "email"]
+        )
+        assert jwt.issuer == "https://auth.example.com"
+        assert jwt.audience == "api.example.com"
+        assert jwt.jwks_uri == "https://auth.example.com/.well-known/jwks.json"
+        assert len(jwt.algorithms) == 2
+        assert len(jwt.required_claims) == 2
+
+    def test_jwt_config_defaults(self):
+        """Test JWT configuration with default algorithm"""
+        jwt = JwtConfig()
+        assert jwt.algorithms == ["RS256"]
+        assert jwt.required_claims == []
+
+    def test_route_with_basic_auth(self):
+        """Test route with basic authentication"""
+        basic = BasicAuthConfig(users={"admin": "secret"})
+        auth = AuthenticationConfig(type="basic", basic_auth=basic)
+        route = Route(path_prefix="/api", authentication=auth)
+
+        assert route.authentication is not None
+        assert route.authentication.type == "basic"
+        assert route.authentication.basic_auth is not None
+        assert "admin" in route.authentication.basic_auth.users
+
+    def test_route_with_api_key_auth(self):
+        """Test route with API key authentication"""
+        api_key = ApiKeyConfig(keys=["key123"])
+        auth = AuthenticationConfig(type="api_key", api_key=api_key)
+        route = Route(path_prefix="/api", authentication=auth)
+
+        assert route.authentication is not None
+        assert route.authentication.type == "api_key"
+        assert route.authentication.api_key is not None
+        assert len(route.authentication.api_key.keys) == 1
+
+    def test_route_with_jwt_auth(self):
+        """Test route with JWT authentication"""
+        jwt = JwtConfig(issuer="https://auth.example.com")
+        auth = AuthenticationConfig(type="jwt", jwt=jwt)
+        route = Route(path_prefix="/api", authentication=auth)
+
+        assert route.authentication is not None
+        assert route.authentication.type == "jwt"
+        assert route.authentication.jwt is not None
+        assert route.authentication.jwt.issuer == "https://auth.example.com"
+
+    def test_auth_disabled(self):
+        """Test disabled authentication configuration"""
+        api_key = ApiKeyConfig(keys=["key123"])
+        auth = AuthenticationConfig(enabled=False, type="api_key", api_key=api_key)
+
+        assert auth.enabled is False
+        assert auth.type == "api_key"
 
 
 class TestComputedField:

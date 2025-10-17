@@ -135,6 +135,8 @@ class TraefikProvider(Provider):
 
                 # Collect middlewares for this route
                 middlewares = []
+                if route.authentication and route.authentication.enabled:
+                    middlewares.append(f"{router_name}_auth")
                 if service.transformation and service.transformation.enabled:
                     middlewares.append(f"{service.name}_transform")
                 if route.rate_limit and route.rate_limit.enabled:
@@ -156,7 +158,12 @@ class TraefikProvider(Provider):
             output.append(f"        - url: 'http://{service.upstream.host}:{service.upstream.port}'")
             output.append("")
         
-        # Middlewares for transformations and rate limiting
+        # Middlewares for authentication, transformations, and rate limiting
+        has_authentication = any(
+            route.authentication and route.authentication.enabled
+            for service in config.services
+            for route in service.routes
+        )
         has_transformations = any(s.transformation and s.transformation.enabled for s in config.services)
         has_rate_limits = any(
             route.rate_limit and route.rate_limit.enabled
@@ -164,8 +171,50 @@ class TraefikProvider(Provider):
             for route in service.routes
         )
 
-        if has_transformations or has_rate_limits:
+        if has_authentication or has_transformations or has_rate_limits:
             output.append("  middlewares:")
+
+            # Authentication middlewares
+            for service in config.services:
+                for i, route in enumerate(service.routes):
+                    if route.authentication and route.authentication.enabled:
+                        router_name = f"{service.name}_router_{i}"
+                        auth = route.authentication
+
+                        if auth.type == "basic":
+                            output.append(f"    {router_name}_auth:")
+                            output.append("      basicAuth:")
+                            if auth.basic_auth and auth.basic_auth.users:
+                                output.append("        users:")
+                                for username, password in auth.basic_auth.users.items():
+                                    # Traefik expects htpasswd format, but for simplicity using plain format
+                                    # In production, use: htpasswd -nb username password
+                                    output.append(f"          - '{username}:{password}'")
+                                if auth.basic_auth.realm:
+                                    output.append(f"        realm: '{auth.basic_auth.realm}'")
+                            output.append("")
+
+                        elif auth.type == "api_key":
+                            # Traefik doesn't have native API key auth, use forwardAuth to external service
+                            output.append(f"    {router_name}_auth:")
+                            output.append("      forwardAuth:")
+                            output.append("        address: 'http://api-key-validator:8080/validate'")
+                            key_name = auth.api_key.key_name if auth.api_key else "X-API-Key"
+                            output.append("        authRequestHeaders:")
+                            output.append(f"          - '{key_name}'")
+                            output.append("")
+
+                        elif auth.type == "jwt":
+                            # Traefik uses forwardAuth for JWT validation
+                            output.append(f"    {router_name}_auth:")
+                            output.append("      forwardAuth:")
+                            if auth.jwt and auth.jwt.jwks_uri:
+                                output.append(f"        address: 'http://jwt-validator:8080/validate'")
+                            else:
+                                output.append("        address: 'http://jwt-validator:8080/validate'")
+                            output.append("        authRequestHeaders:")
+                            output.append("          - 'Authorization'")
+                            output.append("")
 
             # Transformation middlewares
             for service in config.services:

@@ -160,11 +160,38 @@ class APISIXProvider(Provider):
                 if route.methods:
                     route_config["methods"] = route.methods
 
-                # Add rate limiting plugin if configured
-                if route.rate_limit and route.rate_limit.enabled:
+                # Initialize plugins dict if needed
+                if (route.rate_limit and route.rate_limit.enabled) or (route.authentication and route.authentication.enabled):
                     if "plugins" not in route_config:
                         route_config["plugins"] = {}
 
+                # Add authentication plugin if configured
+                if route.authentication and route.authentication.enabled:
+                    auth = route.authentication
+                    if auth.type == "basic":
+                        route_config["plugins"]["basic-auth"] = {}
+                    elif auth.type == "api_key":
+                        key_name = auth.api_key.key_name if auth.api_key else "X-API-Key"
+                        in_location = auth.api_key.in_location if auth.api_key else "header"
+                        route_config["plugins"]["key-auth"] = {
+                            "header": key_name if in_location == "header" else None,
+                            "query": key_name if in_location == "query" else None
+                        }
+                        # Remove None values
+                        route_config["plugins"]["key-auth"] = {k: v for k, v in route_config["plugins"]["key-auth"].items() if v is not None}
+                    elif auth.type == "jwt":
+                        jwt_config = {}
+                        if auth.jwt:
+                            if auth.jwt.issuer:
+                                jwt_config["iss"] = auth.jwt.issuer
+                            if auth.jwt.audience:
+                                jwt_config["aud"] = auth.jwt.audience
+                            if auth.jwt.algorithms:
+                                jwt_config["algorithm"] = auth.jwt.algorithms[0]  # APISIX supports one algorithm
+                        route_config["plugins"]["jwt-auth"] = jwt_config if jwt_config else {}
+
+                # Add rate limiting plugin if configured
+                if route.rate_limit and route.rate_limit.enabled:
                     route_config["plugins"]["limit-count"] = {
                         "count": route.rate_limit.requests_per_second,
                         "time_window": 1,
