@@ -1,5 +1,11 @@
 # Gateway Abstraction Layer (GAL) - Python Edition
 
+[![Tests](https://github.com/pt9912/x-gal/actions/workflows/test.yml/badge.svg)](https://github.com/pt9912/x-gal/actions/workflows/test.yml)
+[![Docker Build](https://github.com/pt9912/x-gal/actions/workflows/docker-build.yml/badge.svg)](https://github.com/pt9912/x-gal/actions/workflows/docker-build.yml)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/pt9912/x-gal/releases)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+
 **Gateway-Abstraktionsschicht** - Provider-agnostisches API-Gateway-Konfigurations- und Transformationssystem in Python.
 
 Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong, APISIX, Traefik oder anderen Gateways - ohne Vendor Lock-in.
@@ -13,27 +19,50 @@ Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong
 - ✅ **Default-Wert-Injektion**
 - ✅ **Berechnete Felder** (UUIDs, Zeitstempel)
 - ✅ **Feldvalidierung**
+- ✅ **Strukturiertes Logging** mit konfigurierbaren Log-Levels
 - ✅ **Reines Python** - kein Go erforderlich!
+- ✅ **CI/CD Ready** - GitHub Actions Workflows integriert
+- ✅ **Umfassende Tests** - 101 Tests mit 89% Coverage
 
 ## Installation
 
 ### 🐳 Docker (Empfohlen)
 
+#### Von GitHub Container Registry (Fertig)
+
+```bash
+# Latest Version ziehen
+docker pull ghcr.io/pt9912/x-gal:latest
+
+# Direkt verwenden
+docker run --rm ghcr.io/pt9912/x-gal:latest list-providers
+
+# Mit Volume für Ausgabe
+docker run --rm -v $(pwd)/generated:/app/generated \
+  ghcr.io/pt9912/x-gal:latest \
+  generate --config examples/gateway-config.yaml --provider envoy --output generated/envoy.yaml
+
+# Spezifische Version
+docker pull ghcr.io/pt9912/x-gal:v1.0.0
+```
+
+#### Lokal bauen
+
 ```bash
 # Image bauen
 docker build -t gal:latest .
 
-# Direkt verwenden
+# Verwenden
 docker run --rm gal:latest list-providers
-
-# Mit Volume für Ausgabe
-docker run --rm -v $(pwd)/generated:/app/generated gal:latest \
-  generate --config examples/gateway-config.yaml --provider envoy --output generated/envoy.yaml
 ```
 
 ### 🐍 Python (Lokal)
 
 ```bash
+# Repository klonen
+git clone https://github.com/pt9912/x-gal.git
+cd x-gal
+
 # Virtuelle Umgebung erstellen
 python3 -m venv venv
 source venv/bin/activate  # Unter Windows: venv\Scripts\activate
@@ -43,6 +72,14 @@ pip install -r requirements.txt
 
 # CLI ausführbar machen
 chmod +x gal-cli.py
+```
+
+### 📦 PyPI (Geplant)
+
+```bash
+# Wird in zukünftigen Releases verfügbar sein
+pip install gal-gateway
+gal --help
 ```
 
 ## Schnellstart
@@ -132,13 +169,36 @@ python gal-cli.py generate --config CONFIG --provider PROVIDER --output FILE
 python gal-cli.py validate --config CONFIG
 
 # Für alle Provider generieren
-python gal-cli.py generate-all --config CONFIG
+python gal-cli.py generate-all --config CONFIG --output-dir OUTPUT
 
 # Konfigurationsinformationen anzeigen
 python gal-cli.py info --config CONFIG
 
 # Verfügbare Provider auflisten
 python gal-cli.py list-providers
+
+# Mit Logging (für Debugging)
+python gal-cli.py --log-level debug generate --config CONFIG --provider envoy
+
+# Log Levels: debug, info, warning (default), error
+python gal-cli.py --log-level info generate-all --config CONFIG
+```
+
+### Logging-Optionen
+
+GAL unterstützt strukturiertes Logging mit verschiedenen Verbosity-Levels:
+
+- `--log-level debug`: Detaillierte Debug-Informationen (Parsing, Validierung, Generation)
+- `--log-level info`: Haupt-Operationen und Zusammenfassungen
+- `--log-level warning`: Warnungen und nicht-kritische Probleme (Standard)
+- `--log-level error`: Nur kritische Fehler
+
+Beispiel:
+```bash
+# Debugging aktivieren
+docker run --rm ghcr.io/pt9912/x-gal:latest \
+  --log-level debug \
+  generate --config examples/gateway-config.yaml --provider envoy
 ```
 
 ## 🐳 Docker Deployment
@@ -177,11 +237,122 @@ CONFIG_FILE=examples/gateway-config.yaml docker-compose --profile validate up ga
 
 ## Dokumentation
 
-- [Schnellstart-Anleitung](docs/QUICKSTART.md)
-- [Architektur-Übersicht](docs/ARCHITECTURE.md)
-- [Provider-Details](docs/PROVIDERS.md)
-- [Transformations-Anleitung](docs/TRANSFORMATIONS.md)
+- [Schnellstart-Anleitung](docs/guides/QUICKSTART.md)
+- [Architektur-Übersicht](docs/architecture/ARCHITECTURE.md)
+- [Provider-Details](docs/guides/PROVIDERS.md)
+- [Transformations-Anleitung](docs/guides/TRANSFORMATIONS.md)
+- [Docker-Anleitung](docs/guides/DOCKER.md)
+- [Changelog](CHANGELOG.md)
+
+## Testing & Development
+
+### Tests ausführen
+
+```bash
+# Alle Tests
+pytest
+
+# Mit Coverage
+pytest --cov=gal --cov-report=term-missing
+
+# Spezifische Test-Datei
+pytest tests/test_providers.py -v
+
+# Mit Logging
+pytest -v --log-cli-level=DEBUG
+```
+
+### Test-Suite
+
+- **101 Tests** mit **89% Code Coverage**
+- Unit Tests für alle Module
+- Provider-spezifische Tests
+- CLI Tests mit Click CliRunner
+- End-to-End Workflow Tests
+- Deployment Tests (mit Mocking)
+- Real-World Szenario Tests
+
+### Code Quality
+
+```bash
+# Formatting mit black
+black .
+
+# Import sorting mit isort
+isort .
+
+# Linting mit flake8
+flake8 .
+```
+
+## CI/CD
+
+Das Projekt verwendet GitHub Actions für kontinuierliche Integration:
+
+### Workflows
+
+1. **Tests** (`.github/workflows/test.yml`)
+   - Läuft auf Python 3.10, 3.11, 3.12
+   - Automatische Tests bei jedem Push/PR
+   - Code Quality Checks
+   - Coverage Reporting
+
+2. **Docker Build** (`.github/workflows/docker-build.yml`)
+   - Automatischer Build und Push zu ghcr.io
+   - Multi-Platform Support (amd64, arm64)
+   - Intelligentes Tagging (semver, branch, sha)
+
+3. **Release** (`.github/workflows/release.yml`)
+   - Automatische Releases bei Git Tags
+   - Changelog-Generierung
+   - Package Building
+   - GitHub Release Creation
+
+### Release erstellen
+
+```bash
+# Version Tag erstellen
+git tag v1.0.1
+git push origin v1.0.1
+
+# GitHub Actions erstellt automatisch:
+# - GitHub Release mit Changelog
+# - Docker Images auf ghcr.io
+# - Distribution Packages
+```
+
+## Contributing
+
+Beiträge sind willkommen! Bitte:
+
+1. Fork das Repository
+2. Erstelle einen Feature Branch (`git checkout -b feature/amazing-feature`)
+3. Committe deine Änderungen (`git commit -m 'Add amazing feature'`)
+4. Pushe zum Branch (`git push origin feature/amazing-feature`)
+5. Öffne einen Pull Request
+
+### Richtlinien
+
+- Schreibe Tests für neue Features
+- Befolge den bestehenden Code-Stil
+- Aktualisiere die Dokumentation
+- Füge Eintrag im CHANGELOG.md hinzu
 
 ## Lizenz
 
-MIT
+MIT - siehe [LICENSE](LICENSE) für Details.
+
+## Links
+
+- [GitHub Repository](https://github.com/pt9912/x-gal)
+- [GitHub Container Registry](https://github.com/pt9912/x-gal/pkgs/container/x-gal)
+- [Issues](https://github.com/pt9912/x-gal/issues)
+- [Releases](https://github.com/pt9912/x-gal/releases)
+
+## Autor
+
+**Dietmar Burkard** - Gateway Abstraction Layer
+
+---
+
+⭐ Wenn dir dieses Projekt gefällt, gib ihm einen Stern auf GitHub!
