@@ -7,10 +7,13 @@ serverless functions (Lua) for request transformations.
 
 import json
 import os
+import logging
 import requests
 from typing import Optional
 from ..provider import Provider
 from ..config import Config
+
+logger = logging.getLogger(__name__)
 
 
 class APISIXProvider(Provider):
@@ -82,6 +85,7 @@ class APISIXProvider(Provider):
             >>> provider.validate(config)
             True
         """
+        logger.debug(f"Validating APISIX configuration: {len(config.services)} services")
         return True
 
     def generate(self, config: Config) -> str:
@@ -109,6 +113,7 @@ class APISIXProvider(Provider):
             >>> 'routes' in data and 'services' in data
             True
         """
+        logger.info(f"Generating APISIX configuration for {len(config.services)} services")
         apisix_config = {
             "routes": [],
             "upstreams": [],
@@ -156,8 +161,10 @@ class APISIXProvider(Provider):
                     route_config["methods"] = route.methods
                 
                 apisix_config["routes"].append(route_config)
-        
-        return json.dumps(apisix_config, indent=2)
+
+        result = json.dumps(apisix_config, indent=2)
+        logger.info(f"APISIX configuration generated: {len(result)} bytes, {len(config.services)} services")
+        return result
     
     def _generate_lua_transformation(self, service) -> str:
         """Generate Lua transformation script for APISIX serverless plugin.
@@ -254,6 +261,7 @@ class APISIXProvider(Provider):
             ...                 api_key="your-api-key")
             True
         """
+        logger.info(f"Deploying APISIX configuration to file: {output_file or 'apisix.json'}")
         # Generate configuration
         generated_config = self.generate(config)
 
@@ -269,8 +277,10 @@ class APISIXProvider(Provider):
             with open(output_file, 'w') as f:
                 f.write(generated_config)
 
+            logger.info(f"APISIX configuration successfully written to {output_file}")
             print(f"✓ APISIX configuration written to {output_file}")
         except IOError as e:
+            logger.error(f"Failed to write APISIX config file to {output_file}: {e}")
             print(f"✗ Failed to write config file: {e}")
             return False
 
@@ -285,11 +295,13 @@ class APISIXProvider(Provider):
                 "Content-Type": "application/json"
             }
 
+            logger.debug(f"Deploying to APISIX Admin API at {admin_url}")
             try:
                 # Load generated config
                 apisix_data = json.loads(generated_config)
 
                 # Deploy upstreams
+                logger.debug(f"Deploying {len(apisix_data.get('upstreams', []))} upstreams")
                 for upstream in apisix_data.get("upstreams", []):
                     upstream_id = upstream["id"]
                     response = requests.put(
@@ -337,15 +349,19 @@ class APISIXProvider(Provider):
                         print(f"  Response: {response.text}")
                         return False
 
+                logger.info("All configuration deployed successfully to APISIX")
                 print(f"✓ All configuration deployed successfully to APISIX")
                 return True
 
             except requests.RequestException as e:
+                logger.error(f"Could not reach APISIX Admin API at {admin_url}: {e}")
                 print(f"⚠ Could not reach APISIX Admin API: {e}")
                 print(f"  Config written to {output_file}")
                 return False
             except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON configuration: {e}")
                 print(f"✗ Invalid JSON configuration: {e}")
                 return False
 
+        logger.info("APISIX deployment completed successfully")
         return True

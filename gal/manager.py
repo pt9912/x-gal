@@ -2,9 +2,12 @@
 Manager for orchestrating GAL operations
 """
 
+import logging
 from typing import Dict, List
 from .config import Config
 from .provider import Provider
+
+logger = logging.getLogger(__name__)
 
 
 class Manager:
@@ -44,7 +47,9 @@ class Manager:
             >>> "envoy" in manager.list_providers()
             True
         """
-        self.providers[provider.name()] = provider
+        provider_name = provider.name()
+        self.providers[provider_name] = provider
+        logger.debug(f"Registered provider: {provider_name}")
 
     def load_config(self, filepath: str) -> Config:
         """Load configuration from YAML file.
@@ -65,7 +70,14 @@ class Manager:
             >>> config.version
             '1.0'
         """
-        return Config.from_yaml(filepath)
+        logger.info(f"Loading configuration from: {filepath}")
+        try:
+            config = Config.from_yaml(filepath)
+            logger.info(f"Configuration loaded successfully: provider={config.provider}, services={len(config.services)}")
+            return config
+        except Exception as e:
+            logger.error(f"Failed to load configuration from {filepath}: {e}")
+            raise
 
     def validate(self, config: Config) -> bool:
         """Validate configuration for the specified provider.
@@ -86,14 +98,21 @@ class Manager:
             >>> manager.validate(config)
             True
         """
+        logger.info(f"Validating configuration for provider: {config.provider}")
         provider = self.providers.get(config.provider)
         if not provider:
+            logger.error(f"Provider '{config.provider}' not registered")
             raise ValueError(f"Provider '{config.provider}' not registered")
 
-        if not provider.validate(config):
-            raise ValueError(f"Configuration validation failed for {config.provider}")
-
-        return True
+        try:
+            if not provider.validate(config):
+                logger.error(f"Configuration validation failed for {config.provider}")
+                raise ValueError(f"Configuration validation failed for {config.provider}")
+            logger.info(f"Configuration validation successful for {config.provider}")
+            return True
+        except Exception as e:
+            logger.error(f"Validation error for {config.provider}: {e}")
+            raise
 
     def generate(self, config: Config) -> str:
         """Generate provider-specific configuration.
@@ -118,14 +137,23 @@ class Manager:
             >>> "static_resources" in output
             True
         """
+        logger.info(f"Generating configuration for provider: {config.provider}")
         provider = self.providers.get(config.provider)
         if not provider:
+            logger.error(f"Provider '{config.provider}' not registered")
             raise ValueError(f"Provider '{config.provider}' not registered")
 
-        if not provider.validate(config):
-            raise ValueError(f"Configuration validation failed for {config.provider}")
+        try:
+            if not provider.validate(config):
+                logger.error(f"Configuration validation failed for {config.provider}")
+                raise ValueError(f"Configuration validation failed for {config.provider}")
 
-        return provider.generate(config)
+            result = provider.generate(config)
+            logger.info(f"Configuration generated successfully for {config.provider} ({len(result)} bytes)")
+            return result
+        except Exception as e:
+            logger.error(f"Generation error for {config.provider}: {e}")
+            raise
 
     def deploy(self, config: Config) -> bool:
         """Deploy configuration to gateway.
@@ -149,11 +177,22 @@ class Manager:
             >>> config = manager.load_config("config.yaml")
             >>> success = manager.deploy(config)
         """
+        logger.info(f"Deploying configuration for provider: {config.provider}")
         provider = self.providers.get(config.provider)
         if not provider:
+            logger.error(f"Provider '{config.provider}' not registered")
             raise ValueError(f"Provider '{config.provider}' not registered")
 
-        return provider.deploy(config)
+        try:
+            result = provider.deploy(config)
+            if result:
+                logger.info(f"Deployment successful for {config.provider}")
+            else:
+                logger.warning(f"Deployment returned False for {config.provider}")
+            return result
+        except Exception as e:
+            logger.error(f"Deployment error for {config.provider}: {e}")
+            raise
 
     def list_providers(self) -> List[str]:
         """List all registered providers.
