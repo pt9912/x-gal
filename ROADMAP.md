@@ -280,10 +280,105 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 
 ---
 
-## 🔮 v1.2.0 (Q1 2026 - Vision)
+## 🚀 v1.2.0 (Q1 2026 - In Planning)
+
+**Focus:** Neue Gateway-Provider & Erweiterte Features
+**Status:** 📋 In Planning (siehe [docs/v1.2.0-PLAN.md](docs/v1.2.0-PLAN.md))
+**Estimated Effort:** 11.5 Wochen
+
+### High Priority Features
+
+#### 1. Nginx Provider (Open Source)
+**Status:** 🔄 Pending
+**Effort:** 3 Wochen
+- **Reverse Proxy & Load Balancing**
+- **Rate Limiting** (ngx_http_limit_req_module)
+- **Basic Authentication** (ngx_http_auth_basic_module)
+- **Header Manipulation** (add_header, proxy_set_header)
+- **CORS** (via add_header directives)
+- **Passive Health Checks** (max_fails, fail_timeout)
+- **Load Balancing Algorithms:** Round Robin, Least Conn, IP Hash, Weighted
+
+**Limitations:**
+- ❌ No Active Health Checks (Nginx Plus only)
+- ⚠️ JWT Auth requires OpenResty/Lua
+- ⚠️ Circuit Breaker requires Lua
+
+#### 2. HAProxy Provider
+**Status:** 🔄 Pending
+**Effort:** 2.5 Wochen
+- **Advanced Load Balancing** (10+ Algorithmen)
+- **Active & Passive Health Checks**
+- **Rate Limiting** (stick-tables)
+- **Header Manipulation** (req.hdr, res.hdr)
+- **ACLs** (Access Control Lists)
+- **Sticky Sessions** (multiple methods)
+- **Circuit Breaker** (via server checks)
+
+**Provider Comparison (Updated):**
+| Feature | Envoy | Kong | APISIX | Traefik | **Nginx** | **HAProxy** |
+|---------|-------|------|--------|---------|-----------|-------------|
+| Rate Limiting | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Basic Auth | ⚠️ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| JWT Auth | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ |
+| Headers | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| CORS | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| Active HC | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| Passive HC | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ |
+| Load Balancing | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+### Medium Priority Features
+
+#### 3. WebSocket Support
+**Status:** 🔄 Pending
+**Effort:** 2 Wochen
+- **WebSocket Routing**
+- **Connection Limits**
+- **Idle Timeout Configuration**
+- **Ping/Pong Heartbeat**
+
+**Provider Support:**
+- ✅ All 6 Providers (Envoy, Kong, APISIX, Traefik, Nginx, HAProxy)
+
+#### 4. Request/Response Body Transformation
+**Status:** 🔄 Pending
+**Effort:** 1.5 Wochen
+- **Request Body Modification**
+- **Response Body Filtering**
+- **Data Enrichment**
+- **Format Conversion**
+
+#### 5. Timeout & Retry Policies
+**Status:** 🔄 Pending
+**Effort:** 1 Woche
+- **Connect Timeout**
+- **Send/Read Timeout**
+- **Automatic Retries**
+- **Exponential Backoff**
+
+### Low Priority Features
+
+#### 6. Enhanced Logging & Observability (Optional)
+**Status:** 🔄 Pending
+**Effort:** 1.5 Wochen
+- **Structured Access Logs** (JSON)
+- **Custom Log Formats**
+- **Log Sampling**
+- **OpenTelemetry Integration** (Basic)
+- **Prometheus Metrics Export**
+
+### Success Metrics
+- **6 Gateway Providers** (Envoy, Kong, APISIX, Traefik, Nginx, HAProxy)
+- **600+ Tests** (erhöht von 400+)
+- **95%+ Code Coverage**
+- **10.000+ Zeilen Dokumentation**
+
+---
+
+## 🔮 v1.3.0 (Q2 2026 - Vision)
 
 **Focus:** Advanced Traffic Management & Multi-Cloud
-**Status:** Planned
+**Status:** Concept
 
 ### Features
 
@@ -321,14 +416,9 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 - **Query Complexity Limits**
 - **Field-Level Rate Limiting**
 
-#### WebSocket Support
-- **WebSocket Routing**
-- **Connection Limits**
-- **Message Rate Limiting**
-
 ---
 
-## 🌟 v1.3.0 (Q2 2026 - Vision)
+## 🌟 v1.4.0 (Q3 2026 - Vision)
 
 **Focus:** Enterprise Features & Developer Experience
 **Status:** Concept
@@ -457,5 +547,5 @@ Hast du Feedback zur Roadmap? Erstelle ein Issue oder starte eine Discussion:
 ---
 
 **Last Updated:** 2025-10-18
-**Current Version:** v1.0.0
-**Next Milestone:** v1.1.0 (Q4 2025)
+**Current Version:** v1.1.0
+**Next Milestone:** v1.2.0 (Q1 2026)

@@ -257,12 +257,33 @@ Siehe [CHANGELOG.md](CHANGELOG.md) für vollständige Details.
 
 ## 🔮 Was kommt als Nächstes (v1.2.0)
 
-- WebSocket-Unterstützung
-- gRPC Health Checks
-- Request/Response Body Transformationen
-- Timeout-Konfigurationen
-- Retry Policies
-- Zusätzliche Gateway-Provider (HAProxy, Nginx)
+Das nächste Release (v1.2.0, Q1 2026) bringt **neue Gateway-Provider** und **erweiterte Features**:
+
+### Neue Gateway-Provider
+- **Nginx Provider (Open Source)** - Der #1 Web Server weltweit
+  - Reverse Proxy & Load Balancing
+  - Rate Limiting, Basic Auth, Header Manipulation
+  - Passive Health Checks
+  - 4 Load Balancing Algorithmen
+- **HAProxy Provider** - Enterprise-grade High-Performance Load Balancer
+  - 10+ Load Balancing Algorithmen
+  - Active & Passive Health Checks
+  - Advanced Rate Limiting (stick-tables)
+  - ACLs und Sticky Sessions
+
+### Neue Features
+- **WebSocket Support** - Real-time bidirektionale Kommunikation
+- **Request/Response Body Transformation** - On-the-fly Datenmanipulation
+- **Timeout & Retry Policies** - Robuste Fehlerbehandlung
+- **Enhanced Logging & Observability** - Strukturierte Logs, OpenTelemetry
+
+### Ziele v1.2.0
+- **6 Gateway-Provider** (Envoy, Kong, APISIX, Traefik, Nginx, HAProxy)
+- **600+ Tests** (erhöht von 400+)
+- **95%+ Code Coverage**
+- **10.000+ Zeilen Dokumentation**
+
+**Weitere Informationen:** Siehe [docs/v1.2.0-PLAN.md](docs/v1.2.0-PLAN.md) für den detaillierten Implementierungsplan.
 
 ---
 
