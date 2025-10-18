@@ -7,9 +7,25 @@ load balancing, rate limiting, basic authentication, headers, and CORS.
 
 import logging
 import os
-from typing import List, Optional
+import re
+from typing import Any, Dict, List, Optional
 
-from ..config import Config, Route, Service, Upstream
+from ..config import (
+    AuthenticationConfig,
+    BasicAuthConfig,
+    Config,
+    CORSPolicy,
+    GlobalConfig,
+    HeaderManipulation,
+    HealthCheckConfig,
+    LoadBalancerConfig,
+    PassiveHealthCheck,
+    RateLimitConfig,
+    Route,
+    Service,
+    Upstream,
+    UpstreamTarget,
+)
 from ..provider import Provider
 
 logger = logging.getLogger(__name__)
@@ -810,19 +826,455 @@ class NginxProvider(Provider):
             # Static value, quote it
             return f"'{value}'"
 
-    def parse(self, provider_config: str):
+    def parse(self, provider_config: str) -> Config:
         """Parse Nginx configuration to GAL format.
 
-        TODO: Implementation pending for v1.3.0 Feature 5 (Custom Parser).
+        Parses nginx.conf format with custom regex-based parser.
+        Extracts upstreams, servers, locations, and directives.
 
         Args:
-            provider_config: Nginx nginx.conf configuration
+            provider_config: Nginx nginx.conf configuration string
+
+        Returns:
+            Config: GAL configuration object
 
         Raises:
-            NotImplementedError: Nginx parser not yet implemented
+            ValueError: If config is invalid or cannot be parsed
         """
-        raise NotImplementedError(
-            "Nginx config import will be implemented in v1.3.0 Feature 5. "
-            "Requires custom nginx.conf parser. "
-            "Use 'gal import --provider nginx' after the feature is released."
+        logger.info("Parsing Nginx configuration to GAL format")
+
+        if not provider_config or not provider_config.strip():
+            raise ValueError("Empty configuration")
+
+        self._import_warnings = []
+
+        # Remove comments
+        config_text = self._remove_comments(provider_config)
+
+        # Extract http block
+        http_block = self._extract_http_block(config_text)
+        if not http_block:
+            raise ValueError("No http block found in nginx configuration")
+
+        # Parse upstreams
+        upstreams = self._parse_upstreams(http_block)
+
+        # Parse rate limiting zones
+        rate_limit_zones = self._parse_rate_limit_zones(http_block)
+
+        # Parse servers with locations
+        services = self._parse_servers(http_block, upstreams, rate_limit_zones)
+
+        # Create default global config
+        global_config = GlobalConfig(host="0.0.0.0", port=80, timeout="60s")
+
+        return Config(
+            version="1.0",
+            provider="nginx",
+            global_config=global_config,
+            services=services,
         )
+
+    def _remove_comments(self, config_text: str) -> str:
+        """Remove comments from nginx config."""
+        lines = []
+        for line in config_text.split("\n"):
+            # Remove comments (but preserve strings with #)
+            if "#" in line:
+                # Simple approach: remove # and everything after if not in quotes
+                # This is simplified - full parser would handle quoted strings
+                line = re.sub(r'#.*$', '', line)
+            lines.append(line)
+        return "\n".join(lines)
+
+    def _extract_http_block(self, config_text: str) -> Optional[str]:
+        """Extract http {} block from nginx config."""
+        # Find http block
+        match = re.search(r'http\s*\{', config_text, re.MULTILINE)
+        if not match:
+            return None
+
+        # Find matching closing brace
+        start = match.end()
+        depth = 1
+        pos = start
+
+        while pos < len(config_text) and depth > 0:
+            if config_text[pos] == '{':
+                depth += 1
+            elif config_text[pos] == '}':
+                depth -= 1
+            pos += 1
+
+        if depth == 0:
+            return config_text[start:pos-1]
+        return None
+
+    def _parse_upstreams(self, http_block: str) -> Dict[str, Dict[str, Any]]:
+        """Parse upstream blocks from http block."""
+        upstreams = {}
+
+        # Find all upstream blocks
+        for match in re.finditer(r'upstream\s+(\w+)\s*\{([^}]+)\}', http_block, re.MULTILINE | re.DOTALL):
+            upstream_name = match.group(1)
+            upstream_body = match.group(2)
+
+            # Parse upstream configuration
+            upstream_config = {
+                'name': upstream_name,
+                'targets': [],
+                'algorithm': 'round_robin',  # Default
+            }
+
+            # Check for load balancing algorithm
+            if re.search(r'\bleast_conn\s*;', upstream_body):
+                upstream_config['algorithm'] = 'least_conn'
+            elif re.search(r'\bip_hash\s*;', upstream_body):
+                upstream_config['algorithm'] = 'ip_hash'
+
+            # Parse server directives
+            for server_match in re.finditer(
+                r'server\s+([\w\.\-]+):(\d+)(?:\s+weight=(\d+))?(?:\s+max_fails=(\d+))?(?:\s+fail_timeout=(\w+))?',
+                upstream_body
+            ):
+                host = server_match.group(1)
+                port = int(server_match.group(2))
+                weight = int(server_match.group(3)) if server_match.group(3) else 1
+                max_fails = int(server_match.group(4)) if server_match.group(4) else None
+                fail_timeout = server_match.group(5) if server_match.group(5) else None
+
+                upstream_config['targets'].append({
+                    'host': host,
+                    'port': port,
+                    'weight': weight,
+                    'max_fails': max_fails,
+                    'fail_timeout': fail_timeout,
+                })
+
+            upstreams[upstream_name] = upstream_config
+
+        return upstreams
+
+    def _parse_rate_limit_zones(self, http_block: str) -> Dict[str, Dict[str, Any]]:
+        """Parse limit_req_zone directives."""
+        zones = {}
+
+        # Pattern: limit_req_zone $binary_remote_addr zone=myzone:10m rate=10r/s;
+        for match in re.finditer(
+            r'limit_req_zone\s+\$[\w_]+\s+zone=(\w+):[\w]+\s+rate=(\d+)r/([smhd])',
+            http_block
+        ):
+            zone_name = match.group(1)
+            rate = int(match.group(2))
+            unit = match.group(3)
+
+            # Convert to requests per second
+            if unit == 's':
+                requests_per_second = rate
+            elif unit == 'm':
+                requests_per_second = rate / 60
+            elif unit == 'h':
+                requests_per_second = rate / 3600
+            elif unit == 'd':
+                requests_per_second = rate / 86400
+            else:
+                requests_per_second = rate
+
+            zones[zone_name] = {
+                'requests_per_second': requests_per_second,
+                'rate': rate,
+                'unit': unit,
+            }
+
+        return zones
+
+    def _parse_servers(
+        self,
+        http_block: str,
+        upstreams: Dict[str, Dict[str, Any]],
+        rate_limit_zones: Dict[str, Dict[str, Any]]
+    ) -> List[Service]:
+        """Parse server blocks and create GAL services."""
+        services = []
+
+        # Find all server blocks using brace counting
+        server_blocks = self._extract_blocks(http_block, 'server')
+
+        for server_body in server_blocks:
+            # Parse locations in this server
+            service = self._parse_server_block(server_body, upstreams, rate_limit_zones)
+            if service:
+                services.append(service)
+
+        return services
+
+    def _extract_blocks(self, text: str, block_name: str) -> List[str]:
+        """Extract all blocks of a given type using brace counting."""
+        blocks = []
+        pattern = rf'{block_name}\s+[^{{]*\{{'
+
+        pos = 0
+        while True:
+            match = re.search(pattern, text[pos:], re.MULTILINE)
+            if not match:
+                break
+
+            # Find matching closing brace
+            start = pos + match.end()
+            depth = 1
+            curr_pos = start
+
+            while curr_pos < len(text) and depth > 0:
+                if text[curr_pos] == '{':
+                    depth += 1
+                elif text[curr_pos] == '}':
+                    depth -= 1
+                curr_pos += 1
+
+            if depth == 0:
+                blocks.append(text[start:curr_pos-1])
+
+            pos = curr_pos
+
+        return blocks
+
+    def _parse_server_block(
+        self,
+        server_body: str,
+        upstreams: Dict[str, Dict[str, Any]],
+        rate_limit_zones: Dict[str, Dict[str, Any]]
+    ) -> Optional[Service]:
+        """Parse a single server block."""
+        routes = []
+
+        # Find all location blocks using brace counting
+        location_blocks = self._extract_location_blocks(server_body)
+
+        for path_prefix, location_body in location_blocks:
+            route = self._parse_location_block(path_prefix, location_body, rate_limit_zones)
+            if route:
+                routes.append(route)
+
+        if not routes:
+            return None
+
+        # Extract proxy_pass to determine upstream (check all locations)
+        upstream_name = None
+        for _, location_body in location_blocks:
+            proxy_pass_match = re.search(r'proxy_pass\s+http://([\w_]+)', location_body)
+            if proxy_pass_match:
+                upstream_name = proxy_pass_match.group(1)
+                break
+
+        if not upstream_name:
+            return None
+
+        # Get upstream configuration
+        upstream_config = upstreams.get(upstream_name)
+        if not upstream_config:
+            # No upstream found, create simple service
+            service_name = "default_service"
+        else:
+            service_name = upstream_config['name'].replace('upstream_', '')
+
+            # Build upstream
+            targets = []
+            for target_info in upstream_config['targets']:
+                targets.append(UpstreamTarget(
+                    host=target_info['host'],
+                    port=target_info['port'],
+                    weight=target_info.get('weight', 1)
+                ))
+
+            # Health check (passive only for nginx OSS)
+            health_check = None
+            if any(t.get('max_fails') for t in upstream_config['targets']):
+                max_fails = upstream_config['targets'][0].get('max_fails', 3)
+                health_check = HealthCheckConfig(
+                    passive=PassiveHealthCheck(
+                        enabled=True,
+                        max_failures=max_fails
+                    )
+                )
+
+            upstream = Upstream(
+                targets=targets,
+                load_balancer=LoadBalancerConfig(
+                    algorithm=upstream_config.get('algorithm', 'round_robin')
+                ),
+                health_check=health_check
+            )
+
+        return Service(
+            name=service_name,
+            type="rest",
+            protocol="http",
+            upstream=upstream if upstream_config else None,
+            routes=routes
+        )
+
+    def _parse_location_block(
+        self,
+        path_prefix: str,
+        location_body: str,
+        rate_limit_zones: Dict[str, Dict[str, Any]]
+    ) -> Optional[Route]:
+        """Parse a single location block."""
+        # Rate limiting
+        rate_limit = None
+        limit_req_match = re.search(r'limit_req\s+zone=(\w+)(?:\s+burst=(\d+))?', location_body)
+        if limit_req_match:
+            zone_name = limit_req_match.group(1)
+            burst = int(limit_req_match.group(2)) if limit_req_match.group(2) else None
+
+            zone_config = rate_limit_zones.get(zone_name)
+            if zone_config:
+                rate_limit = RateLimitConfig(
+                    enabled=True,
+                    requests_per_second=zone_config['requests_per_second'],
+                    burst=burst,
+                    key_type="ip_address"
+                )
+
+        # Authentication (Basic Auth)
+        authentication = None
+        if re.search(r'auth_basic\s+"([^"]+)"', location_body):
+            self._import_warnings.append(
+                f"Basic auth detected for {path_prefix} - htpasswd file not imported"
+            )
+            authentication = AuthenticationConfig(
+                enabled=True,
+                type="basic",
+                basic_auth=BasicAuthConfig(users={}, realm="Protected")
+            )
+
+        # Headers
+        headers = self._parse_headers(location_body)
+
+        # CORS
+        cors = self._extract_cors_from_headers(headers) if headers else None
+
+        return Route(
+            path_prefix=path_prefix,
+            rate_limit=rate_limit,
+            authentication=authentication,
+            headers=headers,
+            cors=cors
+        )
+
+    def _parse_headers(self, location_body: str) -> Optional[HeaderManipulation]:
+        """Parse header directives."""
+        request_add = {}
+        response_add = {}
+
+        # proxy_set_header (request headers)
+        for match in re.finditer(r'proxy_set_header\s+([\w\-]+)\s+"?([^";]+)"?', location_body):
+            header_name = match.group(1)
+            header_value = match.group(2).strip()
+            request_add[header_name] = header_value
+
+        # add_header (response headers)
+        for match in re.finditer(r'add_header\s+([\w\-]+)\s+"?([^";]+)"?', location_body):
+            header_name = match.group(1)
+            header_value = match.group(2).strip()
+            response_add[header_name] = header_value
+
+        if not request_add and not response_add:
+            return None
+
+        return HeaderManipulation(
+            request_add=request_add if request_add else None,
+            response_add=response_add if response_add else None
+        )
+
+    def _extract_cors_from_headers(
+        self, headers: HeaderManipulation
+    ) -> Optional[CORSPolicy]:
+        """Extract CORS config from response headers."""
+        if not headers or not headers.response_add:
+            return None
+
+        cors_headers = {}
+        for key, value in headers.response_add.items():
+            if key.startswith("Access-Control-"):
+                cors_headers[key] = value
+
+        if not cors_headers:
+            return None
+
+        # Build CORS config
+        allowed_origins_str = cors_headers.get("Access-Control-Allow-Origin", "*")
+        allowed_origins = (
+            [allowed_origins_str]
+            if allowed_origins_str != "*"
+            else ["*"]
+        )
+
+        allowed_methods_str = cors_headers.get(
+            "Access-Control-Allow-Methods", "GET,POST,PUT,DELETE"
+        )
+        allowed_methods = [m.strip() for m in allowed_methods_str.split(",")]
+
+        allowed_headers_str = cors_headers.get("Access-Control-Allow-Headers")
+        allowed_headers = (
+            [h.strip() for h in allowed_headers_str.split(",")]
+            if allowed_headers_str
+            else None
+        )
+
+        allow_credentials = (
+            cors_headers.get("Access-Control-Allow-Credentials") == "true"
+        )
+
+        max_age = cors_headers.get("Access-Control-Max-Age", "86400")
+
+        # Remove CORS headers from response_add
+        for key in list(headers.response_add.keys()):
+            if key.startswith("Access-Control-"):
+                del headers.response_add[key]
+
+        return CORSPolicy(
+            enabled=True,
+            allowed_origins=allowed_origins,
+            allowed_methods=allowed_methods,
+            allowed_headers=allowed_headers,
+            allow_credentials=allow_credentials,
+            max_age=max_age,
+        )
+
+    def _extract_location_blocks(self, server_body: str) -> List[tuple]:
+        """Extract location blocks with their paths."""
+        locations = []
+        pattern = r'location\s+([\w/\-\.]+)\s*\{'
+
+        pos = 0
+        while True:
+            match = re.search(pattern, server_body[pos:])
+            if not match:
+                break
+
+            path_prefix = match.group(1)
+
+            # Find matching closing brace
+            start = pos + match.end()
+            depth = 1
+            curr_pos = start
+
+            while curr_pos < len(server_body) and depth > 0:
+                if server_body[curr_pos] == '{':
+                    depth += 1
+                elif server_body[curr_pos] == '}':
+                    depth -= 1
+                curr_pos += 1
+
+            if depth == 0:
+                location_body = server_body[start:curr_pos-1]
+                locations.append((path_prefix, location_body))
+
+            pos = curr_pos
+
+        return locations
+
+    def get_import_warnings(self) -> List[str]:
+        """Return warnings from last import."""
+        return getattr(self, "_import_warnings", [])

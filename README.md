@@ -23,14 +23,14 @@ Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong
 - ✅ **Strukturiertes Logging** mit konfigurierbaren Log-Levels
 - ✅ **Reines Python** - kein Go erforderlich!
 - ✅ **CI/CD Ready** - GitHub Actions Workflows integriert
-- ✅ **Umfassende Tests** - 446 Tests mit 89% Coverage
+- ✅ **Umfassende Tests** - 464 Tests mit 89% Coverage
 - 🆕 **Traffic Management** - Rate Limiting, Circuit Breaker, Health Checks & Load Balancing
 - 🆕 **Security** - Authentication (Basic, API Key, JWT), Header Manipulation, CORS
 - 🆕 **WebSocket Support** - Real-time bidirectional communication (all 6 providers)
 - 🆕 **Body Transformation** - Request/Response body manipulation with dynamic fields
 - 🆕 **Timeout & Retry** - Connection/read/send timeouts, automatic retries with exponential backoff
 - 🆕 **Logging & Observability** - Structured logging (JSON), Prometheus/OpenTelemetry metrics, log sampling, custom fields
-- 🚀 **Config Import** (v1.3.0) - Import existing Envoy, Kong, APISIX, Traefik configs to GAL format (`gal import-config`)
+- 🚀 **Config Import** (v1.3.0) - Import existing Envoy, Kong, APISIX, Traefik, Nginx configs to GAL format (`gal import-config`)
 
 ## Installation
 

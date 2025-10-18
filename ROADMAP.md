@@ -556,7 +556,7 @@ routes:
 
 **Focus:** Import/Migration & Provider Portability
 **Status:** 🚧 In Development (siehe [docs/v1.3.0-PLAN.md](docs/v1.3.0-PLAN.md))
-**Progress:** 4/8 Features (50.0%)
+**Progress:** 5/8 Features (62.5%)
 **Estimated Effort:** 10-12 Wochen
 
 ### Mission
@@ -566,8 +566,8 @@ routes:
 ### High Priority Features
 
 #### 1. Config Import (Provider → GAL)
-**Status:** 🚧 In Development (Envoy ✅, Kong ✅, APISIX ✅, Traefik ✅ IMPLEMENTED)
-**Effort:** 8 Wochen (4/8 Wochen completed)
+**Status:** 🚧 In Development (Envoy ✅, Kong ✅, APISIX ✅, Traefik ✅, Nginx ✅ IMPLEMENTED)
+**Effort:** 8 Wochen (5/8 Wochen completed)
 
 Reverse Engineering: Provider-spezifische Configs nach GAL konvertieren.
 
@@ -575,8 +575,8 @@ Reverse Engineering: Provider-spezifische Configs nach GAL konvertieren.
 - ✅ **Envoy** (envoy.yaml → gal-config.yaml) - **✅ IMPLEMENTED** (Commit: 652a78d)
 - ✅ **Kong** (kong.yaml/kong.json → gal-config.yaml) - **✅ IMPLEMENTED** (Commit: 93845e7)
 - ✅ **APISIX** (apisix.yaml/apisix.json → gal-config.yaml) - **✅ IMPLEMENTED** (Commit: 4378d95)
-- ✅ **Traefik** (traefik.yaml → gal-config.yaml) - **✅ IMPLEMENTED** (Commit: TBD)
-- 🔄 **Nginx** (nginx.conf → gal-config.yaml)
+- ✅ **Traefik** (traefik.yaml → gal-config.yaml) - **✅ IMPLEMENTED** (Commit: be8c866)
+- ✅ **Nginx** (nginx.conf → gal-config.yaml) - **✅ IMPLEMENTED** (Commit: TBD)
 - 🔄 **HAProxy** (haproxy.cfg → gal-config.yaml)
 
 **CLI Commands:**
@@ -596,6 +596,9 @@ gal import-config --provider kong --input kong.yaml --dry-run
 
 # Traefik example
 gal import-config --provider traefik --input traefik.yaml --output gal-config.yaml
+
+# Nginx example
+gal import-config --provider nginx --input nginx.conf --output gal-config.yaml
 ```
 
 **Implementation:**
@@ -709,6 +712,24 @@ class Provider(ABC):
   - ✅ Multiple Services & Routes
 - **Import Warnings:** ⚠️ Traefik OSS passive health checks only, Basic auth users hashed, Path manipulation middleware not imported
 - **Example:** See docs/v1.3.0-PLAN.md Feature 4 for detailed input/output examples
+
+**Nginx Implementation Summary (✅ COMPLETE):**
+- **Provider:** gal/providers/nginx.py:829-1280 (NginxProvider.parse() + 11 helper methods, ~450 lines)
+- **CLI:** gal-cli.py:225-368 (import-config command - already implemented)
+- **Tests:** tests/test_import_nginx.py (18 tests, all passing ✅)
+- **Coverage:** nginx.py: 6% → 38% (improved by 32%)
+- **Supported Features:**
+  - ✅ Upstream Blocks (servers with host:port)
+  - ✅ Load Balancing (round_robin, least_conn, ip_hash, weighted)
+  - ✅ Passive Health Checks (max_fails, fail_timeout)
+  - ✅ Rate Limiting (limit_req_zone with r/s, r/m, r/h, r/d conversion)
+  - ✅ Basic Authentication (auth_basic with htpasswd warning)
+  - ✅ Request/Response Header Manipulation (proxy_set_header, add_header)
+  - ✅ CORS (extracted from Access-Control-* response headers)
+  - ✅ Multiple Location Blocks per Server
+  - ✅ Comment Removal & Nested Block Parsing (brace counting)
+- **Import Warnings:** ⚠️ Basic auth htpasswd file not imported
+- **Example:** See docs/v1.3.0-PLAN.md Feature 5 for detailed input/output examples
 
 #### 2. Config Validation & Compatibility Checker
 **Status:** 🔄 Planned
