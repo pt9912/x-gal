@@ -9,12 +9,12 @@
 
 **Gateway-Abstraktionsschicht** - Provider-agnostisches API-Gateway-Konfigurations- und Transformationssystem in Python.
 
-Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong, APISIX, Traefik oder anderen Gateways - ohne Vendor Lock-in.
+Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong, APISIX, Traefik, Nginx, HAProxy oder anderen Gateways - ohne Vendor Lock-in.
 
 ## Features
 
 - ✅ **Einheitliche YAML-Konfiguration** für mehrere API-Gateway-Provider
-- ✅ **Unterstützung für Envoy, Kong, APISIX, Traefik**
+- ✅ **Unterstützung für 6 Provider:** Envoy, Kong, APISIX, Traefik, Nginx, HAProxy
 - ✅ **Automatische Payload-Transformationsgenerierung**
 - ✅ **REST- und gRPC-Service-Unterstützung** (3 gRPC + 2 REST Services)
 - ✅ **Default-Wert-Injektion**
@@ -23,7 +23,7 @@ Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong
 - ✅ **Strukturiertes Logging** mit konfigurierbaren Log-Levels
 - ✅ **Reines Python** - kein Go erforderlich!
 - ✅ **CI/CD Ready** - GitHub Actions Workflows integriert
-- ✅ **Umfassende Tests** - 101 Tests mit 89% Coverage
+- ✅ **Umfassende Tests** - 291 Tests mit 89% Coverage
 
 ## Installation
 
@@ -153,6 +153,8 @@ Jeder mit Transformationsregeln für:
 | Kong | ✅ | Lua Plugins |
 | APISIX | ✅ | Lua Scripts |
 | Traefik | ✅ | Middleware |
+| Nginx | ✅ | Open Source (ngx_http modules) |
+| HAProxy | ✅ | Advanced Load Balancing & ACLs |
 
 ## Projektstruktur
 
@@ -168,7 +170,9 @@ x-gal/
 │   │   ├── envoy.py
 │   │   ├── kong.py
 │   │   ├── apisix.py
-│   │   └── traefik.py
+│   │   ├── traefik.py
+│   │   ├── nginx.py
+│   │   └── haproxy.py
 │   └── transformation/
 │       ├── __init__.py
 │       ├── engine.py
@@ -252,7 +256,7 @@ CONFIG_FILE=examples/gateway-config.yaml docker-compose --profile validate up ga
 
 ### Environment Variables
 
-- `PROVIDER`: Gateway-Provider (envoy, kong, apisix, traefik)
+- `PROVIDER`: Gateway-Provider (envoy, kong, apisix, traefik, nginx, haproxy)
 - `CONFIG_FILE`: Pfad zur Konfigurationsdatei
 - `OUTPUT_DIR`: Ausgabeverzeichnis für generierte Configs
 
@@ -264,7 +268,8 @@ CONFIG_FILE=examples/gateway-config.yaml docker-compose --profile validate up ga
 - [Transformations-Anleitung](docs/guides/TRANSFORMATIONS.md)
 - [Docker-Anleitung](docs/guides/DOCKER.md)
 - [**Roadmap**](ROADMAP.md) - Geplante Features und Releases
-- [**v1.1.0 Plan**](docs/v1.1.0-PLAN.md) - Detaillierter Implementierungsplan
+- [**v1.1.0 Plan**](docs/v1.1.0-PLAN.md) - v1.1.0 Implementierungsplan (100% abgeschlossen)
+- [**v1.2.0 Plan**](docs/v1.2.0-PLAN.md) - v1.2.0 Implementierungsplan (33.3% abgeschlossen)
 - [Changelog](CHANGELOG.md)
 
 ## Testing & Development
