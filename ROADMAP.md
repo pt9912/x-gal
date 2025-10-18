@@ -32,8 +32,8 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 ## 🚀 v1.1.0 (Q4 2025 - In Development)
 
 **Focus:** Traffic Management & Security Basics
-**Status:** 🔄 In Development (4/7 Features Complete)
-**Progress:** 62% (6.5 von 10.5 Wochen)
+**Status:** 🔄 In Development (5/7 Features Complete)
+**Progress:** 71% (8 von 10.5 Wochen)
 
 ### High Priority Features
 
@@ -162,16 +162,31 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 
 ### Medium Priority Features
 
-#### 6. Circuit Breaker Pattern
-- **Failure Detection**
-- **Automatic Recovery**
-- **Config Format:**
+#### 6. Circuit Breaker Pattern ✅
+**Status:** ✅ **IMPLEMENTED** (Commit: `8f5a83a`)
+- **Failure Detection** ✅
+- **Automatic Recovery** ✅
+- **Half-Open Testing** ✅
+- **Provider Support:**
+  - ✅ APISIX: Native api-breaker plugin
+  - ✅ Traefik: Native CircuitBreaker middleware
+  - ✅ Envoy: Native Outlier Detection
+  - ⚠️ Kong: Third-party plugin required
+- **Implemented Config:**
   ```yaml
   circuit_breaker:
+    enabled: true
     max_failures: 5
-    timeout: 30s
+    timeout: "30s"
     half_open_requests: 3
+    unhealthy_status_codes: [500, 502, 503, 504]
+    response:
+      status_code: 503
+      message: "Service temporarily unavailable"
   ```
+- **Documentation:** [docs/guides/CIRCUIT_BREAKER.md](docs/guides/CIRCUIT_BREAKER.md)
+- **Tests:** 30+ Circuit Breaker Tests (357 total)
+- **Coverage:** 75% native provider support (3 von 4)
 
 #### 7. Health Checks & Load Balancing
 - **Active Health Checks**
@@ -351,7 +366,7 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 | Authentication | ✅ Done | 🔴 High | High | Critical | 100% |
 | Header Manipulation | ✅ Done | 🔴 High | Medium | High | 100% |
 | CORS | ✅ Done | 🔴 High | Low | High | 100% |
-| Circuit Breaker | 🔄 Pending | 🟡 Medium | Medium | Medium | 75% |
+| Circuit Breaker | ✅ Done | 🟡 Medium | Medium | Medium | 75% |
 | Health Checks | 🔄 Pending | 🟡 Medium | Medium | High | 90% |
 | Caching | 🔄 Pending | 🟢 Low | Medium | Medium | 60% |
 | AWS API Gateway | 🔄 Pending | 🟡 Medium | High | High | N/A |
@@ -397,6 +412,6 @@ Hast du Feedback zur Roadmap? Erstelle ein Issue oder starte eine Discussion:
 
 ---
 
-**Last Updated:** 2025-10-17
+**Last Updated:** 2025-10-18
 **Current Version:** v1.0.0
 **Next Milestone:** v1.1.0 (Q4 2025)
