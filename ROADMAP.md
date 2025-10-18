@@ -556,7 +556,7 @@ routes:
 
 **Focus:** Import/Migration & Provider Portability
 **Status:** 🚧 In Development (siehe [docs/v1.3.0-PLAN.md](docs/v1.3.0-PLAN.md))
-**Progress:** 3/8 Features (37.5%)
+**Progress:** 4/8 Features (50.0%)
 **Estimated Effort:** 10-12 Wochen
 
 ### Mission
@@ -566,8 +566,8 @@ routes:
 ### High Priority Features
 
 #### 1. Config Import (Provider → GAL)
-**Status:** 🚧 In Development (Envoy ✅, Kong ✅, APISIX ✅ IMPLEMENTED)
-**Effort:** 8 Wochen (3/8 Wochen completed)
+**Status:** 🚧 In Development (Envoy ✅, Kong ✅, APISIX ✅, Traefik ✅ IMPLEMENTED)
+**Effort:** 8 Wochen (4/8 Wochen completed)
 
 Reverse Engineering: Provider-spezifische Configs nach GAL konvertieren.
 
@@ -575,24 +575,27 @@ Reverse Engineering: Provider-spezifische Configs nach GAL konvertieren.
 - ✅ **Envoy** (envoy.yaml → gal-config.yaml) - **✅ IMPLEMENTED** (Commit: 652a78d)
 - ✅ **Kong** (kong.yaml/kong.json → gal-config.yaml) - **✅ IMPLEMENTED** (Commit: 93845e7)
 - ✅ **APISIX** (apisix.yaml/apisix.json → gal-config.yaml) - **✅ IMPLEMENTED** (Commit: 4378d95)
-- 🔄 **Traefik** (traefik.yaml → gal-config.yaml)
+- ✅ **Traefik** (traefik.yaml → gal-config.yaml) - **✅ IMPLEMENTED** (Commit: TBD)
 - 🔄 **Nginx** (nginx.conf → gal-config.yaml)
 - 🔄 **HAProxy** (haproxy.cfg → gal-config.yaml)
 
 **CLI Commands:**
 ```bash
 # Import: Provider-Config → GAL
-gal import --provider nginx --input nginx.conf --output gal-config.yaml
+gal import-config --provider nginx --input nginx.conf --output gal-config.yaml
 
 # Migration Workflow (Nginx → HAProxy)
-gal import --provider nginx --input nginx.conf --output gal-config.yaml
+gal import-config --provider nginx --input nginx.conf --output gal-config.yaml
 gal generate --config gal-config.yaml --provider haproxy --output haproxy.cfg
 
 # Validate Import
-gal import --provider envoy --input envoy.yaml --validate-only
+gal import-config --provider envoy --input envoy.yaml --validate-only
 
 # Diff: Show what would be imported
-gal import --provider kong --input kong.yaml --dry-run
+gal import-config --provider kong --input kong.yaml --dry-run
+
+# Traefik example
+gal import-config --provider traefik --input traefik.yaml --output gal-config.yaml
 ```
 
 **Implementation:**
@@ -686,6 +689,26 @@ class Provider(ABC):
   - ✅ YAML & JSON format support
 - **Import Warnings:** ⚠️ API keys, Basic auth credentials, JWT secrets, Circuit breaker plugin not imported (security/manual review)
 - **Example:** See docs/v1.3.0-PLAN.md Feature 3 for detailed input/output examples
+
+**Traefik Implementation Summary (✅ COMPLETE):**
+- **Provider:** gal/providers/traefik.py:662-978 (TraefikProvider.parse() + 10 helper methods, ~312 lines)
+- **CLI:** gal-cli.py:225-368 (import-config command - already implemented)
+- **Tests:** tests/test_import_traefik.py (24 tests, all passing ✅)
+- **Coverage:** traefik.py: 6% → 32% (improved by 26%)
+- **Supported Features:**
+  - ✅ Services & Routers (http.services.loadBalancer.servers → GAL services)
+  - ✅ Load Balancer (servers with URL parsing: http://host:port)
+  - ✅ Health Checks (passive only - Traefik OSS limitation)
+  - ✅ Sticky Sessions (cookie-based with custom names)
+  - ✅ Rate Limiting (rateLimit middleware: average, burst)
+  - ✅ Basic Authentication (basicAuth middleware with hashed users warning)
+  - ✅ Request/Response Header Manipulation (customRequestHeaders/customResponseHeaders)
+  - ✅ CORS (extracted from Access-Control-* response headers)
+  - ✅ Router Rule Parsing (PathPrefix, Path, Host combinations)
+  - ✅ Multiple Middlewares per Route
+  - ✅ Multiple Services & Routes
+- **Import Warnings:** ⚠️ Traefik OSS passive health checks only, Basic auth users hashed, Path manipulation middleware not imported
+- **Example:** See docs/v1.3.0-PLAN.md Feature 4 for detailed input/output examples
 
 #### 2. Config Validation & Compatibility Checker
 **Status:** 🔄 Planned
