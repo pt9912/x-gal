@@ -288,6 +288,11 @@ class APISIXProvider(Provider):
                     }
                     route_config["plugins"]["api-breaker"] = cb_config
 
+                # Add WebSocket support if configured
+                if route.websocket and route.websocket.enabled:
+                    route_config["enable_websocket"] = True
+                    # APISIX handles WebSocket timeout via upstream configuration
+
                 apisix_config["routes"].append(route_config)
 
         result = json.dumps(apisix_config, indent=2)

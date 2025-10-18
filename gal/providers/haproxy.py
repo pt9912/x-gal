@@ -318,6 +318,20 @@ class HAProxyProvider(Provider):
                 cookie_name = service.upstream.load_balancer.cookie_name or "SERVERID"
                 output.append(f"    cookie {cookie_name} insert indirect nocache")
 
+        # WebSocket support
+        has_websocket = any(
+            route.websocket and route.websocket.enabled
+            for route in service.routes
+        )
+        if has_websocket:
+            # Get idle_timeout from first WebSocket route
+            for route in service.routes:
+                if route.websocket and route.websocket.enabled:
+                    ws = route.websocket
+                    # timeout tunnel is for WebSocket connections
+                    output.append(f"    timeout tunnel {ws.idle_timeout}")
+                    break
+
         # Health checks
         if service.upstream and service.upstream.health_check:
             hc = service.upstream.health_check

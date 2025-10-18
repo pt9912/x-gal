@@ -415,6 +415,18 @@ class TraefikProvider(Provider):
                 output.append(f"          interval: {active.interval}")
                 output.append(f"          timeout: {active.timeout}")
 
+        # Configure WebSocket support if any route has WebSocket enabled
+        has_websocket = any(
+            route.websocket and route.websocket.enabled
+            for route in service.routes
+        )
+        if has_websocket:
+            # Traefik supports WebSocket automatically, but we ensure proper configuration
+            output.append("        passHostHeader: true")
+            # Optional: Add responseForwarding for better WebSocket performance
+            output.append("        responseForwarding:")
+            output.append("          flushInterval: 100ms")
+
     def deploy(self, config: Config, output_file: Optional[str] = None,
                api_url: Optional[str] = None) -> bool:
         """Deploy Traefik configuration.

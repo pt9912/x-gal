@@ -1,0 +1,448 @@
+# ============================================================================
+# GAL WebSocket Support - Beispielkonfigurationen
+# ============================================================================
+#
+# Diese Datei enthält 6 produktionsreife WebSocket-Konfigurationen für
+# typische Anwendungsfälle:
+#
+# 1. Basic WebSocket - Einfache Echtzeitkommunikation
+# 2. Chat Application - Messaging mit JWT Auth & Sticky Sessions
+# 3. Live Dashboard - Metriken mit Compression & Rate Limiting
+# 4. IoT Sensor Data - Sensor-Streaming mit API Key Auth
+# 5. Gaming Server - Multiplayer mit kurzen Ping-Intervallen
+# 6. File Upload Streaming - Große Dateien mit großem Message Size
+#
+# Provider-Support:
+#   ✅ Envoy: Native WebSocket via HTTP/1.1 Upgrade
+#   ✅ Kong: Native WebSocket support
+#   ✅ APISIX: enable_websocket flag
+#   ✅ Traefik: Automatic mit flushInterval
+#   ✅ Nginx: proxy_http_version 1.1 + Upgrade headers
+#   ✅ HAProxy: timeout tunnel für WebSocket
+#
+# Verwendung:
+#   gal generate --config websocket-example.yaml --provider envoy
+#   gal generate --config websocket-example.yaml --provider kong
+#   gal generate --config websocket-example.yaml --provider nginx
+#
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Beispiel 1: Basic WebSocket - Einfache Echtzeitkommunikation
+# ----------------------------------------------------------------------------
+#
+# Use Case: Einfache WebSocket-Verbindung für Echtzeit-Updates
+#
+# Features:
+#   - WebSocket aktiviert mit Standardeinstellungen
+#   - 5 Minuten Idle Timeout
+#   - 30 Sekunden Ping Interval
+#   - 1MB Message Size Limit
+#
+# Generierte Config:
+#   - Envoy: upgrade_configs mit websocket
+#   - Kong: WebSocket standardmäßig aktiviert
+#   - APISIX: enable_websocket: true
+#   - Traefik: Automatisch mit HTTP/1.1
+#   - Nginx: proxy_http_version 1.1, proxy_set_header Upgrade
+#   - HAProxy: timeout tunnel 300s
+#
+---
+global:
+  host: "0.0.0.0"
+  port: 8080
+
+services:
+  - name: websocket_basic
+    upstream:
+      targets:
+        - host: ws-server.internal
+          port: 8080
+
+    routes:
+      - path_prefix: /ws
+        websocket:
+          enabled: true
+          idle_timeout: "300s"    # 5 Minuten
+          ping_interval: "30s"    # 30 Sekunden Keep-Alive
+          max_message_size: 1048576  # 1MB
+          compression: false
+
+# ----------------------------------------------------------------------------
+# Beispiel 2: Chat Application - Messaging mit JWT Auth & Sticky Sessions
+# ----------------------------------------------------------------------------
+#
+# Use Case: Echtzeit-Chat-Anwendung (Slack, Discord)
+#
+# Features:
+#   - JWT Authentication für sichere Verbindungen
+#   - Sticky Sessions (IP Hash) für stateful connections
+#   - 10 Minuten Idle Timeout für längere Chats
+#   - Rate Limiting: 100 Nachrichten/Sekunde pro Benutzer
+#   - Compression aktiviert für Text-Nachrichten
+#
+# Generierte Config:
+#   - Envoy: JWT Filter + Hash Policy auf Source IP
+#   - Kong: JWT Plugin + IP Hash Load Balancing
+#   - APISIX: jwt-auth + chash (consistent hashing)
+#   - Traefik: JWT Middleware + Sticky Cookie
+#   - Nginx: JWT via Lua + ip_hash upstream
+#   - HAProxy: JWT via Lua + source load balancing
+#
+---
+global:
+  host: "0.0.0.0"
+  port: 8080
+
+services:
+  - name: chat_service
+    upstream:
+      targets:
+        - host: chat-1.internal
+          port: 8080
+        - host: chat-2.internal
+          port: 8080
+        - host: chat-3.internal
+          port: 8080
+      load_balancer:
+        algorithm: ip_hash  # Sticky Sessions für stateful WebSocket
+
+    routes:
+      - path_prefix: /ws/chat
+        websocket:
+          enabled: true
+          idle_timeout: "600s"      # 10 Minuten
+          ping_interval: "20s"      # Aggressive Keep-Alive
+          max_message_size: 524288  # 512KB (Text-Nachrichten)
+          compression: true         # Per-Message Deflate
+
+        authentication:
+          enabled: true
+          type: jwt
+          jwt:
+            issuer: "https://auth.example.com"
+            audiences:
+              - "chat-api"
+            jwks_uri: "https://auth.example.com/.well-known/jwks.json"
+
+        rate_limit:
+          enabled: true
+          requests_per_second: 100  # 100 Nachrichten/Sekunde
+          burst: 200
+
+        headers:
+          request:
+            add:
+              X-Gateway: "GAL"
+              X-Service: "Chat"
+
+# ----------------------------------------------------------------------------
+# Beispiel 3: Live Dashboard - Metriken mit Compression & Rate Limiting
+# ----------------------------------------------------------------------------
+#
+# Use Case: Live-Dashboard mit Echtzeitmetriken (Grafana-ähnlich)
+#
+# Features:
+#   - High-frequency updates (10s ping interval)
+#   - Compression für reduzierte Bandbreite
+#   - Rate Limiting: 1000 req/s für Dashboard-Updates
+#   - Load Balancing: Least Connections für gleichmäßige Last
+#   - CORS für Browser-basierte Dashboards
+#
+# Generierte Config:
+#   - Envoy: LEAST_REQUEST policy + CORS filter
+#   - Kong: least-connections + CORS plugin
+#   - APISIX: roundrobin (weighted by least_conn) + cors
+#   - Traefik: WRR (weighted round robin) + CORS middleware
+#   - Nginx: least_conn + CORS headers
+#   - HAProxy: leastconn + CORS via http-response
+#
+---
+global:
+  host: "0.0.0.0"
+  port: 8080
+
+services:
+  - name: dashboard_service
+    upstream:
+      targets:
+        - host: dashboard-1.internal
+          port: 8080
+        - host: dashboard-2.internal
+          port: 8080
+      load_balancer:
+        algorithm: least_conn  # Gleichmäßige Lastverteilung
+
+    routes:
+      - path_prefix: /ws/dashboard
+        websocket:
+          enabled: true
+          idle_timeout: "300s"       # 5 Minuten
+          ping_interval: "10s"       # High-frequency Keep-Alive
+          max_message_size: 2097152  # 2MB (Metriken-Daten)
+          compression: true          # Bandbreitenoptimierung
+
+        rate_limit:
+          enabled: true
+          requests_per_second: 1000  # High throughput
+          burst: 2000
+
+        cors:
+          enabled: true
+          allowed_origins:
+            - "https://dashboard.example.com"
+            - "https://admin.example.com"
+          allowed_methods:
+            - GET
+          allowed_headers:
+            - "Authorization"
+            - "Content-Type"
+          allow_credentials: true
+          max_age: 86400
+
+        headers:
+          request:
+            add:
+              X-Dashboard-Version: "v2.0"
+
+# ----------------------------------------------------------------------------
+# Beispiel 4: IoT Sensor Data - Sensor-Streaming mit API Key Auth
+# ----------------------------------------------------------------------------
+#
+# Use Case: IoT-Sensoren streamen Daten in Echtzeit
+#
+# Features:
+#   - API Key Authentication für Geräte
+#   - Long Idle Timeout (30 Minuten) für Sensoren
+#   - Small Message Size (64KB) für Sensor-Daten
+#   - No Compression (bereits binäre Daten)
+#   - Rate Limiting: 10 req/s pro Sensor
+#
+# Generierte Config:
+#   - Envoy: External Auth Filter (API Key) + timeout 1800s
+#   - Kong: key-auth Plugin
+#   - APISIX: key-auth Plugin
+#   - Traefik: ForwardAuth Middleware
+#   - Nginx: API Key via Lua oder HTTP Header Validation
+#   - HAProxy: API Key via ACL + http-request deny
+#
+---
+global:
+  host: "0.0.0.0"
+  port: 8080
+
+services:
+  - name: iot_service
+    upstream:
+      targets:
+        - host: iot-collector-1.internal
+          port: 8080
+        - host: iot-collector-2.internal
+          port: 8080
+      load_balancer:
+        algorithm: round_robin
+
+    routes:
+      - path_prefix: /ws/sensors
+        websocket:
+          enabled: true
+          idle_timeout: "1800s"     # 30 Minuten (long-running sensors)
+          ping_interval: "60s"      # Low-frequency Keep-Alive
+          max_message_size: 65536   # 64KB (kleine Sensor-Pakete)
+          compression: false        # Binäre Daten, keine Compression
+
+        authentication:
+          enabled: true
+          type: api_key
+          api_key:
+            header_name: "X-API-Key"
+            keys:
+              - "sensor-key-12345"
+              - "sensor-key-67890"
+
+        rate_limit:
+          enabled: true
+          requests_per_second: 10   # 10 Messwerte/Sekunde pro Sensor
+          burst: 20
+
+        headers:
+          request:
+            add:
+              X-Gateway: "GAL-IoT"
+              X-Timestamp: "{{timestamp}}"
+
+# ----------------------------------------------------------------------------
+# Beispiel 5: Gaming Server - Multiplayer mit kurzen Ping-Intervallen
+# ----------------------------------------------------------------------------
+#
+# Use Case: Multiplayer-Gaming-Server (Echtzeit-Gameplay)
+#
+# Features:
+#   - Ultra-short Ping Interval (5s) für niedrige Latenz
+#   - Short Idle Timeout (60s) für inaktive Spieler
+#   - Large Message Size (4MB) für Spielzustände
+#   - Weighted Load Balancing (stärkere Server mehr Last)
+#   - No Rate Limiting (Gameplay darf nicht gedrosselt werden)
+#
+# Generierte Config:
+#   - Envoy: ROUND_ROBIN + weighted clusters
+#   - Kong: weighted-round-robin
+#   - APISIX: roundrobin mit weighted targets
+#   - Traefik: WRR (weighted round robin)
+#   - Nginx: upstream mit weight-Parameter
+#   - HAProxy: roundrobin mit weight-Parameter
+#
+---
+global:
+  host: "0.0.0.0"
+  port: 8080
+
+services:
+  - name: gaming_service
+    upstream:
+      targets:
+        - host: game-server-high.internal
+          port: 8080
+          weight: 3  # Stärkerer Server (3x Kapazität)
+        - host: game-server-med.internal
+          port: 8080
+          weight: 2  # Mittlerer Server (2x Kapazität)
+        - host: game-server-low.internal
+          port: 8080
+          weight: 1  # Schwächerer Server (1x Kapazität)
+      load_balancer:
+        algorithm: weighted  # Gewichtete Lastverteilung
+
+    routes:
+      - path_prefix: /ws/game
+        websocket:
+          enabled: true
+          idle_timeout: "60s"        # Kurz - Inaktive Spieler raus
+          ping_interval: "5s"        # Sehr kurz - Niedrige Latenz
+          max_message_size: 4194304  # 4MB (Spielzustände)
+          compression: false         # Latenz wichtiger als Bandbreite
+
+        headers:
+          request:
+            add:
+              X-Game-Server: "GAL"
+              X-Session-ID: "{{uuid}}"
+
+# ----------------------------------------------------------------------------
+# Beispiel 6: File Upload Streaming - Große Dateien mit großem Message Size
+# ----------------------------------------------------------------------------
+#
+# Use Case: Datei-Upload via WebSocket (resumable uploads)
+#
+# Features:
+#   - Very Large Message Size (16MB) für Datei-Chunks
+#   - Long Idle Timeout (20 Minuten) für langsame Uploads
+#   - No Compression (Dateien oft bereits komprimiert)
+#   - JWT Authentication für Upload-Berechtigung
+#   - Rate Limiting: 1 Upload/Sekunde pro Benutzer
+#
+# Generierte Config:
+#   - Envoy: max_request_bytes: 16777216, timeout: 1200s
+#   - Kong: client_max_body_size + timeouts
+#   - APISIX: client_max_body_size
+#   - Traefik: buffering + flushInterval
+#   - Nginx: client_max_body_size 16m
+#   - HAProxy: timeout tunnel 1200s
+#
+---
+global:
+  host: "0.0.0.0"
+  port: 8080
+
+services:
+  - name: upload_service
+    upstream:
+      targets:
+        - host: upload-1.internal
+          port: 8080
+        - host: upload-2.internal
+          port: 8080
+      load_balancer:
+        algorithm: least_conn  # Gleichmäßige Upload-Last
+
+    routes:
+      - path_prefix: /ws/upload
+        websocket:
+          enabled: true
+          idle_timeout: "1200s"       # 20 Minuten
+          ping_interval: "30s"        # Standard Keep-Alive
+          max_message_size: 16777216  # 16MB (große Datei-Chunks)
+          compression: false          # Dateien oft bereits komprimiert
+
+        authentication:
+          enabled: true
+          type: jwt
+          jwt:
+            issuer: "https://auth.example.com"
+            audiences:
+              - "upload-api"
+            jwks_uri: "https://auth.example.com/.well-known/jwks.json"
+
+        rate_limit:
+          enabled: true
+          requests_per_second: 1   # 1 Upload/Sekunde
+          burst: 2
+
+        headers:
+          request:
+            add:
+              X-Upload-Gateway: "GAL"
+              X-Upload-ID: "{{uuid}}"
+          response:
+            add:
+              X-Upload-Server: "Backend"
+
+# ----------------------------------------------------------------------------
+# HINWEISE
+# ----------------------------------------------------------------------------
+#
+# 1. WebSocket-Konfiguration ist optional - wenn nicht angegeben,
+#    wird WebSocket nicht aktiviert
+#
+# 2. Default-Werte:
+#    - enabled: true
+#    - idle_timeout: "300s" (5 Minuten)
+#    - ping_interval: "30s"
+#    - max_message_size: 1048576 (1MB)
+#    - compression: false
+#
+# 3. Provider-Unterschiede:
+#    - Envoy: Volle Kontrolle über alle Parameter
+#    - Kong: WebSocket standardmäßig aktiviert (transparent)
+#    - APISIX: enable_websocket Flag erforderlich
+#    - Traefik: Automatische WebSocket-Erkennung
+#    - Nginx: Erfordert proxy_http_version 1.1
+#    - HAProxy: timeout tunnel für WebSocket-Verbindungen
+#
+# 4. Sticky Sessions sind WICHTIG für stateful WebSocket-Verbindungen:
+#    - ip_hash: Session Persistence via Source IP
+#    - Cookie-based: Session Persistence via Cookie (Traefik)
+#
+# 5. Compression (Per-Message Deflate):
+#    - Nur für Text-Nachrichten sinnvoll (JSON, XML, HTML)
+#    - Nicht für Binärdaten (Bilder, Videos, komprimierte Dateien)
+#    - Erhöht CPU-Last, reduziert Bandbreite
+#
+# 6. Security:
+#    - IMMER Authentication verwenden (JWT, API Key, Basic)
+#    - Rate Limiting zum Schutz vor Abuse
+#    - CORS nur für vertrauenswürdige Domains
+#    - TLS/SSL für verschlüsselte WebSocket-Verbindungen (wss://)
+#
+# 7. Testing:
+#    - wscat: wscat -c ws://localhost:8080/ws/chat
+#    - websocat: websocat ws://localhost:8080/ws/chat
+#    - Browser: new WebSocket('ws://localhost:8080/ws/chat')
+#
+# 8. Monitoring:
+#    - Anzahl aktiver WebSocket-Verbindungen
+#    - Durchschnittliche Connection-Dauer
+#    - Message Rate (Messages/Sekunde)
+#    - Fehlerrate (Disconnects, Timeouts)
+#
+# Weitere Informationen: docs/guides/WEBSOCKET.md
