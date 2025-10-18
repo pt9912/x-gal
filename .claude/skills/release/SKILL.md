@@ -237,10 +237,21 @@ pip install -e .
   - Bitte um manuelle Konfliktlösung
   - Warte auf Bestätigung, bevor fortgefahren wird
 - Push zu main: `git push origin main`
-- Wechsle zurück zum develop Branch: `git checkout develop`
-- Bestätige, dass develop und main jetzt synchron sind
 
-### 15. Abschluss
+### 15. Main zurück in Develop mergen
+
+- **WICHTIG:** Nach dem Release muss develop wieder auf dem Stand von main sein
+- Wechsle zurück zum develop Branch: `git checkout develop`
+- Pull neueste Änderungen: `git pull origin develop`
+- Merge main in develop: `git merge main --no-edit`
+- Falls Merge-Konflikte auftreten (sollte nicht vorkommen):
+  - Zeige die Konflikte an
+  - Informiere den Nutzer
+  - Bitte um manuelle Konfliktlösung
+- Push zu develop: `git push origin develop`
+- Bestätige, dass develop und main jetzt vollständig synchron sind
+
+### 16. Abschluss
 
 - Zeige eine Zusammenfassung aller durchgeführten Schritte
 - Informiere über veröffentlichte Artifacts:
