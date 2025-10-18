@@ -223,6 +223,152 @@ def info(config):
 
 
 @cli.command()
+@click.option(
+    "--provider",
+    "-p",
+    required=True,
+    type=click.Choice(
+        ["envoy", "kong", "apisix", "traefik", "nginx", "haproxy"], case_sensitive=False
+    ),
+    help="Source provider to import from",
+)
+@click.option(
+    "--input",
+    "-i",
+    "input_file",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False),
+    help="Provider-specific configuration file to import",
+)
+@click.option(
+    "--output",
+    "-o",
+    "output_file",
+    required=True,
+    type=click.Path(dir_okay=False),
+    help="Output GAL configuration file (YAML)",
+)
+def import_config(provider, input_file, output_file):
+    """Import provider-specific configuration to GAL format"""
+    try:
+        click.echo(f"Importing {provider} configuration from: {input_file}")
+
+        # Create manager and register providers
+        manager = Manager()
+        manager.register_provider(EnvoyProvider())
+        manager.register_provider(KongProvider())
+        manager.register_provider(APISIXProvider())
+        manager.register_provider(TraefikProvider())
+        manager.register_provider(NginxProvider())
+        manager.register_provider(HAProxyProvider())
+
+        # Get the provider instance
+        provider_instance = manager.get_provider(provider)
+        if not provider_instance:
+            click.echo(f"Error: Provider '{provider}' not found", err=True)
+            sys.exit(1)
+
+        # Read provider-specific config
+        with open(input_file, "r") as f:
+            provider_config = f.read()
+
+        click.echo(f"Parsing {provider} configuration...")
+
+        # Parse to GAL format
+        try:
+            gal_config = provider_instance.parse(provider_config)
+        except NotImplementedError as e:
+            click.echo(f"Error: {e}", err=True)
+            click.echo(f"\n💡 Tip: Check the v1.3.0 roadmap for implementation timeline.", err=True)
+            sys.exit(1)
+
+        # Convert GAL Config to YAML
+        import yaml
+
+        from gal.config import Config
+
+        # Build YAML structure
+        config_dict = {
+            "version": gal_config.version,
+            "provider": gal_config.provider,
+            "global": {
+                "host": gal_config.global_config.host,
+                "port": gal_config.global_config.port,
+            },
+            "services": [],
+        }
+
+        for service in gal_config.services:
+            service_dict = {
+                "name": service.name,
+                "type": service.type,
+                "protocol": service.protocol,
+                "upstream": {
+                    "targets": [
+                        {"host": t.host, "port": t.port, "weight": t.weight}
+                        for t in service.upstream.targets
+                    ]
+                },
+                "routes": [{"path_prefix": r.path_prefix} for r in service.routes],
+            }
+
+            # Add health checks if present
+            if service.upstream.health_check:
+                hc = service.upstream.health_check
+                hc_dict = {}
+                if hasattr(hc, "active") and hc.active:
+                    hc_dict["active"] = {
+                        "enabled": hc.active.enabled,
+                        "http_path": hc.active.http_path,
+                        "interval": hc.active.interval,
+                        "timeout": hc.active.timeout,
+                        "unhealthy_threshold": hc.active.unhealthy_threshold,
+                        "healthy_threshold": hc.active.healthy_threshold,
+                    }
+                if hasattr(hc, "passive") and hc.passive:
+                    hc_dict["passive"] = {
+                        "enabled": hc.passive.enabled,
+                        "max_failures": hc.passive.max_failures,
+                    }
+                if hc_dict:
+                    service_dict["upstream"]["health_check"] = hc_dict
+
+            # Add load balancer if present
+            if service.upstream.load_balancer:
+                service_dict["upstream"]["load_balancer"] = {
+                    "algorithm": service.upstream.load_balancer.algorithm
+                }
+
+            config_dict["services"].append(service_dict)
+
+        # Write to output file
+        Path(output_file).parent.mkdir(parents=True, exist_ok=True)
+        with open(output_file, "w") as f:
+            yaml.safe_dump(config_dict, f, default_flow_style=False, sort_keys=False)
+
+        click.echo(f"\n✓ Successfully imported configuration!")
+        click.echo(f"  Source:      {input_file} ({provider})")
+        click.echo(f"  Destination: {output_file} (GAL YAML)")
+        click.echo(f"  Services:    {len(gal_config.services)}")
+        click.echo(f"  Routes:      {sum(len(s.routes) for s in gal_config.services)}")
+
+        click.echo(f"\n💡 Next steps:")
+        click.echo(f"   1. Review the generated GAL config: {output_file}")
+        click.echo(f"   2. Generate config for target provider:")
+        click.echo(f"      gal generate --config {output_file} --provider <target-provider>")
+
+    except FileNotFoundError as e:
+        click.echo(f"Error: File not found: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        import traceback
+
+        traceback.print_exc()
+        sys.exit(1)
+
+
+@cli.command()
 def list_providers():
     """List all available providers"""
     click.echo("Available providers:")

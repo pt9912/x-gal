@@ -881,3 +881,19 @@ class APISIXProvider(Provider):
 
         logger.info("APISIX deployment completed successfully")
         return True
+
+    def parse(self, provider_config: str):
+        """Parse APISIX JSON/YAML configuration to GAL format.
+
+        TODO: Implementation pending for v1.3.0 Feature 3.
+
+        Args:
+            provider_config: APISIX JSON or YAML configuration
+
+        Raises:
+            NotImplementedError: APISIX parser not yet implemented
+        """
+        raise NotImplementedError(
+            "APISIX config import will be implemented in v1.3.0 Feature 3. "
+            "Use 'gal import --provider apisix' after the feature is released."
+        )

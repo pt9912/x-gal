@@ -809,3 +809,20 @@ class NginxProvider(Provider):
         else:
             # Static value, quote it
             return f"'{value}'"
+
+    def parse(self, provider_config: str):
+        """Parse Nginx configuration to GAL format.
+
+        TODO: Implementation pending for v1.3.0 Feature 5 (Custom Parser).
+
+        Args:
+            provider_config: Nginx nginx.conf configuration
+
+        Raises:
+            NotImplementedError: Nginx parser not yet implemented
+        """
+        raise NotImplementedError(
+            "Nginx config import will be implemented in v1.3.0 Feature 5. "
+            "Requires custom nginx.conf parser. "
+            "Use 'gal import --provider nginx' after the feature is released."
+        )

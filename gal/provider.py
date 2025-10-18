@@ -24,6 +24,7 @@ class Provider(ABC):
         - name(): Return the provider's unique identifier
         - validate(): Validate configuration for this specific provider
         - generate(): Generate provider-specific configuration output
+        - parse(): Parse provider-specific config to GAL format
 
     Optional methods:
         - deploy(): Deploy configuration to gateway (if supported)
@@ -100,6 +101,50 @@ class Provider(ABC):
             >>> output = provider.generate(config)
             >>> "static_resources:" in output
             True
+        """
+        pass
+
+    @abstractmethod
+    def parse(self, provider_config: str) -> Config:
+        """Parse provider-specific configuration to GAL format.
+
+        Transforms the provider's native configuration format (YAML, JSON, etc.)
+        into the generic GAL configuration model. This enables migration from
+        existing gateway deployments to GAL.
+
+        Args:
+            provider_config: Provider-specific configuration as string
+                            (e.g., Envoy YAML, Kong declarative config)
+
+        Returns:
+            Parsed GAL Config object
+
+        Raises:
+            ValueError: If parsing fails due to invalid format or unsupported features
+
+        Example:
+            >>> provider = EnvoyProvider()
+            >>> envoy_yaml = '''
+            ... static_resources:
+            ...   clusters:
+            ...   - name: api_cluster
+            ...     connect_timeout: 5s
+            ...     type: STRICT_DNS
+            ...     load_assignment:
+            ...       cluster_name: api_cluster
+            ...       endpoints:
+            ...       - lb_endpoints:
+            ...         - endpoint:
+            ...             address:
+            ...               socket_address:
+            ...                 address: api.internal
+            ...                 port_value: 8080
+            ... '''
+            >>> config = provider.parse(envoy_yaml)
+            >>> config.services[0].name
+            'api'
+            >>> config.services[0].upstream.host
+            'api.internal'
         """
         pass
 

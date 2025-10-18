@@ -741,3 +741,19 @@ class KongProvider(Provider):
 
         logger.info("Kong deployment completed successfully")
         return True
+
+    def parse(self, provider_config: str):
+        """Parse Kong declarative config to GAL format.
+
+        TODO: Implementation pending for v1.3.0 Feature 2.
+
+        Args:
+            provider_config: Kong declarative YAML/JSON configuration
+
+        Raises:
+            NotImplementedError: Kong parser not yet implemented
+        """
+        raise NotImplementedError(
+            "Kong config import will be implemented in v1.3.0 Feature 2. "
+            "Use 'gal import --provider kong' after the feature is released."
+        )

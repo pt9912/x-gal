@@ -640,3 +640,19 @@ class TraefikProvider(Provider):
 
         logger.info("Traefik deployment completed successfully")
         return True
+
+    def parse(self, provider_config: str):
+        """Parse Traefik YAML configuration to GAL format.
+
+        TODO: Implementation pending for v1.3.0 Feature 4.
+
+        Args:
+            provider_config: Traefik dynamic configuration (YAML/TOML)
+
+        Raises:
+            NotImplementedError: Traefik parser not yet implemented
+        """
+        raise NotImplementedError(
+            "Traefik config import will be implemented in v1.3.0 Feature 4. "
+            "Use 'gal import --provider traefik' after the feature is released."
+        )
