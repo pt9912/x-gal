@@ -552,10 +552,11 @@ routes:
 
 ---
 
-## 🔄 v1.3.0 (Q2 2026 - Planning)
+## 🚧 v1.3.0 (Q2 2026 - In Development)
 
 **Focus:** Import/Migration & Provider Portability
-**Status:** 🔄 Planning (siehe [docs/v1.3.0-PLAN.md](docs/v1.3.0-PLAN.md))
+**Status:** 🚧 In Development (siehe [docs/v1.3.0-PLAN.md](docs/v1.3.0-PLAN.md))
+**Progress:** 1/8 Features (12.5%)
 **Estimated Effort:** 10-12 Wochen
 
 ### Mission
@@ -565,18 +566,18 @@ routes:
 ### High Priority Features
 
 #### 1. Config Import (Provider → GAL)
-**Status:** 🔄 Planned
-**Effort:** 8 Wochen
+**Status:** 🚧 In Development (Envoy ✅ IMPLEMENTED)
+**Effort:** 8 Wochen (1/8 Wochen completed)
 
 Reverse Engineering: Provider-spezifische Configs nach GAL konvertieren.
 
 **Unterstützte Import-Formate:**
-- ✅ **Envoy** (envoy.yaml → gal-config.yaml)
-- ✅ **Kong** (kong.yaml → gal-config.yaml)
-- ✅ **APISIX** (apisix.json → gal-config.yaml)
-- ✅ **Traefik** (traefik.yaml → gal-config.yaml)
-- ✅ **Nginx** (nginx.conf → gal-config.yaml)
-- ✅ **HAProxy** (haproxy.cfg → gal-config.yaml)
+- ✅ **Envoy** (envoy.yaml → gal-config.yaml) - **✅ IMPLEMENTED** (Commit: 652a78d)
+- 🔄 **Kong** (kong.yaml → gal-config.yaml)
+- 🔄 **APISIX** (apisix.json → gal-config.yaml)
+- 🔄 **Traefik** (traefik.yaml → gal-config.yaml)
+- 🔄 **Nginx** (nginx.conf → gal-config.yaml)
+- 🔄 **HAProxy** (haproxy.cfg → gal-config.yaml)
 
 **CLI Commands:**
 ```bash
@@ -623,6 +624,21 @@ class Provider(ABC):
 - Complex parsing (YAML/JSON/Custom Formats)
 - Information loss (non-mappable features)
 - Ambiguity resolution (best-effort + warnings)
+
+**Envoy Implementation Summary (✅ COMPLETE):**
+- **Provider:** gal/providers/envoy.py:1159-1381 (EnvoyProvider.parse())
+- **Manager:** gal/manager.py:217-239 (Manager.get_provider())
+- **CLI:** gal-cli.py:225-368 (import-config command)
+- **Tests:** tests/test_import_envoy.py (15 tests, all passing ✅)
+- **Supported Features:**
+  - ✅ Clusters → Services (with name extraction)
+  - ✅ Load assignment endpoints → UpstreamTargets (with weights)
+  - ✅ Health checks → ActiveHealthCheck (HTTP probes)
+  - ✅ Outlier detection → PassiveHealthCheck (consecutive_5xx)
+  - ✅ Load balancing policies → LoadBalancerConfig (all algorithms)
+  - ✅ Listeners + routes → Routes (path prefix)
+  - ✅ Multiple clusters → Multiple services
+- **Example:** See `/tmp/test-envoy-import.yaml` and `/tmp/gal-imported.yaml`
 
 #### 2. Config Validation & Compatibility Checker
 **Status:** 🔄 Planned
@@ -847,7 +863,7 @@ gal migrate
 ### Version Timeline:
 - **v1.1.0 (Q4 2025):** ✅ Released - Traffic Management & Security
 - **v1.2.0 (Q1 2026):** ✅ **COMPLETE** (100% - 6/6 Features) - New Providers & Features 🎉
-- **v1.3.0 (Q2 2026):** 🔄 Planning - Import/Migration & Portability
+- **v1.3.0 (Q2 2026):** 🚧 **In Development** (12.5% - 1/8 Features) - Import/Migration (Envoy ✅)
 - **v1.4.0 (Q3 2026):** Concept - Advanced Traffic & Multi-Cloud + gRPC Transformations
 - **v1.5.0 (Q4 2026):** Concept - Enterprise Features & Developer UX + **Caddy Provider**
 - **v2.0+ (2027+):** Vision - Advanced Features & Extensibility
