@@ -284,7 +284,7 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 
 **Focus:** Neue Gateway-Provider & Erweiterte Features
 **Status:** 🚧 In Development (siehe [docs/v1.2.0-PLAN.md](docs/v1.2.0-PLAN.md))
-**Progress:** 50.0% (3 von 6 Features komplett)
+**Progress:** 66.7% (4 von 6 Features komplett)
 **Estimated Effort:** 11.5 Wochen
 
 ### High Priority Features
@@ -346,6 +346,7 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 | Passive HC | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ |
 | Load Balancing | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **WebSocket** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Body Transformation** | ✅ | ✅ | ✅ | ❌ | ✅ | ⚠️ |
 
 ### Medium Priority Features
 
@@ -392,13 +393,55 @@ routes:
       compression: true         # Per-Message Deflate
 ```
 
-#### 4. Request/Response Body Transformation
-**Status:** 🔄 Pending
+#### 4. Request/Response Body Transformation ✅
+**Status:** ✅ **IMPLEMENTED** (Commit: b753c0f, 37bb1aa)
 **Effort:** 1.5 Wochen
-- **Request Body Modification**
-- **Response Body Filtering**
-- **Data Enrichment**
-- **Format Conversion**
+- ✅ **Request Body Modification** (add_fields, remove_fields, rename_fields)
+- ✅ **Response Body Filtering** (filter_fields, add_fields)
+- ✅ **Data Enrichment** (Template variables: {{uuid}}, {{now}}, {{timestamp}})
+- ✅ **Provider Support:**
+  - ✅ Envoy: Complete Lua filter implementation (lines 416-613)
+  - ✅ Kong: request-transformer & response-transformer plugins
+  - ✅ APISIX: serverless-pre-function & serverless-post-function (Lua)
+  - ⚠️ Traefik: Warning only (no native support)
+  - ✅ Nginx: OpenResty Lua blocks (access_by_lua_block, body_filter_by_lua_block)
+  - ⚠️ HAProxy: Lua function references (manual implementation required)
+
+**Implementierung:**
+- Config Model: `BodyTransformationConfig`, `RequestBodyTransformation`, `ResponseBodyTransformation` (gal/config.py:550-629)
+- All 6 providers updated with body transformation support
+- Tests: `tests/test_body_transformation.py` (12 tests, all passing)
+- Dokumentation: `docs/guides/BODY_TRANSFORMATION.md` (1000+ lines, German)
+- Beispiele: `examples/body-transformation-example.yaml` (15 production scenarios)
+
+**Use Cases:**
+- Add trace IDs and timestamps for distributed tracing
+- Remove sensitive fields (PII, passwords, secrets)
+- Field renaming for legacy system integration
+- API versioning metadata
+- Audit logging with complete request/response context
+
+**Config Example:**
+```yaml
+routes:
+  - path_prefix: /api/users
+    body_transformation:
+      enabled: true
+      request:
+        add_fields:
+          trace_id: "{{uuid}}"
+          timestamp: "{{now}}"
+        remove_fields:
+          - internal_secret
+        rename_fields:
+          user_id: id
+      response:
+        filter_fields:
+          - password
+          - ssn
+        add_fields:
+          server_time: "{{timestamp}}"
+```
 
 #### 5. Timeout & Retry Policies
 **Status:** 🔄 Pending
