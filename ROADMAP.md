@@ -347,6 +347,7 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 | Load Balancing | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **WebSocket** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Body Transformation** | ✅ | ✅ | ✅ | ❌ | ✅ | ⚠️ |
+| **Timeout & Retry** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ### Medium Priority Features
 
@@ -443,13 +444,74 @@ routes:
           server_time: "{{timestamp}}"
 ```
 
-#### 5. Timeout & Retry Policies
-**Status:** 🔄 Pending
+#### 5. Timeout & Retry Policies ✅
+**Status:** ✅ **IMPLEMENTED** (Commit: 98131c0, 630676e)
 **Effort:** 1 Woche
-- **Connect Timeout**
-- **Send/Read Timeout**
-- **Automatic Retries**
-- **Exponential Backoff**
+- ✅ **Connection Timeout** (Max time to establish TCP connection)
+- ✅ **Send Timeout** (Max time to send request to upstream)
+- ✅ **Read Timeout** (Max time to receive response from upstream)
+- ✅ **Idle Timeout** (Max time for inactive keep-alive connections)
+- ✅ **Automatic Retries** (Configurable retry attempts)
+- ✅ **Exponential Backoff** (Prevents thundering herd)
+- ✅ **Linear Backoff** (Alternative strategy)
+- ✅ **Retry Conditions** (connect_timeout, http_5xx, http_502/503/504, reset, refused)
+- ✅ **Per-Try Timeout** (Timeout for each retry attempt)
+
+**Provider Support:**
+- ✅ **Envoy:** cluster.connect_timeout, route.timeout, retry_policy (lines 167-220)
+- ✅ **Kong:** Service-level timeouts in milliseconds, retries field (lines 158-181)
+- ✅ **APISIX:** timeout plugin (connect/send/read), proxy-retry plugin (lines 294-341)
+- ✅ **Traefik:** serversTransport.forwardingTimeouts, retry middleware (lines 489-502, 411-422)
+- ✅ **Nginx:** proxy_*_timeout, proxy_next_upstream directives (lines 396-450)
+- ✅ **HAProxy:** timeout connect/server/client, retry-on parameter (lines 388-436)
+
+**Implementierung:**
+- Config Models: `TimeoutConfig`, `RetryConfig` (gal/config.py:704-792)
+- All 6 providers implemented with provider-specific formats
+- Tests: `tests/test_timeout_retry.py` (22 tests, all passing)
+- Dokumentation: `docs/guides/TIMEOUT_RETRY.md` (1000+ lines, German)
+- Beispiele: `examples/timeout-retry-example.yaml` (12 production scenarios)
+
+**Use Cases:**
+- Resilient microservices with automatic failover
+- Payment APIs with aggressive retry strategies
+- Long-running batch operations (retry disabled)
+- Multi-datacenter deployments with fast failover
+- gRPC services with connection-reset handling
+- External APIs with rate limit retry (retriable_4xx)
+
+**Config Example:**
+```yaml
+routes:
+  - path_prefix: /api
+    timeout:
+      connect: "5s"       # Connection timeout
+      send: "30s"         # Send timeout
+      read: "60s"         # Read timeout
+      idle: "300s"        # Idle timeout (5 min)
+    retry:
+      enabled: true
+      attempts: 3         # Max 3 attempts
+      backoff: exponential
+      base_interval: "25ms"
+      max_interval: "250ms"
+      retry_on:
+        - connect_timeout
+        - http_5xx
+        - http_502
+        - http_503
+```
+
+**Feature Matrix:**
+| Feature | Envoy | Kong | APISIX | Traefik | Nginx | HAProxy |
+|---------|-------|------|--------|---------|-------|---------|
+| Connection Timeout | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Send/Read Timeout | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Idle Timeout | ✅ | ⚠️ | ⚠️ | ✅ | ⚠️ | ✅ |
+| Retry Attempts | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Exponential Backoff | ✅ | ❌ | ⚠️ | ✅ | ❌ | ❌ |
+| Retry Conditions | ✅ | ❌ | ✅ | ⚠️ | ✅ | ✅ |
+| Status Code Retry | ✅ | ❌ | ✅ | ⚠️ | ✅ | ✅ |
 
 ### Low Priority Features
 
