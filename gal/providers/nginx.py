@@ -191,8 +191,11 @@ class NginxProvider(Provider):
 
         # Logging
         output.append("    # Logging")
-        output.append("    access_log /var/log/nginx/access.log;")
-        output.append("    error_log /var/log/nginx/error.log;")
+        if config.global_config and config.global_config.logging:
+            self._generate_nginx_logging(config.global_config.logging, output)
+        else:
+            output.append("    access_log /var/log/nginx/access.log;")
+            output.append("    error_log /var/log/nginx/error.log;")
         output.append("")
 
         # Rate limiting zones (global definition)
@@ -213,6 +216,46 @@ class NginxProvider(Provider):
         result = "\n".join(output)
         logger.debug(f"Generated Nginx config: {len(result)} characters")
         return result
+
+    def _generate_nginx_logging(self, logging_config, output: List[str]) -> None:
+        """Generate Nginx logging configuration.
+
+        Args:
+            logging_config: LoggingConfig object
+            output: Output list to append to
+        """
+        # Log format
+        if logging_config.format == "json":
+            output.append("    # JSON Access Log Format")
+            output.append("    log_format json_combined escape=json")
+            output.append("      '{'")
+            output.append('        \'"time_local":"$time_local",\'')
+            output.append('        \'"remote_addr":"$remote_addr",\'')
+            output.append('        \'"request_method":"$request_method",\'')
+            output.append('        \'"request_uri":"$request_uri",\'')
+            output.append('        \'"status":"$status",\'')
+            output.append('        \'"body_bytes_sent":"$body_bytes_sent",\'')
+            output.append('        \'"http_referer":"$http_referer",\'')
+            output.append('        \'"http_user_agent":"$http_user_agent",\'')
+            output.append('        \'"request_time":"$request_time"\'')
+
+            # Add custom fields
+            for key, value in logging_config.custom_fields.items():
+                output.append(f'        \'",{key}":"{value}"\'')
+
+            output.append("      '};'")
+            output.append("")
+
+        # Access log
+        if logging_config.format == "json":
+            output.append(f"    access_log {logging_config.access_log_path} json_combined;")
+        else:
+            output.append(f"    access_log {logging_config.access_log_path};")
+
+        # Error log with level
+        log_level_map = {"debug": "debug", "info": "info", "warning": "warn", "error": "error"}
+        nginx_level = log_level_map.get(logging_config.level, "warn")
+        output.append(f"    error_log {logging_config.error_log_path} {nginx_level};")
 
     def _generate_rate_limit_zones(self, config: Config, output: List[str]) -> None:
         """Generate rate limiting zone definitions.

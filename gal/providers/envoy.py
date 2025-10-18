@@ -199,7 +199,9 @@ class EnvoyProvider(Provider):
                             retry_conditions.append("refused-stream")
 
                     if retry_conditions:
-                        output.append(f"                    retry_on: {','.join(set(retry_conditions))}")
+                        output.append(
+                            f"                    retry_on: {','.join(set(retry_conditions))}"
+                        )
 
                     # Add retriable status codes if specified
                     retriable_codes = []
@@ -357,6 +359,10 @@ class EnvoyProvider(Provider):
         if has_websocket:
             output.append("          upgrade_configs:")
             output.append("          - upgrade_type: websocket")
+
+        # Access logging
+        if config.global_config and config.global_config.logging:
+            self._generate_envoy_logging(config.global_config.logging, output)
 
         # HTTP filters
         output.append("          http_filters:")
@@ -824,11 +830,107 @@ class EnvoyProvider(Provider):
         output.append(f"      address: {config.global_config.host}")
         output.append(f"      port_value: {config.global_config.admin_port}")
 
+        # Metrics export (Prometheus/OpenTelemetry)
+        if config.global_config and config.global_config.metrics:
+            self._generate_envoy_metrics(config.global_config.metrics, output)
+
         result = "\n".join(output)
         logger.info(
             f"Envoy configuration generated: {len(result)} bytes, {len(config.services)} services"
         )
         return result
+
+    def _generate_envoy_logging(self, logging_config, output: list):
+        """Generate Envoy access logging configuration.
+
+        Args:
+            logging_config: LoggingConfig object
+            output: Output list to append YAML lines to
+        """
+        output.append("          access_log:")
+        output.append("          - name: envoy.access_loggers.file")
+        output.append("            typed_config:")
+        output.append(
+            "              '@type': type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog"
+        )
+        output.append(f"              path: {logging_config.access_log_path}")
+
+        # Log format (JSON or text)
+        if logging_config.format == "json":
+            output.append("              json_format:")
+            output.append('                request_id: "%REQ(X-REQUEST-ID)%"')
+            output.append('                method: "%REQ(:METHOD)%"')
+            output.append('                path: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"')
+            output.append('                protocol: "%PROTOCOL%"')
+            output.append('                response_code: "%RESPONSE_CODE%"')
+            output.append('                bytes_received: "%BYTES_RECEIVED%"')
+            output.append('                bytes_sent: "%BYTES_SENT%"')
+            output.append('                duration: "%DURATION%"')
+            output.append(
+                '                upstream_service_time: "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%"'
+            )
+            output.append('                x_forwarded_for: "%REQ(X-FORWARDED-FOR)%"')
+
+            # Include configured headers
+            for header in logging_config.include_headers:
+                safe_header = header.replace("-", "_").lower()
+                output.append(f'                {safe_header}: "%REQ({header})%"')
+
+            # Custom fields
+            for key, value in logging_config.custom_fields.items():
+                output.append(f'                {key}: "{value}"')
+        else:
+            # Text format
+            output.append("              log_format:")
+            output.append("                text_format_source:")
+            output.append(
+                '                  inline_string: "[%START_TIME%] %REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %RESPONSE_CODE% %BYTES_RECEIVED% %BYTES_SENT% %DURATION%\\n"'
+            )
+
+        # Sampling (if sample_rate < 1.0)
+        if logging_config.sample_rate < 1.0:
+            sample_percent = int(logging_config.sample_rate * 100)
+            output.append("              filter:")
+            output.append("                runtime_filter:")
+            output.append("                  runtime_key: access_log_sampling")
+            output.append("                  percent_sampled:")
+            output.append(f"                    numerator: {sample_percent}")
+            output.append("                    denominator: HUNDRED")
+
+        output.append("")
+
+    def _generate_envoy_metrics(self, metrics_config, output: list):
+        """Generate Envoy metrics export configuration.
+
+        Args:
+            metrics_config: MetricsConfig object
+            output: Output list to append YAML lines to
+        """
+        if metrics_config.exporter in ("prometheus", "both"):
+            # Prometheus stats endpoint (via admin interface)
+            output.append("")
+            output.append("# Prometheus metrics available at admin interface")
+            output.append(f"# http://<admin_host>:<admin_port>/stats/prometheus")
+            logger.info(
+                f"Prometheus metrics enabled on admin interface at port {metrics_config.prometheus_port}"
+            )
+
+        if metrics_config.exporter in ("opentelemetry", "both"):
+            # OpenTelemetry exporter
+            if metrics_config.opentelemetry_endpoint:
+                output.append("")
+                output.append("stats_sinks:")
+                output.append("- name: envoy.stat_sinks.open_telemetry")
+                output.append("  typed_config:")
+                output.append(
+                    "    '@type': type.googleapis.com/envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig"
+                )
+                output.append("    grpc_service:")
+                output.append("      envoy_grpc:")
+                output.append("        cluster_name: opentelemetry_collector")
+                logger.info(
+                    f"OpenTelemetry metrics export enabled to {metrics_config.opentelemetry_endpoint}"
+                )
 
     def _generate_envoy_cluster(self, service, output: list):
         """Generate Envoy cluster configuration with health checks and load balancing.

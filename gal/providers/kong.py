@@ -120,6 +120,28 @@ class KongProvider(Provider):
         output.append("_format_version: '3.0'")
         output.append("")
 
+        # Global plugins for logging and metrics
+        global_plugins = []
+        if config.global_config and config.global_config.logging:
+            global_plugins.extend(self._generate_kong_logging_plugins(config.global_config.logging))
+        if config.global_config and config.global_config.metrics:
+            global_plugins.extend(self._generate_kong_metrics_plugins(config.global_config.metrics))
+
+        if global_plugins:
+            output.append("plugins:")
+            for plugin in global_plugins:
+                output.append(f"- name: {plugin['name']}")
+                if plugin.get("config"):
+                    output.append("  config:")
+                    for key, value in plugin["config"].items():
+                        if isinstance(value, bool):
+                            output.append(f"    {key}: {str(value).lower()}")
+                        elif isinstance(value, (list, dict)):
+                            output.append(f"    {key}: {value}")
+                        else:
+                            output.append(f"    {key}: {value}")
+            output.append("")
+
         # Generate upstreams first (if needed for load balancing or health checks)
         upstreams_needed = []
         for service in config.services:
@@ -455,6 +477,50 @@ class KongProvider(Provider):
             f"Kong configuration generated: {len(result)} bytes, {len(config.services)} services"
         )
         return result
+
+    def _generate_kong_logging_plugins(self, logging_config) -> list:
+        """Generate Kong logging plugins.
+
+        Args:
+            logging_config: LoggingConfig object
+
+        Returns:
+            List of plugin dictionaries
+        """
+        plugins = []
+
+        if logging_config.enabled:
+            # file-log plugin
+            log_config = {"path": logging_config.access_log_path}
+
+            if logging_config.format == "json":
+                log_config["format"] = "json"
+
+            # Custom fields
+            if logging_config.custom_fields:
+                log_config["custom_fields_by_lua"] = logging_config.custom_fields
+
+            plugins.append({"name": "file-log", "config": log_config})
+
+        return plugins
+
+    def _generate_kong_metrics_plugins(self, metrics_config) -> list:
+        """Generate Kong metrics plugins.
+
+        Args:
+            metrics_config: MetricsConfig object
+
+        Returns:
+            List of plugin dictionaries
+        """
+        plugins = []
+
+        if metrics_config.enabled and metrics_config.exporter in ("prometheus", "both"):
+            # Prometheus plugin
+            plugins.append({"name": "prometheus", "config": {}})
+            logger.info(f"Prometheus metrics enabled at http://<kong_host>:8001/metrics")
+
+        return plugins
 
     def _generate_kong_upstream(self, service, output: list):
         """Generate Kong upstream configuration with health checks and load balancing.
