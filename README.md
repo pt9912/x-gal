@@ -284,8 +284,14 @@ CONFIG_FILE=examples/gateway-config.yaml docker-compose --profile validate up ga
 - [**WebSocket Support**](docs/guides/WEBSOCKET.md) - Real-time bidirectional communication
 - [**Body Transformation**](docs/guides/BODY_TRANSFORMATION.md) - Request/Response body manipulation (add/remove/rename fields, PII filtering)
 - [**Timeout & Retry Policies**](docs/guides/TIMEOUT_RETRY.md) - Connection/read/send timeouts, automatic retries with exponential backoff
-- [Nginx Provider](docs/guides/NGINX.md) - Nginx-spezifische Features
-- [HAProxy Provider](docs/guides/HAPROXY.md) - HAProxy-spezifische Features
+
+### Provider-Guides
+- [**Envoy Provider**](docs/guides/ENVOY.md) - CNCF cloud-native proxy, Filter-Architektur, xDS API
+- [**Kong Provider**](docs/guides/KONG.md) - Plugin-Ökosystem, Admin API, DB-less mode
+- [**APISIX Provider**](docs/guides/APISIX.md) - Ultra-high performance, etcd integration, Lua scripting
+- [**Traefik Provider**](docs/guides/TRAEFIK.md) - Auto-discovery, Let's Encrypt, Cloud-native
+- [**Nginx Provider**](docs/guides/NGINX.md) - Open Source, ngx_http modules, OpenResty
+- [**HAProxy Provider**](docs/guides/HAPROXY.md) - Advanced Load Balancing, ACLs, High performance
 
 ### Roadmap & Changelog
 - [**Roadmap**](ROADMAP.md) - Geplante Features und Releases
