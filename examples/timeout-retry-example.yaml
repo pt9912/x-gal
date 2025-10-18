@@ -1,0 +1,447 @@
+# Timeout & Retry Policies - Beispielkonfigurationen
+#
+# Diese Datei enthält 12 produktionsreife Beispiele für Timeout- und Retry-Konfigurationen
+# für verschiedene Anwendungsfälle. Jedes Beispiel kann einzeln verwendet oder als
+# Vorlage für eigene Konfigurationen dienen.
+#
+# Verwendung:
+#   gal generate --config timeout-retry-example.yaml --provider <provider>
+
+version: "1.0"
+provider: envoy
+
+global:
+  host: 0.0.0.0
+  port: 10000
+  admin_port: 9901
+
+# ============================================================================
+# Beispiel 1: Basic Timeout-Konfiguration
+# ============================================================================
+# Use Case: Standard-REST-API mit konservativen Timeouts
+#
+# Generierte Konfiguration enthält:
+# - Envoy: cluster.connect_timeout, route.timeout, route.idle_timeout
+# - Kong: connect_timeout/read_timeout/write_timeout (Millisekunden)
+# - APISIX: timeout plugin (connect/send/read)
+# - Traefik: serversTransport.forwardingTimeouts
+# - Nginx: proxy_connect_timeout, proxy_send_timeout, proxy_read_timeout
+# - HAProxy: timeout connect/server/client
+
+services:
+  - name: basic_api
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+    routes:
+      - path_prefix: /api/basic
+        timeout:
+          connect: "5s"      # Standard Connection-Timeout
+          send: "30s"        # Standard Send-Timeout
+          read: "60s"        # Standard Read-Timeout
+          idle: "300s"       # 5 Minuten Idle-Timeout
+
+# ============================================================================
+# Beispiel 2: Basic Retry-Konfiguration
+# ============================================================================
+# Use Case: Automatische Wiederholung bei transienten Fehlern
+#
+# Generierte Konfiguration enthält:
+# - Envoy: retry_policy mit num_retries, retry_on
+# - Kong: retries field
+# - APISIX: proxy-retry plugin
+# - Traefik: retry middleware
+# - Nginx: proxy_next_upstream mit proxy_next_upstream_tries
+# - HAProxy: retry-on mit retries
+
+  - name: retry_api
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+    routes:
+      - path_prefix: /api/retry
+        retry:
+          enabled: true
+          attempts: 3                  # 3 Versuche (inkl. Original)
+          backoff: exponential         # Exponential Backoff
+          base_interval: "25ms"        # Start-Intervall
+          max_interval: "250ms"        # Max-Intervall
+          retry_on:
+            - connect_timeout          # Bei Connection-Timeout
+            - http_5xx                 # Bei allen 5xx-Fehlern
+
+# ============================================================================
+# Beispiel 3: Timeout & Retry kombiniert (EMPFOHLEN)
+# ============================================================================
+# Use Case: Produktions-API mit Timeouts und Retries
+#
+# Diese Konfiguration kombiniert beide Features für maximale Resilienz.
+# Kurze Timeouts sorgen für schnelles Failover, Retries erhöhen die Verfügbarkeit.
+
+  - name: combined_api
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+    routes:
+      - path_prefix: /api/combined
+        timeout:
+          connect: "5s"
+          send: "30s"
+          read: "60s"
+          idle: "300s"
+        retry:
+          enabled: true
+          attempts: 3
+          backoff: exponential
+          base_interval: "25ms"
+          max_interval: "250ms"
+          retry_on:
+            - connect_timeout
+            - http_5xx
+
+# ============================================================================
+# Beispiel 4: Payment API mit aggressiven Retries
+# ============================================================================
+# Use Case: Kritische Payment-API mit hohen Verfügbarkeitsanforderungen
+#
+# - Kurze Timeouts für schnelles Failover
+# - 5 Retry-Versuche (mehr als Standard)
+# - Nur spezifische 5xx-Codes (502, 503, 504)
+# - Längerer Backoff für Überlastungsschutz
+
+  - name: payment_api
+    type: rest
+    protocol: http
+    upstream:
+      host: payment.internal
+      port: 8080
+    routes:
+      - path_prefix: /api/payments
+        timeout:
+          connect: "3s"       # Kurz für schnelles Failover
+          send: "10s"
+          read: "30s"
+        retry:
+          enabled: true
+          attempts: 5         # Viele Versuche (kritischer Service)
+          backoff: exponential
+          base_interval: "50ms"
+          max_interval: "500ms"
+          retry_on:
+            - connect_timeout
+            - http_502        # Bad Gateway
+            - http_503        # Service Unavailable
+            - http_504        # Gateway Timeout
+
+# ============================================================================
+# Beispiel 5: Long-Running Operations
+# ============================================================================
+# Use Case: Batch-Processing oder Report-Generierung mit langen Laufzeiten
+#
+# - Sehr lange Read-Timeouts (10 Minuten)
+# - Retry deaktiviert (Long-Running Operations sollten nicht wiederholt werden)
+# - Lange Idle-Timeouts (1 Stunde)
+
+  - name: batch_api
+    type: rest
+    protocol: http
+    upstream:
+      host: batch.internal
+      port: 8080
+    routes:
+      - path_prefix: /api/batch
+        timeout:
+          connect: "10s"
+          send: "60s"
+          read: "600s"       # 10 Minuten für Long-Running
+          idle: "3600s"      # 1 Stunde Idle
+        retry:
+          enabled: false      # Keine Retries bei Long-Running
+
+# ============================================================================
+# Beispiel 6: Microservice mit Circuit Breaker
+# ============================================================================
+# Use Case: Microservice mit Circuit Breaker für schnelles Failover
+#
+# - Kurze Timeouts + Circuit Breaker = schnelles Failover
+# - Retry nur bei Connect-Timeout und 503 (Service Unavailable)
+# - Circuit Breaker öffnet nach 5 Fehlern für 30 Sekunden
+
+  - name: user_service
+    type: rest
+    protocol: http
+    upstream:
+      host: user.internal
+      port: 8080
+    routes:
+      - path_prefix: /api/users
+        timeout:
+          connect: "2s"       # Sehr kurz
+          send: "10s"
+          read: "20s"
+        retry:
+          enabled: true
+          attempts: 3
+          backoff: exponential
+          base_interval: "25ms"
+          max_interval: "100ms"
+          retry_on:
+            - connect_timeout
+            - http_503
+        circuit_breaker:
+          enabled: true
+          max_failures: 5
+          timeout: "30s"
+          unhealthy_status_codes: [500, 502, 503, 504]
+          healthy_status_codes: [200, 201, 204]
+          half_open_requests: 3
+
+# ============================================================================
+# Beispiel 7: gRPC Service
+# ============================================================================
+# Use Case: gRPC-Service mit speziellen Timeout-Anforderungen
+#
+# - Längere Read-Timeouts für gRPC-Streams
+# - Retry bei reset (häufig bei gRPC-Problemen)
+# - HTTP/2 Protokoll
+
+  - name: grpc_service
+    type: grpc
+    protocol: http2
+    upstream:
+      host: grpc.internal
+      port: 50051
+    routes:
+      - path_prefix: /
+        timeout:
+          connect: "5s"
+          send: "30s"
+          read: "120s"       # gRPC Streams können länger dauern
+          idle: "600s"
+        retry:
+          enabled: true
+          attempts: 3
+          retry_on:
+            - reset              # Connection-Reset häufig bei gRPC
+            - connect_timeout
+
+# ============================================================================
+# Beispiel 8: External API mit Rate Limiting
+# ============================================================================
+# Use Case: Externe API mit Rate Limiting und konservativen Retries
+#
+# - Längerer Backoff für externe APIs
+# - Retry bei retriable_4xx (429 Too Many Requests)
+# - Längere Timeouts für externe Netzwerke
+
+  - name: external_api
+    type: rest
+    protocol: http
+    upstream:
+      host: api.external.com
+      port: 443
+    routes:
+      - path_prefix: /api/external
+        timeout:
+          connect: "10s"      # Längere Timeouts für externe API
+          send: "30s"
+          read: "60s"
+        retry:
+          enabled: true
+          attempts: 3
+          backoff: exponential
+          base_interval: "100ms"   # Längerer Backoff für externe API
+          max_interval: "1s"
+          retry_on:
+            - connect_timeout
+            - http_503
+            - retriable_4xx        # 429 Too Many Requests
+
+# ============================================================================
+# Beispiel 9: Multi-Datacenter mit Failover
+# ============================================================================
+# Use Case: Multi-Datacenter-Deployment mit schnellem Failover
+#
+# - Sehr kurze Connection-Timeouts (2s) für schnelles DC-Failover
+# - Linear Backoff für schnelles Failover zwischen DCs
+# - Nur 2 Versuche (Multi-DC hat viele Server)
+
+  - name: multi_dc_api
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: api-dc1.internal
+          port: 8080
+          weight: 1
+        - host: api-dc2.internal
+          port: 8080
+          weight: 1
+      load_balancer:
+        algorithm: round_robin
+    routes:
+      - path_prefix: /api/multi-dc
+        timeout:
+          connect: "2s"        # Kurz für schnelles Failover
+          send: "10s"
+          read: "30s"
+        retry:
+          enabled: true
+          attempts: 2          # Nur 2 Versuche (Multi-DC hat viele Server)
+          backoff: linear      # Linear für schnelles Failover
+          base_interval: "10ms"
+          retry_on:
+            - connect_timeout
+            - reset
+
+# ============================================================================
+# Beispiel 10: WebSocket mit Retry
+# ============================================================================
+# Use Case: WebSocket-Verbindungen mit Retry bei Connection-Fehlern
+#
+# - Lange Read-Timeouts für WebSocket-Verbindungen
+# - Retry nur bei Connection-Fehlern (nicht bei Protokollfehlern)
+# - WebSocket-spezifische Idle-Timeouts
+
+  - name: websocket_service
+    type: websocket
+    protocol: http
+    upstream:
+      host: ws.internal
+      port: 8080
+    routes:
+      - path_prefix: /ws
+        websocket:
+          enabled: true
+          idle_timeout: "600s"    # 10 Minuten WebSocket Idle
+        timeout:
+          connect: "5s"
+          send: "30s"
+          read: "600s"            # Lange Timeouts für WebSocket
+        retry:
+          enabled: true
+          attempts: 3
+          retry_on:
+            - connect_timeout
+            - reset
+
+# ============================================================================
+# Beispiel 11: Idempotente API mit vielen Retries
+# ============================================================================
+# Use Case: Idempotente API (GET/PUT/DELETE) mit vielen Retry-Versuchen
+#
+# - Viele Retry-Versuche (7) sind sicher bei idempotenten Operationen
+# - Exponential Backoff mit höherem Maximum (1s)
+# - Nur idempotente Methods (GET, PUT, DELETE)
+
+  - name: idempotent_api
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+    routes:
+      - path_prefix: /api/data
+        methods:
+          - GET
+          - PUT
+          - DELETE
+        timeout:
+          connect: "5s"
+          send: "30s"
+          read: "60s"
+        retry:
+          enabled: true
+          attempts: 7          # Viele Versuche (idempotent)
+          backoff: exponential
+          base_interval: "25ms"
+          max_interval: "1s"   # Höheres Maximum
+          retry_on:
+            - connect_timeout
+            - http_5xx
+            - reset
+
+# ============================================================================
+# Beispiel 12: Non-Idempotente API (POST) ohne Retry
+# ============================================================================
+# Use Case: Non-idempotente API (POST) ohne automatische Retries
+#
+# - POST-Requests sollten nicht automatisch wiederholt werden
+# - Risiko von Duplikaten (z.B. doppelte Bestellungen)
+# - Timeouts trotzdem konfiguriert
+
+  - name: order_api
+    type: rest
+    protocol: http
+    upstream:
+      host: order.internal
+      port: 8080
+    routes:
+      - path_prefix: /api/orders
+        methods:
+          - POST
+        timeout:
+          connect: "5s"
+          send: "30s"
+          read: "60s"
+        retry:
+          enabled: false       # Keine Retries bei POST (non-idempotent)
+
+# ============================================================================
+# Provider-Hinweise
+# ============================================================================
+#
+# Envoy:
+#   - Umfassendste Timeout-Konfiguration
+#   - Granulare Retry-Bedingungen
+#   - Per-Try-Timeout
+#   - Retriable Status Codes
+#
+# Kong:
+#   - Timeouts in Millisekunden
+#   - Nur Retry-Anzahl (keine Bedingungen)
+#   - Einfache Konfiguration
+#
+# APISIX:
+#   - Plugin-basiert: timeout, proxy-retry
+#   - Status Code-basierte Retries
+#   - Timeouts in Sekunden
+#
+# Traefik:
+#   - Middleware-basiert
+#   - serversTransport für Timeouts
+#   - Retry mit initialInterval
+#
+# Nginx:
+#   - proxy_*_timeout Direktiven
+#   - proxy_next_upstream für Retries
+#   - Flexible Retry-Conditions
+#
+# HAProxy:
+#   - timeout connect/server/client
+#   - retry-on mit vielen Bedingungen
+#   - Sehr performant
+#
+# ============================================================================
+# Generierung
+# ============================================================================
+#
+# Generiere Konfiguration für einen Provider:
+#   gal generate --config timeout-retry-example.yaml --provider envoy > envoy.yaml
+#   gal generate --config timeout-retry-example.yaml --provider kong > kong.yaml
+#   gal generate --config timeout-retry-example.yaml --provider apisix > apisix.json
+#   gal generate --config timeout-retry-example.yaml --provider traefik > traefik.yaml
+#   gal generate --config timeout-retry-example.yaml --provider nginx > nginx.conf
+#   gal generate --config timeout-retry-example.yaml --provider haproxy > haproxy.cfg
+#
+# Generiere Konfigurationen für alle Provider:
+#   gal generate-all --config timeout-retry-example.yaml
+#
+# Validiere Konfiguration:
+#   gal validate --config timeout-retry-example.yaml
