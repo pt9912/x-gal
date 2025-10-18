@@ -2,9 +2,10 @@
 
 [![Tests](https://github.com/pt9912/x-gal/actions/workflows/test.yml/badge.svg)](https://github.com/pt9912/x-gal/actions/workflows/test.yml)
 [![Docker Build](https://github.com/pt9912/x-gal/actions/workflows/docker-build.yml/badge.svg)](https://github.com/pt9912/x-gal/actions/workflows/docker-build.yml)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/pt9912/x-gal/releases)
+[![PyPI version](https://img.shields.io/pypi/v/gal-gateway.svg)](https://pypi.org/project/gal-gateway/)
+[![Python Version](https://img.shields.io/pypi/pyversions/gal-gateway.svg)](https://pypi.org/project/gal-gateway/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![Downloads](https://img.shields.io/pypi/dm/gal-gateway.svg)](https://pypi.org/project/gal-gateway/)
 
 **Gateway-Abstraktionsschicht** - Provider-agnostisches API-Gateway-Konfigurations- und Transformationssystem in Python.
 
@@ -75,13 +76,32 @@ pip install -e .[dev]    # Mit Dev-Tools (pytest, black, flake8, isort)
 chmod +x gal-cli.py
 ```
 
-### 📦 PyPI (Geplant)
+### 📦 PyPI (Empfohlen für Produktion)
 
 ```bash
-# Wird in zukünftigen Releases verfügbar sein
+# Stabile Version von PyPI installieren
 pip install gal-gateway
+
+# CLI verwenden
 gal --help
+gal --version
+
+# Mit Development Tools
+pip install gal-gateway[dev]
+
+# Spezifische Version
+pip install gal-gateway==1.0.0
+
+# Pre-Release von TestPyPI (optional)
+pip install --index-url https://test.pypi.org/simple/ \
+            --extra-index-url https://pypi.org/simple/ \
+            gal-gateway
 ```
+
+**PyPI Links:**
+- **Stable Releases:** https://pypi.org/project/gal-gateway/
+- **Pre-Releases (TestPyPI):** https://test.pypi.org/project/gal-gateway/
+- **Dokumentation:** [PyPI Publishing Guide](docs/PYPI_PUBLISHING.md)
 
 ## Schnellstart
 
