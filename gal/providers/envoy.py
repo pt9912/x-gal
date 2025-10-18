@@ -431,6 +431,32 @@ class EnvoyProvider(Provider):
             output.append("    lb_policy: ROUND_ROBIN")
             if service.type == "grpc":
                 output.append("    http2_protocol_options: {}")
+
+            # Add circuit breaker (Outlier Detection) if any route has it enabled
+            circuit_breaker = None
+            for route in service.routes:
+                if route.circuit_breaker and route.circuit_breaker.enabled:
+                    circuit_breaker = route.circuit_breaker
+                    break
+
+            if circuit_breaker:
+                output.append("    outlier_detection:")
+                # Convert max_failures to consecutive error threshold
+                output.append(f"      consecutive_5xx: {circuit_breaker.max_failures}")
+                # Interval for checking outlier status (default 10s)
+                output.append("      interval: 10s")
+                # Base ejection time (how long to eject a host)
+                timeout_value = circuit_breaker.timeout.rstrip('s')
+                output.append(f"      base_ejection_time: {timeout_value}s")
+                # Max percentage of hosts that can be ejected
+                output.append("      max_ejection_percent: 50")
+                # Enforce consecutive 5xx detection (100 = always enforce)
+                output.append("      enforcing_consecutive_5xx: 100")
+                # Configure success rate enforcement
+                output.append(f"      success_rate_minimum_hosts: {circuit_breaker.half_open_requests}")
+                output.append("      success_rate_request_volume: 10")
+                output.append("      enforcing_success_rate: 100")
+
             output.append("    load_assignment:")
             output.append(f"      cluster_name: {service.name}_cluster")
             output.append("      endpoints:")

@@ -273,6 +273,27 @@ class APISIXProvider(Provider):
                         cors_config["expose_headers"] = ",".join(cors.expose_headers)
                     route_config["plugins"]["cors"] = cors_config
 
+                # Add Circuit Breaker plugin if configured
+                if route.circuit_breaker and route.circuit_breaker.enabled:
+                    if "plugins" not in route_config:
+                        route_config["plugins"] = {}
+                    cb = route.circuit_breaker
+                    # Parse timeout (e.g., "30s" -> 30)
+                    timeout_seconds = int(cb.timeout.rstrip('s'))
+                    cb_config = {
+                        "break_response_code": cb.failure_response_code,
+                        "max_breaker_sec": timeout_seconds,
+                        "unhealthy": {
+                            "http_statuses": cb.unhealthy_status_codes,
+                            "failures": cb.max_failures
+                        },
+                        "healthy": {
+                            "http_statuses": cb.healthy_status_codes,
+                            "successes": cb.half_open_requests
+                        }
+                    }
+                    route_config["plugins"]["api-breaker"] = cb_config
+
                 apisix_config["routes"].append(route_config)
 
         result = json.dumps(apisix_config, indent=2)

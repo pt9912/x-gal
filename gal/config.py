@@ -65,6 +65,7 @@ class Route:
         authentication: Optional authentication configuration for this route
         headers: Optional header manipulation configuration for this route
         cors: Optional CORS policy configuration for this route
+        circuit_breaker: Optional circuit breaker configuration for this route
 
     Example:
         >>> route = Route(path_prefix="/api/users", methods=["GET", "POST"])
@@ -77,6 +78,7 @@ class Route:
     authentication: Optional['AuthenticationConfig'] = None
     headers: Optional['HeaderManipulation'] = None
     cors: Optional['CORSPolicy'] = None
+    circuit_breaker: Optional['CircuitBreakerConfig'] = None
 
 
 @dataclass
@@ -348,6 +350,55 @@ class CORSPolicy:
 
 
 @dataclass
+class CircuitBreakerConfig:
+    """Circuit breaker configuration for routes.
+
+    Implements the circuit breaker pattern to prevent cascading failures
+    by detecting unhealthy upstream services and temporarily blocking requests.
+
+    Provider Support:
+        - APISIX: Native api-breaker plugin (100%)
+        - Traefik: Native CircuitBreaker middleware (100%)
+        - Envoy: Outlier Detection (100%)
+        - Kong: Third-party kong-circuit-breaker plugin (Limited)
+
+    Attributes:
+        enabled: Whether circuit breaker is enabled (default: True)
+        max_failures: Maximum consecutive failures before opening circuit (default: 5)
+        timeout: Duration to wait before attempting recovery (default: "30s")
+        half_open_requests: Number of test requests in half-open state (default: 3)
+        unhealthy_status_codes: HTTP status codes considered failures (default: [500, 502, 503, 504])
+        healthy_status_codes: HTTP status codes considered healthy (default: [200, 201, 202, 204])
+        failure_response_code: HTTP status code when circuit is open (default: 503)
+        failure_response_message: Error message when circuit is open
+
+    Circuit States:
+        - CLOSED: Normal operation, requests pass through
+        - OPEN: Circuit broken, requests fail immediately
+        - HALF_OPEN: Testing recovery with limited requests
+
+    Example:
+        >>> cb = CircuitBreakerConfig(
+        ...     enabled=True,
+        ...     max_failures=5,
+        ...     timeout="30s",
+        ...     half_open_requests=3,
+        ...     unhealthy_status_codes=[500, 502, 503, 504]
+        ... )
+        >>> cb.max_failures
+        5
+    """
+    enabled: bool = True
+    max_failures: int = 5
+    timeout: str = "30s"
+    half_open_requests: int = 3
+    unhealthy_status_codes: List[int] = field(default_factory=lambda: [500, 502, 503, 504])
+    healthy_status_codes: List[int] = field(default_factory=lambda: [200, 201, 202, 204])
+    failure_response_code: int = 503
+    failure_response_message: str = "Service temporarily unavailable"
+
+
+@dataclass
 class Transformation:
     """Request payload transformation configuration.
 
@@ -564,13 +615,19 @@ class Config:
                 if 'cors' in route_data:
                     cors_policy = CORSPolicy(**route_data['cors'])
 
+                # Parse route-level circuit breaker
+                circuit_breaker = None
+                if 'circuit_breaker' in route_data:
+                    circuit_breaker = CircuitBreakerConfig(**route_data['circuit_breaker'])
+
                 route = Route(
                     path_prefix=route_data['path_prefix'],
                     methods=route_data.get('methods'),
                     rate_limit=rate_limit,
                     authentication=authentication,
                     headers=route_headers,
-                    cors=cors_policy
+                    cors=cors_policy,
+                    circuit_breaker=circuit_breaker
                 )
                 routes.append(route)
             

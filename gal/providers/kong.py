@@ -235,6 +235,18 @@ class KongProvider(Provider):
                         "config": cors_config
                     })
 
+                # Circuit Breaker: Kong does not have native circuit breaker support.
+                # Third-party plugins exist (e.g., kong-circuit-breaker by Dream11),
+                # but are not part of Kong's official plugin ecosystem.
+                # For production use, consider using Envoy, APISIX, or Traefik which
+                # provide native circuit breaker functionality.
+                if route.circuit_breaker and route.circuit_breaker.enabled:
+                    logger.warning(
+                        f"Circuit breaker configured for route {service.name}/{route.path_prefix}, "
+                        "but Kong does not have native circuit breaker support. "
+                        "Consider using kong-circuit-breaker plugin or switch to a provider with native support."
+                    )
+
                 # Write all route plugins
                 if route_plugins:
                     output.append("    plugins:")
