@@ -223,6 +223,7 @@ class Route:
         cors: Optional CORS policy configuration for this route
         websocket: Optional WebSocket configuration for this route
         circuit_breaker: Optional circuit breaker configuration for this route
+        body_transformation: Optional request/response body transformation configuration
 
     Example:
         >>> route = Route(path_prefix="/api/users", methods=["GET", "POST"])
@@ -237,6 +238,7 @@ class Route:
     cors: Optional['CORSPolicy'] = None
     websocket: Optional['WebSocketConfig'] = None
     circuit_breaker: Optional['CircuitBreakerConfig'] = None
+    body_transformation: Optional['BodyTransformationConfig'] = None
 
 
 @dataclass
@@ -547,6 +549,89 @@ class WebSocketConfig:
 
 
 @dataclass
+class RequestBodyTransformation:
+    """Request body transformation configuration.
+
+    Defines how incoming request bodies should be transformed,
+    including adding fields, removing fields, and renaming fields.
+
+    Attributes:
+        add_fields: Dictionary of fields to add to request body (field_name: value/template)
+        remove_fields: List of field names to remove from request body
+        rename_fields: Dictionary mapping old field names to new field names
+
+    Example:
+        >>> req_transform = RequestBodyTransformation(
+        ...     add_fields={"timestamp": "{{now}}", "trace_id": "{{uuid}}"},
+        ...     remove_fields=["internal_id", "debug_info"],
+        ...     rename_fields={"old_name": "new_name"}
+        ... )
+    """
+    add_fields: Dict[str, Any] = field(default_factory=dict)
+    remove_fields: List[str] = field(default_factory=list)
+    rename_fields: Dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class ResponseBodyTransformation:
+    """Response body transformation configuration.
+
+    Defines how outgoing response bodies should be transformed,
+    primarily for filtering sensitive data and adding metadata.
+
+    Attributes:
+        filter_fields: List of sensitive field names to remove from response
+        add_fields: Dictionary of fields to add to response body
+
+    Example:
+        >>> resp_transform = ResponseBodyTransformation(
+        ...     filter_fields=["password", "secret_key", "api_token"],
+        ...     add_fields={"server_timestamp": "{{now}}"}
+        ... )
+    """
+    filter_fields: List[str] = field(default_factory=list)
+    add_fields: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class BodyTransformationConfig:
+    """Complete body transformation configuration for requests and responses.
+
+    Provides comprehensive body transformation capabilities for both
+    request and response bodies, enabling data enrichment, filtering,
+    and field manipulation.
+
+    Provider Support:
+        - Envoy: Lua filter (100% - full scripting support)
+        - Kong: request-transformer & response-transformer plugins (100%)
+        - APISIX: serverless-pre-function & serverless-post-function (100%)
+        - Traefik: Custom middleware via ForwardAuth (Limited - requires external service)
+        - Nginx: Lua scripting via OpenResty (100% with OpenResty)
+        - HAProxy: Lua scripting (100%)
+
+    Attributes:
+        enabled: Whether body transformation is enabled (default: True)
+        request: Request body transformation configuration
+        response: Response body transformation configuration
+
+    Example:
+        >>> body_transform = BodyTransformationConfig(
+        ...     enabled=True,
+        ...     request=RequestBodyTransformation(
+        ...         add_fields={"timestamp": "{{now}}"},
+        ...         remove_fields=["internal_id"]
+        ...     ),
+        ...     response=ResponseBodyTransformation(
+        ...         filter_fields=["password", "secret"]
+        ...     )
+        ... )
+    """
+    enabled: bool = True
+    request: Optional[RequestBodyTransformation] = None
+    response: Optional[ResponseBodyTransformation] = None
+
+
+@dataclass
 class CircuitBreakerConfig:
     """Circuit breaker configuration for routes.
 
@@ -822,6 +907,24 @@ class Config:
                 if 'circuit_breaker' in route_data:
                     circuit_breaker = CircuitBreakerConfig(**route_data['circuit_breaker'])
 
+                # Parse route-level body transformation
+                body_transformation = None
+                if 'body_transformation' in route_data:
+                    bt_data = route_data['body_transformation']
+                    request_transform = None
+                    if 'request' in bt_data:
+                        request_transform = RequestBodyTransformation(**bt_data['request'])
+
+                    response_transform = None
+                    if 'response' in bt_data:
+                        response_transform = ResponseBodyTransformation(**bt_data['response'])
+
+                    body_transformation = BodyTransformationConfig(
+                        enabled=bt_data.get('enabled', True),
+                        request=request_transform,
+                        response=response_transform
+                    )
+
                 route = Route(
                     path_prefix=route_data['path_prefix'],
                     methods=route_data.get('methods'),
@@ -830,7 +933,8 @@ class Config:
                     headers=route_headers,
                     cors=cors_policy,
                     websocket=websocket,
-                    circuit_breaker=circuit_breaker
+                    circuit_breaker=circuit_breaker,
+                    body_transformation=body_transformation
                 )
                 routes.append(route)
             
