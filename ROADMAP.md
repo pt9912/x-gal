@@ -32,8 +32,8 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 ## 🚀 v1.1.0 (Q4 2025 - In Development)
 
 **Focus:** Traffic Management & Security Basics
-**Status:** 🔄 In Development (3/7 Features Complete)
-**Progress:** 52% (5.5 von 10.5 Wochen)
+**Status:** 🔄 In Development (4/7 Features Complete)
+**Progress:** 62% (6.5 von 10.5 Wochen)
 
 ### High Priority Features
 
@@ -128,19 +128,32 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 - **Documentation:** [docs/guides/HEADERS.md](docs/guides/HEADERS.md)
 - **Tests:** 30 neue Tests (175 total, 85% coverage)
 
-#### 4. CORS Policies
-- **Origin Whitelisting**
-- **Methods & Headers Control**
-- **Credentials Support**
-- **Config Format:**
+#### 4. CORS Policies ✅
+**Status:** ✅ **IMPLEMENTED**
+- **Origin Whitelisting** ✅ (Specific domains or wildcard)
+- **Methods & Headers Control** ✅ (Granular HTTP methods and headers)
+- **Credentials Support** ✅ (Cookies, Authentication headers)
+- **Preflight Caching** ✅ (Configurable max_age)
+- **Provider Support:**
+  - ✅ Kong: Native cors plugin
+  - ✅ APISIX: Native cors plugin
+  - ✅ Traefik: headers middleware with accessControl* fields
+  - ✅ Envoy: Native route-level CORS policy
+- **Implemented Config:**
   ```yaml
   cors:
-    allowed_origins: ["https://example.com"]
-    allowed_methods: ["GET", "POST", "PUT", "DELETE"]
-    allowed_headers: ["Content-Type", "Authorization"]
+    enabled: true
+    allowed_origins:
+      - "https://app.example.com"
+      - "https://www.example.com"
+    allowed_methods: [GET, POST, PUT, DELETE, OPTIONS]
+    allowed_headers: [Content-Type, Authorization, X-API-Key]
+    expose_headers: [X-Request-ID, X-RateLimit-Remaining]
     allow_credentials: true
-    max_age: 3600
+    max_age: 86400  # 24 hours
   ```
+- **Documentation:** [docs/guides/CORS.md](docs/guides/CORS.md)
+- **Tests:** 28 neue Tests + 8 config tests (211 total)
 
 #### 5. PyPI Publication
 - **Package Publishing** auf PyPI
@@ -337,7 +350,7 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 | Rate Limiting | ✅ Done | 🔴 High | Medium | High | 100% |
 | Authentication | ✅ Done | 🔴 High | High | Critical | 100% |
 | Header Manipulation | ✅ Done | 🔴 High | Medium | High | 100% |
-| CORS | 🔄 Pending | 🔴 High | Low | High | 90% |
+| CORS | ✅ Done | 🔴 High | Low | High | 100% |
 | Circuit Breaker | 🔄 Pending | 🟡 Medium | Medium | Medium | 75% |
 | Health Checks | 🔄 Pending | 🟡 Medium | Medium | High | 90% |
 | Caching | 🔄 Pending | 🟢 Low | Medium | Medium | 60% |
