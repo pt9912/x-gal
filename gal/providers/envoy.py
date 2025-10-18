@@ -7,11 +7,23 @@ for HTTP/2, gRPC, and Lua-based request transformations.
 
 import logging
 import os
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 import requests
+import yaml
 
-from ..config import Config
+from ..config import (
+    ActiveHealthCheck,
+    Config,
+    GlobalConfig,
+    HealthCheckConfig,
+    LoadBalancerConfig,
+    PassiveHealthCheck,
+    Route,
+    Service,
+    Upstream,
+    UpstreamTarget,
+)
 from ..provider import Provider
 
 logger = logging.getLogger(__name__)
@@ -1144,3 +1156,214 @@ class EnvoyProvider(Provider):
 
         logger.info("Envoy deployment completed successfully")
         return True
+
+    def parse(self, provider_config: str) -> Config:
+        """Parse Envoy YAML configuration to GAL format.
+
+        Converts Envoy static_resources configuration into GAL Config model.
+        Extracts clusters, listeners, routes, health checks, and load balancing.
+
+        Args:
+            provider_config: Envoy YAML configuration string
+
+        Returns:
+            GAL Config object
+
+        Raises:
+            ValueError: If parsing fails or configuration is invalid
+
+        Example:
+            >>> provider = EnvoyProvider()
+            >>> envoy_yaml = '''
+            ... static_resources:
+            ...   clusters:
+            ...   - name: api_cluster
+            ...     connect_timeout: 5s
+            ... '''
+            >>> config = provider.parse(envoy_yaml)
+        """
+        logger.info("Parsing Envoy configuration to GAL format")
+
+        try:
+            envoy_config = yaml.safe_load(provider_config)
+        except yaml.YAMLError as e:
+            raise ValueError(f"Invalid Envoy YAML: {e}")
+
+        if not isinstance(envoy_config, dict):
+            raise ValueError("Envoy config must be a YAML dictionary")
+
+        static_resources = envoy_config.get("static_resources", {})
+        clusters = static_resources.get("clusters", [])
+        listeners = static_resources.get("listeners", [])
+
+        # Parse clusters → Services
+        services = []
+        cluster_map = {}  # name → Service mapping
+
+        for cluster in clusters:
+            service = self._parse_cluster(cluster)
+            if service:
+                services.append(service)
+                cluster_map[cluster.get("name")] = service
+
+        # Parse listeners/routes and map to services
+        for listener in listeners:
+            self._parse_listener_routes(listener, cluster_map)
+
+        # Create global config
+        global_config = GlobalConfig(
+            host="0.0.0.0",
+            port=10000,  # Default Envoy admin port
+        )
+
+        config = Config(
+            version="1.0",
+            provider="envoy",
+            global_config=global_config,
+            services=services,
+        )
+
+        logger.info(
+            f"Successfully parsed Envoy config: {len(services)} services, "
+            f"{sum(len(s.routes) for s in services)} routes"
+        )
+        return config
+
+    def _parse_cluster(self, cluster: Dict[str, Any]) -> Optional[Service]:
+        """Parse Envoy cluster to GAL Service."""
+        cluster_name = cluster.get("name", "")
+        if not cluster_name:
+            logger.warning("Skipping cluster without name")
+            return None
+
+        # Remove common suffixes to get service name
+        service_name = cluster_name.replace("_cluster", "").replace("-cluster", "")
+
+        # Parse load assignment (endpoints)
+        targets = []
+        load_assignment = cluster.get("load_assignment", {})
+        endpoints = load_assignment.get("endpoints", [])
+
+        for endpoint_group in endpoints:
+            lb_endpoints = endpoint_group.get("lb_endpoints", [])
+            for lb_endpoint in lb_endpoints:
+                endpoint = lb_endpoint.get("endpoint", {})
+                address = endpoint.get("address", {})
+                socket_address = address.get("socket_address", {})
+
+                host = socket_address.get("address")
+                port = socket_address.get("port_value")
+
+                if host and port:
+                    weight = lb_endpoint.get("load_balancing_weight", {}).get("value", 1)
+                    targets.append(UpstreamTarget(host=host, port=port, weight=weight))
+
+        if not targets:
+            logger.warning(f"Cluster {cluster_name} has no valid endpoints")
+            return None
+
+        # Parse health checks
+        health_checks = cluster.get("health_checks", [])
+        active_hc = None
+        passive_hc = None
+
+        if health_checks:
+            hc = health_checks[0]  # Take first health check
+            timeout = hc.get("timeout", "")
+            interval = hc.get("interval", "")
+            unhealthy_threshold = hc.get("unhealthy_threshold", 3)
+            healthy_threshold = hc.get("healthy_threshold", 2)
+
+            # Check if it's HTTP health check
+            http_hc = hc.get("http_health_check", {})
+            if http_hc:
+                path = http_hc.get("path", "/health")
+                active_hc = ActiveHealthCheck(
+                    enabled=True,
+                    http_path=path,
+                    interval=interval or "10s",
+                    timeout=timeout or "5s",
+                    unhealthy_threshold=unhealthy_threshold,
+                    healthy_threshold=healthy_threshold,
+                )
+
+        # Parse outlier detection (passive health checks)
+        outlier_detection = cluster.get("outlier_detection", {})
+        if outlier_detection:
+            consecutive_5xx = outlier_detection.get("consecutive_5xx", 5)
+            passive_hc = PassiveHealthCheck(enabled=True, max_failures=consecutive_5xx)
+
+        # Parse load balancing policy
+        lb_policy = cluster.get("lb_policy", "ROUND_ROBIN")
+        lb_algorithm = self._map_envoy_lb_policy(lb_policy)
+
+        # Create upstream
+        health_check = None
+        if active_hc or passive_hc:
+            health_check = HealthCheckConfig(active=active_hc, passive=passive_hc)
+
+        upstream = Upstream(
+            targets=targets,
+            health_check=health_check,
+            load_balancer=LoadBalancerConfig(algorithm=lb_algorithm),
+        )
+
+        # Create service with empty routes (filled by listener parsing)
+        service = Service(
+            name=service_name,
+            type="rest",  # Default to REST
+            protocol="http",
+            upstream=upstream,
+            routes=[],
+        )
+
+        return service
+
+    def _map_envoy_lb_policy(self, lb_policy: str) -> str:
+        """Map Envoy LB policy to GAL algorithm."""
+        mapping = {
+            "ROUND_ROBIN": "round_robin",
+            "LEAST_REQUEST": "least_conn",
+            "RING_HASH": "ip_hash",
+            "RANDOM": "round_robin",  # Fallback
+            "MAGLEV": "ip_hash",  # Consistent hashing
+        }
+        return mapping.get(lb_policy, "round_robin")
+
+    def _parse_listener_routes(
+        self, listener: Dict[str, Any], cluster_map: Dict[str, Service]
+    ) -> None:
+        """Parse listener routes and add them to corresponding services."""
+        filter_chains = listener.get("filter_chains", [])
+
+        for filter_chain in filter_chains:
+            filters = filter_chain.get("filters", [])
+
+            for filter_config in filters:
+                if filter_config.get("name") != "envoy.filters.network.http_connection_manager":
+                    continue
+
+                typed_config = filter_config.get("typed_config", {})
+                route_config = typed_config.get("route_config", {})
+                virtual_hosts = route_config.get("virtual_hosts", [])
+
+                for vhost in virtual_hosts:
+                    routes = vhost.get("routes", [])
+
+                    for route in routes:
+                        match = route.get("match", {})
+                        route_action = route.get("route", {})
+
+                        # Extract path
+                        path_prefix = match.get("prefix", "/")
+
+                        # Extract cluster
+                        cluster_name = route_action.get("cluster", "")
+                        if cluster_name in cluster_map:
+                            service = cluster_map[cluster_name]
+
+                            # Create GAL route
+                            gal_route = Route(path_prefix=path_prefix)
+                            service.routes.append(gal_route)
+
+                            logger.debug(f"Mapped route {path_prefix} → service {service.name}")

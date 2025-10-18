@@ -213,3 +213,27 @@ class Manager:
             ['envoy', 'kong']
         """
         return list(self.providers.keys())
+
+    def get_provider(self, provider_name: str) -> Provider:
+        """Get a registered provider by name.
+
+        Args:
+            provider_name: Name of the provider to retrieve
+
+        Returns:
+            Provider instance
+
+        Raises:
+            ValueError: If provider not registered
+
+        Example:
+            >>> manager = Manager()
+            >>> manager.register_provider(EnvoyProvider())
+            >>> provider = manager.get_provider("envoy")
+            >>> provider.name()
+            'envoy'
+        """
+        provider = self.providers.get(provider_name)
+        if not provider:
+            raise ValueError(f"Provider '{provider_name}' not registered")
+        return provider

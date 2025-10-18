@@ -579,3 +579,20 @@ class HAProxyProvider(Provider):
         value = value.replace("{{timestamp}}", "%[date()]")
 
         return value
+
+    def parse(self, provider_config: str):
+        """Parse HAProxy configuration to GAL format.
+
+        TODO: Implementation pending for v1.3.0 Feature 6 (Custom Parser).
+
+        Args:
+            provider_config: HAProxy haproxy.cfg configuration
+
+        Raises:
+            NotImplementedError: HAProxy parser not yet implemented
+        """
+        raise NotImplementedError(
+            "HAProxy config import will be implemented in v1.3.0 Feature 6. "
+            "Requires custom haproxy.cfg parser. "
+            "Use 'gal import --provider haproxy' after the feature is released."
+        )
