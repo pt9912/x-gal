@@ -228,6 +228,8 @@ class Route:
         websocket: Optional WebSocket configuration for this route
         circuit_breaker: Optional circuit breaker configuration for this route
         body_transformation: Optional request/response body transformation configuration
+        timeout: Optional timeout configuration for this route
+        retry: Optional retry policy configuration for this route
 
     Example:
         >>> route = Route(path_prefix="/api/users", methods=["GET", "POST"])
@@ -244,6 +246,8 @@ class Route:
     websocket: Optional["WebSocketConfig"] = None
     circuit_breaker: Optional["CircuitBreakerConfig"] = None
     body_transformation: Optional["BodyTransformationConfig"] = None
+    timeout: Optional["TimeoutConfig"] = None
+    retry: Optional["RetryConfig"] = None
 
 
 @dataclass
@@ -702,6 +706,96 @@ class CircuitBreakerConfig:
 
 
 @dataclass
+class TimeoutConfig:
+    """Timeout configuration for requests.
+
+    Configures various timeout parameters for upstream connections
+    and requests to prevent hanging connections and ensure responsiveness.
+
+    Provider Support:
+        - Envoy: Full support (connect, idle, request timeouts)
+        - Kong: Full support (connect, send, read timeouts)
+        - APISIX: Full support (connect, send, read timeouts)
+        - Traefik: Full support (dial, response header, idle timeouts)
+        - Nginx: Full support (proxy_connect, proxy_send, proxy_read)
+        - HAProxy: Full support (timeout connect, client, server)
+
+    Attributes:
+        connect: Maximum time to establish connection (default: "5s")
+        send: Maximum time to send request to upstream (default: "30s")
+        read: Maximum time to receive response from upstream (default: "60s")
+        idle: Maximum time to keep idle connection (default: "300s")
+
+    Example:
+        >>> timeout = TimeoutConfig(
+        ...     connect="5s",
+        ...     send="30s",
+        ...     read="60s",
+        ...     idle="300s"
+        ... )
+        >>> timeout.connect
+        '5s'
+    """
+
+    connect: str = "5s"
+    send: str = "30s"
+    read: str = "60s"
+    idle: str = "300s"
+
+
+@dataclass
+class RetryConfig:
+    """Retry policy configuration for failed requests.
+
+    Implements automatic retry logic for failed upstream requests
+    with configurable backoff strategies and retry conditions.
+
+    Provider Support:
+        - Envoy: Full support (retry_on, num_retries, retry_host_predicate)
+        - Kong: Full support (retries plugin)
+        - APISIX: Full support (retry plugin with exponential backoff)
+        - Traefik: Full support (attempts parameter)
+        - Nginx: Partial support (proxy_next_upstream)
+        - HAProxy: Full support (retry-on parameter)
+
+    Attributes:
+        enabled: Whether retry is enabled (default: True)
+        attempts: Number of retry attempts (default: 3)
+        backoff: Backoff strategy - "exponential" or "linear" (default: "exponential")
+        base_interval: Base interval for exponential backoff (default: "25ms")
+        max_interval: Maximum interval between retries (default: "250ms")
+        retry_on: List of conditions to trigger retry (default: connection errors + 5xx)
+
+    Retry Conditions:
+        - "connect_timeout": Connection timeout
+        - "http_5xx": Any 5xx HTTP status code
+        - "http_502": HTTP 502 Bad Gateway
+        - "http_503": HTTP 503 Service Unavailable
+        - "http_504": HTTP 504 Gateway Timeout
+        - "retriable_4xx": Retriable 4xx errors (429)
+        - "reset": Connection reset
+        - "refused": Connection refused
+
+    Example:
+        >>> retry = RetryConfig(
+        ...     enabled=True,
+        ...     attempts=3,
+        ...     backoff="exponential",
+        ...     retry_on=["connect_timeout", "http_5xx"]
+        ... )
+        >>> retry.attempts
+        3
+    """
+
+    enabled: bool = True
+    attempts: int = 3
+    backoff: str = "exponential"
+    base_interval: str = "25ms"
+    max_interval: str = "250ms"
+    retry_on: List[str] = field(default_factory=lambda: ["connect_timeout", "http_5xx"])
+
+
+@dataclass
 class Transformation:
     """Request payload transformation configuration.
 
@@ -950,6 +1044,16 @@ class Config:
                         response=response_transform,
                     )
 
+                # Parse route-level timeout
+                timeout = None
+                if "timeout" in route_data:
+                    timeout = TimeoutConfig(**route_data["timeout"])
+
+                # Parse route-level retry
+                retry = None
+                if "retry" in route_data:
+                    retry = RetryConfig(**route_data["retry"])
+
                 route = Route(
                     path_prefix=route_data["path_prefix"],
                     methods=route_data.get("methods"),
@@ -960,6 +1064,8 @@ class Config:
                     websocket=websocket,
                     circuit_breaker=circuit_breaker,
                     body_transformation=body_transformation,
+                    timeout=timeout,
+                    retry=retry,
                 )
                 routes.append(route)
 
