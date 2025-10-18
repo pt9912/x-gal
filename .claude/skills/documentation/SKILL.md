@@ -191,6 +191,7 @@ Dokumentation Update Checklist:
 □ Feature-Guide in docs/guides/ erstellt/aktualisiert (auf Deutsch!)
 □ Beispiel-Konfiguration in examples/ erstellt
 □ ROADMAP.md aktualisiert (falls Teil von v1.X.0)
+□ vx.x.x-PLAN.md aktualisiert (Feature-Status, Progress, Implementation Details)
 □ CHANGELOG.md "Unreleased" Sektion aktualisiert
 □ Tests geschrieben und erfolgreich
 □ Breaking Changes dokumentiert
@@ -229,7 +230,13 @@ Dokumentation Update Checklist:
    - Feature als Done markieren
    - Progress aktualisieren
 
-8. **CHANGELOG.md**:
+8. **vx.x.x-PLAN.md** (falls Teil von v1.X.0):
+   - Feature-Status aktualisieren (Pending → In Progress → Done)
+   - Progress-Prozentsatz aktualisieren
+   - Implementation Details hinzufügen (Commits, Dateien, Test-Ergebnisse)
+   - Milestone als erledigt markieren
+
+9. **CHANGELOG.md**:
    - Unter "Added" eintragen
 
 ### Neuer Provider hinzugefügt (z.B. Nginx)
@@ -257,7 +264,15 @@ Dokumentation Update Checklist:
 6. **Guides**:
    - Alle Feature-Guides um Provider-Implementierung erweitern
 
-7. **CHANGELOG.md**:
+7. **ROADMAP.md**:
+   - Provider zur Liste hinzufügen
+   - Feature-Matrix aktualisieren
+
+8. **vx.x.x-PLAN.md** (falls Teil von v1.X.0):
+   - Provider-Feature als Done markieren
+   - Implementation Details dokumentieren
+
+9. **CHANGELOG.md**:
    - Unter "Added" eintragen
 
 ### Config Breaking Change
