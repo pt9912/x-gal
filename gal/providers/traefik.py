@@ -148,6 +148,17 @@ class TraefikProvider(Provider):
                 if route.circuit_breaker and route.circuit_breaker.enabled:
                     middlewares.append(f"{router_name}_circuitbreaker")
 
+                # Body transformation - Traefik limitation
+                if route.body_transformation and route.body_transformation.enabled:
+                    logger.warning(
+                        f"Body transformation configured for {service.name}/{route.path_prefix}, "
+                        "but Traefik does not natively support request/response body transformation. "
+                        "Consider using:\n"
+                        "  1. ForwardAuth middleware with external transformation service\n"
+                        "  2. Custom Traefik plugin (requires Go development)\n"
+                        "  3. Alternative provider (Envoy, Kong, APISIX, Nginx, HAProxy) with native support"
+                    )
+
                 # Add middlewares if any
                 if middlewares:
                     output.append("      middlewares:")

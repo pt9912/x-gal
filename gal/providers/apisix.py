@@ -293,6 +293,29 @@ class APISIXProvider(Provider):
                     route_config["enable_websocket"] = True
                     # APISIX handles WebSocket timeout via upstream configuration
 
+                # Add body transformation plugins if configured
+                if route.body_transformation and route.body_transformation.enabled:
+                    if "plugins" not in route_config:
+                        route_config["plugins"] = {}
+
+                    bt = route.body_transformation
+
+                    # Request body transformation (serverless-pre-function)
+                    if bt.request:
+                        lua_request = self._generate_body_transformation_request_lua(bt.request)
+                        route_config["plugins"]["serverless-pre-function"] = {
+                            "phase": "rewrite",
+                            "functions": [lua_request]
+                        }
+
+                    # Response body transformation (serverless-post-function)
+                    if bt.response:
+                        lua_response = self._generate_body_transformation_response_lua(bt.response)
+                        route_config["plugins"]["serverless-post-function"] = {
+                            "phase": "body_filter",
+                            "functions": [lua_response]
+                        }
+
                 apisix_config["routes"].append(route_config)
 
         result = json.dumps(apisix_config, indent=2)
@@ -480,6 +503,116 @@ class APISIXProvider(Provider):
                 lua_code.append("      end")
         
         lua_code.append("      ngx.req.set_body_data(cjson.encode(json_body))")
+        lua_code.append("    end")
+        lua_code.append("  end")
+        lua_code.append("end")
+
+        return "\n".join(lua_code)
+
+    def _generate_body_transformation_request_lua(self, request_transform) -> str:
+        """Generate Lua script for request body transformation.
+
+        Creates Lua code for serverless-pre-function plugin that:
+        - Parses request body as JSON
+        - Adds fields (with template variable support)
+        - Removes fields
+        - Renames fields
+        - Re-encodes modified body
+
+        Args:
+            request_transform: RequestBodyTransformation object
+
+        Returns:
+            Complete Lua function as string
+        """
+        lua_code = []
+        lua_code.append("return function(conf, ctx)")
+        lua_code.append("  local core = require('apisix.core')")
+        lua_code.append("  local cjson = require('cjson.safe')")
+        lua_code.append("  local body = core.request.get_body()")
+        lua_code.append("  if body then")
+        lua_code.append("    local json_body = cjson.decode(body)")
+        lua_code.append("    if json_body then")
+
+        # Add fields
+        if request_transform.add_fields:
+            lua_code.append("      -- Add fields")
+            for key, value in request_transform.add_fields.items():
+                if value == "{{uuid}}":
+                    lua_code.append(f"      json_body.{key} = core.utils.uuid()")
+                elif value == "{{now}}" or value == "{{timestamp}}":
+                    lua_code.append(f"      json_body.{key} = os.date('%Y-%m-%dT%H:%M:%SZ')")
+                elif isinstance(value, str):
+                    lua_code.append(f"      json_body.{key} = '{value}'")
+                else:
+                    lua_code.append(f"      json_body.{key} = {value}")
+
+        # Remove fields
+        if request_transform.remove_fields:
+            lua_code.append("      -- Remove fields")
+            for field in request_transform.remove_fields:
+                lua_code.append(f"      json_body.{field} = nil")
+
+        # Rename fields
+        if request_transform.rename_fields:
+            lua_code.append("      -- Rename fields")
+            for old_name, new_name in request_transform.rename_fields.items():
+                lua_code.append(f"      if json_body.{old_name} ~= nil then")
+                lua_code.append(f"        json_body.{new_name} = json_body.{old_name}")
+                lua_code.append(f"        json_body.{old_name} = nil")
+                lua_code.append("      end")
+
+        lua_code.append("      ngx.req.set_body_data(cjson.encode(json_body))")
+        lua_code.append("    end")
+        lua_code.append("  end")
+        lua_code.append("end")
+
+        return "\n".join(lua_code)
+
+    def _generate_body_transformation_response_lua(self, response_transform) -> str:
+        """Generate Lua script for response body transformation.
+
+        Creates Lua code for serverless-post-function plugin that:
+        - Parses response body as JSON
+        - Filters (removes) sensitive fields
+        - Adds metadata fields
+        - Re-encodes modified body
+
+        Args:
+            response_transform: ResponseBodyTransformation object
+
+        Returns:
+            Complete Lua function as string
+        """
+        lua_code = []
+        lua_code.append("return function(conf, ctx)")
+        lua_code.append("  local core = require('apisix.core')")
+        lua_code.append("  local cjson = require('cjson.safe')")
+        lua_code.append("  local chunk = ngx.arg[1]")
+        lua_code.append("  if chunk and chunk ~= '' then")
+        lua_code.append("    local json_body = cjson.decode(chunk)")
+        lua_code.append("    if json_body then")
+
+        # Filter (remove) sensitive fields
+        if response_transform.filter_fields:
+            lua_code.append("      -- Filter sensitive fields")
+            for field in response_transform.filter_fields:
+                lua_code.append(f"      json_body.{field} = nil")
+
+        # Add metadata fields
+        if response_transform.add_fields:
+            lua_code.append("      -- Add metadata fields")
+            for key, value in response_transform.add_fields.items():
+                if value == "{{uuid}}":
+                    lua_code.append(f"      json_body.{key} = core.utils.uuid()")
+                elif value == "{{now}}" or value == "{{timestamp}}":
+                    lua_code.append(f"      json_body.{key} = os.date('%Y-%m-%dT%H:%M:%SZ')")
+                elif isinstance(value, str):
+                    lua_code.append(f"      json_body.{key} = '{value}'")
+                else:
+                    lua_code.append(f"      json_body.{key} = {value}")
+
+        lua_code.append("      ngx.arg[1] = cjson.encode(json_body)")
         lua_code.append("    end")
         lua_code.append("  end")
         lua_code.append("end")

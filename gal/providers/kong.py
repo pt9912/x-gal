@@ -266,6 +266,76 @@ class KongProvider(Provider):
                         "config": cors_config
                     })
 
+                # Add body transformation plugins if configured
+                if route.body_transformation and route.body_transformation.enabled:
+                    bt = route.body_transformation
+
+                    # Request body transformation
+                    if bt.request:
+                        req_bt_config = {}
+
+                        # Add fields to request body
+                        if bt.request.add_fields:
+                            add_fields = []
+                            for key, value in bt.request.add_fields.items():
+                                # Convert template variables
+                                if value == "{{uuid}}":
+                                    # Kong doesn't support UUID generation natively in request-transformer
+                                    # Use a placeholder that could be replaced by custom plugin
+                                    add_fields.append(f"{key}:$(uuid())")
+                                elif value == "{{now}}" or value == "{{timestamp}}":
+                                    # Kong doesn't support timestamp generation natively
+                                    add_fields.append(f"{key}:$(date())")
+                                else:
+                                    add_fields.append(f"{key}:{value}")
+                            req_bt_config["add"] = {"json": add_fields}
+
+                        # Remove fields from request body
+                        if bt.request.remove_fields:
+                            req_bt_config["remove"] = {"json": bt.request.remove_fields}
+
+                        # Rename fields (requires custom Lua plugin for full support)
+                        # For now, we document this as a limitation
+                        if bt.request.rename_fields:
+                            logger.warning(
+                                f"Request body field renaming configured for {service.name}/{route.path_prefix}, "
+                                "but Kong's request-transformer plugin does not natively support field renaming. "
+                                "Consider using a custom Lua plugin or post-function plugin for this functionality."
+                            )
+
+                        if req_bt_config:
+                            route_plugins.append({
+                                "name": "request-transformer",
+                                "config": req_bt_config
+                            })
+
+                    # Response body transformation
+                    if bt.response:
+                        resp_bt_config = {}
+
+                        # Filter (remove) sensitive fields from response
+                        if bt.response.filter_fields:
+                            resp_bt_config["remove"] = {"json": bt.response.filter_fields}
+
+                        # Add metadata fields to response
+                        if bt.response.add_fields:
+                            add_fields = []
+                            for key, value in bt.response.add_fields.items():
+                                # Convert template variables
+                                if value == "{{uuid}}":
+                                    add_fields.append(f"{key}:$(uuid())")
+                                elif value == "{{now}}" or value == "{{timestamp}}":
+                                    add_fields.append(f"{key}:$(date())")
+                                else:
+                                    add_fields.append(f"{key}:{value}")
+                            resp_bt_config["add"] = {"json": add_fields}
+
+                        if resp_bt_config:
+                            route_plugins.append({
+                                "name": "response-transformer",
+                                "config": resp_bt_config
+                            })
+
                 # Circuit Breaker: Kong does not have native circuit breaker support.
                 # Third-party plugins exist (e.g., kong-circuit-breaker by Dream11),
                 # but are not part of Kong's official plugin ecosystem.

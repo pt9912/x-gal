@@ -371,6 +371,10 @@ class NginxProvider(Provider):
         if route.headers:
             self._generate_response_headers(route, output)
 
+        # Body transformation (requires OpenResty)
+        if route.body_transformation and route.body_transformation.enabled:
+            self._generate_body_transformation(route, output)
+
         # Proxy pass to upstream or direct backend
         self._generate_proxy_pass(service, route, output)
 
@@ -583,6 +587,98 @@ class NginxProvider(Provider):
 
         output.append("            # Proxy to backend")
         output.append(f"            proxy_pass {proxy_url};")
+
+    def _generate_body_transformation(self, route: Route, output: List[str]) -> None:
+        """Generate Lua blocks for body transformation (OpenResty required).
+
+        Args:
+            route: Route configuration
+            output: Output buffer to append to
+        """
+        bt = route.body_transformation
+
+        # Request body transformation
+        if bt.request:
+            output.append("")
+            output.append("            # Request body transformation (requires OpenResty)")
+            output.append("            access_by_lua_block {")
+            output.append("                local cjson = require('cjson')")
+            output.append("                ngx.req.read_body()")
+            output.append("                local body_data = ngx.req.get_body_data()")
+            output.append("                if body_data then")
+            output.append("                    local success, body_json = pcall(cjson.decode, body_data)")
+            output.append("                    if success then")
+
+            # Add fields
+            if bt.request.add_fields:
+                output.append("                        -- Add fields")
+                for key, value in bt.request.add_fields.items():
+                    if value == "{{uuid}}":
+                        output.append(f"                        body_json.{key} = ngx.var.request_id")
+                    elif value == "{{now}}" or value == "{{timestamp}}":
+                        output.append(f"                        body_json.{key} = ngx.utctime()")
+                    elif isinstance(value, str):
+                        output.append(f"                        body_json.{key} = '{value}'")
+                    else:
+                        output.append(f"                        body_json.{key} = {value}")
+
+            # Remove fields
+            if bt.request.remove_fields:
+                output.append("                        -- Remove fields")
+                for field in bt.request.remove_fields:
+                    output.append(f"                        body_json.{field} = nil")
+
+            # Rename fields
+            if bt.request.rename_fields:
+                output.append("                        -- Rename fields")
+                for old_name, new_name in bt.request.rename_fields.items():
+                    output.append(f"                        if body_json.{old_name} ~= nil then")
+                    output.append(f"                            body_json.{new_name} = body_json.{old_name}")
+                    output.append(f"                            body_json.{old_name} = nil")
+                    output.append("                        end")
+
+            output.append("                        local new_body = cjson.encode(body_json)")
+            output.append("                        ngx.req.set_body_data(new_body)")
+            output.append("                    end")
+            output.append("                end")
+            output.append("            }")
+
+        # Response body transformation
+        if bt.response:
+            output.append("")
+            output.append("            # Response body transformation (requires OpenResty)")
+            output.append("            body_filter_by_lua_block {")
+            output.append("                local cjson = require('cjson')")
+            output.append("                local chunk = ngx.arg[1]")
+            output.append("                if chunk and chunk ~= '' then")
+            output.append("                    local success, body_json = pcall(cjson.decode, chunk)")
+            output.append("                    if success then")
+
+            # Filter sensitive fields
+            if bt.response.filter_fields:
+                output.append("                        -- Filter sensitive fields")
+                for field in bt.response.filter_fields:
+                    output.append(f"                        body_json.{field} = nil")
+
+            # Add metadata fields
+            if bt.response.add_fields:
+                output.append("                        -- Add metadata fields")
+                for key, value in bt.response.add_fields.items():
+                    if value == "{{uuid}}":
+                        output.append(f"                        body_json.{key} = ngx.var.request_id")
+                    elif value == "{{now}}" or value == "{{timestamp}}":
+                        output.append(f"                        body_json.{key} = ngx.utctime()")
+                    elif isinstance(value, str):
+                        output.append(f"                        body_json.{key} = '{value}'")
+                    else:
+                        output.append(f"                        body_json.{key} = {value}")
+
+            output.append("                        ngx.arg[1] = cjson.encode(body_json)")
+            output.append("                    end")
+            output.append("                end")
+            output.append("            }")
+
+        output.append("")
 
     def _convert_template_value(self, value: str) -> str:
         """Convert GAL template variables to Nginx variables.
