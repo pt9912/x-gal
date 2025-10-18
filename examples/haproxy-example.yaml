@@ -1,0 +1,562 @@
+# ============================================================================
+# GAL HAProxy Provider - Example Configuration
+# ============================================================================
+#
+# This example demonstrates HAProxy Load Balancer configurations for various
+# use cases including advanced load balancing, health checks, rate limiting,
+# headers, CORS, and sticky sessions.
+#
+# Provider: haproxy
+# Features: Advanced Load Balancing (10+ algorithms), Active/Passive Health
+#           Checks, Rate Limiting (stick-table), Headers, CORS, Sticky Sessions
+#
+# Generation: gal generate haproxy-example.yaml --provider haproxy > haproxy.cfg
+# Testing: haproxy -c -f haproxy.cfg
+# Running: haproxy -f haproxy.cfg
+#
+# ============================================================================
+
+version: "1.0"
+provider: haproxy
+
+global:
+  host: "0.0.0.0"
+  port: 80
+  timeout: "30s"
+
+services:
+  # ===========================================================================
+  # Example 1: Basic Load Balancing - Round Robin
+  # ===========================================================================
+  # Use Case: Distribute traffic evenly across backend servers
+  # Features: Round Robin algorithm (default)
+  # ===========================================================================
+  - name: basic_roundrobin
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: api-1.internal
+          port: 8080
+        - host: api-2.internal
+          port: 8080
+        - host: api-3.internal
+          port: 8080
+      load_balancer:
+        algorithm: round_robin  # Default, evenly distributed
+
+    routes:
+      - path_prefix: /api/roundrobin
+
+  # ===========================================================================
+  # Example 2: Load Balancing - Least Connections
+  # ===========================================================================
+  # Use Case: Route to server with fewest active connections
+  # Features: Best for long-running requests or uneven request duration
+  # ===========================================================================
+  - name: least_conn_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: api-1.internal
+          port: 8080
+        - host: api-2.internal
+          port: 8080
+      load_balancer:
+        algorithm: least_conn  # Route to least connected server
+
+    routes:
+      - path_prefix: /api/leastconn
+
+  # ===========================================================================
+  # Example 3: Load Balancing - Source IP Hash (Sticky Sessions via IP)
+  # ===========================================================================
+  # Use Case: Session persistence based on client IP
+  # Features: Same client IP always goes to same backend server
+  # ===========================================================================
+  - name: sticky_ip_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: session-1.internal
+          port: 8080
+        - host: session-2.internal
+          port: 8080
+      load_balancer:
+        algorithm: ip_hash  # Source-based persistence
+
+    routes:
+      - path_prefix: /api/sessions
+
+  # ===========================================================================
+  # Example 4: Load Balancing - Weighted
+  # ===========================================================================
+  # Use Case: Distribute traffic based on server capacity
+  # Features: Servers with higher weight receive more traffic
+  # ===========================================================================
+  - name: weighted_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: powerful-server.internal
+          port: 8080
+          weight: 3  # Gets 75% of traffic (3/4)
+        - host: small-server.internal
+          port: 8080
+          weight: 1  # Gets 25% of traffic (1/4)
+      load_balancer:
+        algorithm: weighted
+
+    routes:
+      - path_prefix: /api/weighted
+
+  # ===========================================================================
+  # Example 5: Active Health Checks
+  # ===========================================================================
+  # Use Case: Periodic HTTP probing to verify backend health
+  # Features: Automatic failover, health check path, thresholds
+  # ===========================================================================
+  - name: active_health_check_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: api-1.internal
+          port: 8080
+        - host: api-2.internal
+          port: 8080
+      health_check:
+        active:
+          enabled: true
+          http_path: /health           # Health check endpoint
+          interval: "5s"                # Check every 5 seconds
+          timeout: "3s"                 # 3 second timeout
+          healthy_threshold: 2          # 2 successes → healthy
+          unhealthy_threshold: 3        # 3 failures → unhealthy
+          healthy_status_codes:
+            - 200
+            - 204
+
+    routes:
+      - path_prefix: /api/active-health
+
+  # ===========================================================================
+  # Example 6: Passive Health Checks
+  # ===========================================================================
+  # Use Case: Monitor real traffic to detect failures
+  # Features: Automatic server removal after failures
+  # ===========================================================================
+  - name: passive_health_check_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: api-1.internal
+          port: 8080
+        - host: api-2.internal
+          port: 8080
+      health_check:
+        passive:
+          enabled: true
+          max_failures: 5  # Mark unhealthy after 5 consecutive failures
+
+    routes:
+      - path_prefix: /api/passive-health
+
+  # ===========================================================================
+  # Example 7: Combined Active + Passive Health Checks (RECOMMENDED)
+  # ===========================================================================
+  # Use Case: Maximum reliability and quick failure detection
+  # Features: Both proactive and reactive health monitoring
+  # ===========================================================================
+  - name: combined_health_checks
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: api-1.internal
+          port: 8080
+        - host: api-2.internal
+          port: 8080
+      health_check:
+        active:
+          enabled: true
+          http_path: /health
+          interval: "10s"
+          healthy_threshold: 2
+          unhealthy_threshold: 3
+        passive:
+          enabled: true
+          max_failures: 3
+      load_balancer:
+        algorithm: least_conn
+
+    routes:
+      - path_prefix: /api/reliable
+
+  # ===========================================================================
+  # Example 8: Rate Limiting - IP-based
+  # ===========================================================================
+  # Use Case: Protect API from abuse and DDoS
+  # Features: IP-based rate limiting with stick-table
+  # ===========================================================================
+  - name: rate_limited_api
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+
+    routes:
+      - path_prefix: /api/ratelimit
+        rate_limit:
+          enabled: true
+          requests_per_second: 100  # 100 req/s per IP
+          burst: 200                # Allow bursts up to 200 req
+          key_type: ip_address      # Limit per client IP
+          response_status: 429      # HTTP 429 Too Many Requests
+
+  # ===========================================================================
+  # Example 9: Rate Limiting - Header-based (API Key)
+  # ===========================================================================
+  # Use Case: Different rate limits per API key/tenant
+  # Features: Header-based rate limiting
+  # ===========================================================================
+  - name: api_key_rate_limit
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+
+    routes:
+      - path_prefix: /api/premium
+        rate_limit:
+          enabled: true
+          requests_per_second: 1000  # Higher limit for premium users
+          burst: 2000
+          key_type: header
+          key_header: X-API-Key  # Limit per API key
+
+  # ===========================================================================
+  # Example 10: Request/Response Header Manipulation
+  # ===========================================================================
+  # Use Case: Add security headers, tracking IDs, modify headers
+  # Features: Add, set, and remove headers
+  # ===========================================================================
+  - name: headers_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+
+    routes:
+      - path_prefix: /api/headers
+        headers:
+          # Request headers (sent to backend)
+          request_add:
+            X-Request-ID: "{{uuid}}"      # Add unique request ID
+            X-Gateway: "GAL-HAProxy"
+            X-Timestamp: "{{now}}"         # Add ISO8601 timestamp
+          request_set:
+            User-Agent: "GAL-Gateway/1.0"
+          request_remove:
+            - X-Internal-Token             # Remove sensitive headers
+
+          # Response headers (sent to client)
+          response_add:
+            X-Frame-Options: "DENY"
+            X-Content-Type-Options: "nosniff"
+            X-XSS-Protection: "1; mode=block"
+          response_set:
+            Server: "GAL-Gateway"
+          response_remove:
+            - X-Powered-By
+
+  # ===========================================================================
+  # Example 11: CORS Configuration
+  # ===========================================================================
+  # Use Case: Enable cross-origin requests for SPA/Mobile Apps
+  # Features: Full CORS configuration
+  # ===========================================================================
+  - name: cors_api
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+
+    routes:
+      - path_prefix: /api/cors
+        cors:
+          enabled: true
+          allowed_origins:
+            - "https://app.example.com"
+            - "https://www.example.com"
+          allowed_methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - OPTIONS
+          allowed_headers:
+            - Content-Type
+            - Authorization
+            - X-API-Key
+          expose_headers:
+            - X-Request-ID
+            - X-RateLimit-Remaining
+          allow_credentials: true
+          max_age: 86400  # 24 hours preflight cache
+
+  # ===========================================================================
+  # Example 12: Sticky Sessions - Cookie-based
+  # ===========================================================================
+  # Use Case: Session persistence for stateful applications
+  # Features: Cookie-based sticky sessions
+  # ===========================================================================
+  - name: sticky_cookie_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: app-1.internal
+          port: 8080
+        - host: app-2.internal
+          port: 8080
+      load_balancer:
+        algorithm: round_robin
+        sticky_sessions: true       # Enable cookie-based persistence
+        cookie_name: "GALID"         # Custom cookie name
+
+    routes:
+      - path_prefix: /app
+
+  # ===========================================================================
+  # Example 13: Combined Features - Production API
+  # ===========================================================================
+  # Use Case: Production-ready API with all security features
+  # Features: Load balancing + health checks + rate limiting + headers + CORS
+  # ===========================================================================
+  - name: production_api
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: api-1.internal
+          port: 8080
+          weight: 2
+        - host: api-2.internal
+          port: 8080
+          weight: 1
+      health_check:
+        active:
+          enabled: true
+          http_path: /health
+          interval: "10s"
+          healthy_threshold: 2
+          unhealthy_threshold: 3
+        passive:
+          enabled: true
+          max_failures: 3
+      load_balancer:
+        algorithm: least_conn
+
+    routes:
+      - path_prefix: /api/v1
+        rate_limit:
+          enabled: true
+          requests_per_second: 100
+          burst: 200
+          key_type: ip_address
+
+        headers:
+          request_add:
+            X-Request-ID: "{{uuid}}"
+            X-Gateway: "GAL"
+          response_add:
+            X-Frame-Options: "DENY"
+            X-Content-Type-Options: "nosniff"
+
+        cors:
+          enabled: true
+          allowed_origins:
+            - "https://app.example.com"
+          allowed_methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+          allow_credentials: true
+
+  # ===========================================================================
+  # Example 14: High-Availability Payment Service
+  # ===========================================================================
+  # Use Case: Critical payment service with maximum reliability
+  # Features: Active health checks, weighted LB, strict rate limiting
+  # ===========================================================================
+  - name: payment_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: payment-primary.internal
+          port: 8443
+          weight: 3
+        - host: payment-backup.internal
+          port: 8443
+          weight: 1
+      health_check:
+        active:
+          enabled: true
+          http_path: /actuator/health
+          interval: "5s"
+          timeout: "2s"
+          healthy_threshold: 3
+          unhealthy_threshold: 2
+          healthy_status_codes: [200]
+      load_balancer:
+        algorithm: weighted
+
+    routes:
+      - path_prefix: /api/payments
+        methods:
+          - POST
+          - PUT
+        rate_limit:
+          enabled: true
+          requests_per_second: 50  # Strict limit for payments
+          burst: 100
+          key_type: ip_address
+        headers:
+          request_add:
+            X-Request-ID: "{{uuid}}"
+            X-Payment-Gateway: "GAL"
+          response_add:
+            X-Frame-Options: "DENY"
+            Strict-Transport-Security: "max-age=31536000"
+
+  # ===========================================================================
+  # Example 15: Multiple Routes per Service
+  # ===========================================================================
+  # Use Case: Different configurations for different API versions
+  # Features: Multiple routes with different rate limits
+  # ===========================================================================
+  - name: versioned_api
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+
+    routes:
+      # v1 API - Legacy, lower rate limit
+      - path_prefix: /api/v1
+        methods:
+          - GET
+          - POST
+        rate_limit:
+          enabled: true
+          requests_per_second: 50
+          burst: 100
+
+      # v2 API - Current, higher rate limit
+      - path_prefix: /api/v2
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+        rate_limit:
+          enabled: true
+          requests_per_second: 200
+          burst: 400
+
+      # v3 API - Beta, no rate limit
+      - path_prefix: /api/v3
+
+  # ===========================================================================
+  # Example 16: Microservices Architecture
+  # ===========================================================================
+  # Use Case: Multiple microservices behind single gateway
+  # Features: Multiple services with different backends
+  # ===========================================================================
+  - name: user_service
+    type: rest
+    protocol: http
+    upstream:
+      host: user-service.internal
+      port: 8080
+    routes:
+      - path_prefix: /api/users
+
+  - name: order_service
+    type: rest
+    protocol: http
+    upstream:
+      host: order-service.internal
+      port: 8081
+    routes:
+      - path_prefix: /api/orders
+        rate_limit:
+          enabled: true
+          requests_per_second: 50
+
+  - name: notification_service
+    type: rest
+    protocol: http
+    upstream:
+      host: notification-service.internal
+      port: 8082
+    routes:
+      - path_prefix: /api/notifications
+
+# ===========================================================================
+# DEPLOYMENT INSTRUCTIONS
+# ===========================================================================
+#
+# 1. Generate haproxy.cfg:
+#    gal generate haproxy-example.yaml --provider haproxy > haproxy.cfg
+#
+# 2. Validate configuration:
+#    haproxy -c -f haproxy.cfg
+#
+# 3. Run HAProxy:
+#    # Production
+#    sudo cp haproxy.cfg /etc/haproxy/haproxy.cfg
+#    sudo systemctl reload haproxy
+#
+#    # Local testing
+#    haproxy -f haproxy.cfg
+#
+# 4. Check stats:
+#    # Via Runtime API
+#    echo "show info" | socat /var/lib/haproxy/stats -
+#    echo "show stat" | socat /var/lib/haproxy/stats -
+#
+# 5. Monitor logs:
+#    tail -f /var/log/haproxy/access.log
+#
+# ===========================================================================
+# NOTES
+# ===========================================================================
+#
+# HAProxy Capabilities:
+# - ✅ Advanced Load Balancing (roundrobin, leastconn, source, weighted)
+# - ✅ Active & Passive Health Checks
+# - ✅ Rate Limiting (stick-table based)
+# - ✅ Header Manipulation (request/response)
+# - ✅ CORS (via custom headers)
+# - ✅ Sticky Sessions (cookie, source)
+# - ⚠️ JWT Authentication (requires Lua scripting)
+#
+# For advanced features, consider:
+# - HAProxy Enterprise (additional features)
+# - Lua scripting (for JWT, complex ACLs)
+# - Other GAL providers (Kong, APISIX for native JWT)
+#
+# ===========================================================================
