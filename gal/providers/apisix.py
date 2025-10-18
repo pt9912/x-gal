@@ -118,6 +118,20 @@ class APISIXProvider(Provider):
         logger.info(f"Generating APISIX configuration for {len(config.services)} services")
         apisix_config = {"routes": [], "upstreams": [], "services": []}
 
+        # Global plugins for logging and metrics
+        global_plugins = {}
+        if config.global_config and config.global_config.logging:
+            global_plugins.update(
+                self._generate_apisix_logging_plugins(config.global_config.logging)
+            )
+        if config.global_config and config.global_config.metrics:
+            global_plugins.update(
+                self._generate_apisix_metrics_plugins(config.global_config.metrics)
+            )
+
+        if global_plugins:
+            apisix_config["global_plugins"] = global_plugins
+
         for service in config.services:
             # Create upstream with health checks and load balancing
             upstream = self._generate_upstream(service)
@@ -329,8 +343,16 @@ class APISIXProvider(Provider):
 
                     route_config["plugins"]["proxy-retry"] = {
                         "retries": retry.attempts,
-                        "retry_timeout": int(retry.max_interval.rstrip("msMS")) if "ms" in retry.max_interval else int(retry.max_interval.rstrip("sS")) * 1000,
-                        "vars": [["status", "==", code] for code in retry_status_codes] if retry_status_codes else None,
+                        "retry_timeout": (
+                            int(retry.max_interval.rstrip("msMS"))
+                            if "ms" in retry.max_interval
+                            else int(retry.max_interval.rstrip("sS")) * 1000
+                        ),
+                        "vars": (
+                            [["status", "==", code] for code in retry_status_codes]
+                            if retry_status_codes
+                            else None
+                        ),
                     }
 
                     # Remove None values
@@ -375,6 +397,50 @@ class APISIXProvider(Provider):
             f"APISIX configuration generated: {len(result)} bytes, {len(config.services)} services"
         )
         return result
+
+    def _generate_apisix_logging_plugins(self, logging_config) -> dict:
+        """Generate APISIX logging plugins.
+
+        Args:
+            logging_config: LoggingConfig object
+
+        Returns:
+            Dictionary of plugins
+        """
+        plugins = {}
+
+        if logging_config.enabled:
+            # file-logger plugin
+            log_config = {"path": logging_config.access_log_path}
+
+            if logging_config.include_request_body:
+                log_config["include_req_body"] = True
+            if logging_config.include_response_body:
+                log_config["include_resp_body"] = True
+
+            plugins["file-logger"] = log_config
+
+        return plugins
+
+    def _generate_apisix_metrics_plugins(self, metrics_config) -> dict:
+        """Generate APISIX metrics plugins.
+
+        Args:
+            metrics_config: MetricsConfig object
+
+        Returns:
+            Dictionary of plugins
+        """
+        plugins = {}
+
+        if metrics_config.enabled and metrics_config.exporter in ("prometheus", "both"):
+            # prometheus plugin
+            plugins["prometheus"] = {}
+            logger.info(
+                f"Prometheus metrics enabled at http://<apisix_host>:9091/apisix/prometheus/metrics"
+            )
+
+        return plugins
 
     def _generate_upstream(self, service) -> dict:
         """Generate upstream configuration with health checks and load balancing.

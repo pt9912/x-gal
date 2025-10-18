@@ -99,19 +99,33 @@ class HAProxyProvider(Provider):
             "# Global settings",
             "#---------------------------------------------------------------------",
             "global",
-            "    log         127.0.0.1 local0",
-            "    log         127.0.0.1 local1 notice",
-            "    chroot      /var/lib/haproxy",
-            "    pidfile     /var/run/haproxy.pid",
-            "    maxconn     4000",
-            "    user        haproxy",
-            "    group       haproxy",
-            "    daemon",
-            "",
-            "    # Stats socket for runtime API",
-            "    stats socket /var/lib/haproxy/stats level admin",
-            "    stats timeout 30s",
         ]
+
+        # Logging configuration
+        if config.global_config and config.global_config.logging:
+            self._generate_haproxy_logging(config.global_config.logging, output)
+        else:
+            output.append("    log         127.0.0.1 local0")
+            output.append("    log         127.0.0.1 local1 notice")
+
+        output.extend(
+            [
+                "    chroot      /var/lib/haproxy",
+                "    pidfile     /var/run/haproxy.pid",
+                "    maxconn     4000",
+                "    user        haproxy",
+                "    group       haproxy",
+                "    daemon",
+                "",
+                "    # Stats socket for runtime API",
+                "    stats socket /var/lib/haproxy/stats level admin",
+                "    stats timeout 30s",
+            ]
+        )
+
+        # Metrics configuration
+        if config.global_config and config.global_config.metrics:
+            self._generate_haproxy_metrics(config.global_config.metrics, output)
 
         return output
 
@@ -522,6 +536,38 @@ class HAProxyProvider(Provider):
             output.append(server_line)
 
         return output
+
+    def _generate_haproxy_logging(self, logging_config, output: List[str]) -> None:
+        """Generate HAProxy logging configuration.
+
+        Args:
+            logging_config: LoggingConfig object
+            output: Output list to append to
+        """
+        # HAProxy logging
+        if logging_config.format == "json":
+            output.append("    log         127.0.0.1 local0 info")
+            output.append("    # JSON format requires log-format directive in defaults/frontend")
+        else:
+            log_level_map = {"debug": "debug", "info": "info", "warning": "notice", "error": "err"}
+            haproxy_level = log_level_map.get(logging_config.level, "notice")
+            output.append(f"    log         127.0.0.1 local0 {haproxy_level}")
+
+    def _generate_haproxy_metrics(self, metrics_config, output: List[str]) -> None:
+        """Generate HAProxy metrics configuration.
+
+        Args:
+            metrics_config: MetricsConfig object
+            output: Output list to append to
+        """
+        if metrics_config.enabled and metrics_config.exporter in ("prometheus", "both"):
+            output.append("")
+            output.append("    # Prometheus metrics endpoint")
+            output.append(
+                f"    # Configure prometheus-exporter on port {metrics_config.prometheus_port}"
+            )
+            output.append("    # or use stats endpoint: http://<haproxy_host>:8404/stats;csv")
+            logger.info(f"Prometheus metrics: Configure external exporter or use stats endpoint")
 
     def _convert_template_vars(self, value: str) -> str:
         """Convert GAL template variables to HAProxy format."""
