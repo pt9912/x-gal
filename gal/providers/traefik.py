@@ -7,11 +7,29 @@ for HTTP routers, services, and middleware plugins.
 
 import logging
 import os
-from typing import Optional
+import re
+from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 import requests
+import yaml
 
-from ..config import Config
+from ..config import (
+    AuthenticationConfig,
+    BasicAuthConfig,
+    Config,
+    CORSPolicy,
+    GlobalConfig,
+    HeaderManipulation,
+    HealthCheckConfig,
+    LoadBalancerConfig,
+    PassiveHealthCheck,
+    RateLimitConfig,
+    Route,
+    Service,
+    Upstream,
+    UpstreamTarget,
+)
 from ..provider import Provider
 
 logger = logging.getLogger(__name__)
@@ -641,18 +659,319 @@ class TraefikProvider(Provider):
         logger.info("Traefik deployment completed successfully")
         return True
 
-    def parse(self, provider_config: str):
+    def parse(self, provider_config: str) -> Config:
         """Parse Traefik YAML configuration to GAL format.
 
-        TODO: Implementation pending for v1.3.0 Feature 4.
+        Traefik has static config (entrypoints, providers) and
+        dynamic config (routers, services, middlewares). This parser
+        handles dynamic config files.
 
         Args:
-            provider_config: Traefik dynamic configuration (YAML/TOML)
+            provider_config: Traefik YAML configuration string (dynamic config)
+
+        Returns:
+            Config: GAL configuration object
 
         Raises:
-            NotImplementedError: Traefik parser not yet implemented
+            ValueError: If config is invalid or cannot be parsed
         """
-        raise NotImplementedError(
-            "Traefik config import will be implemented in v1.3.0 Feature 4. "
-            "Use 'gal import --provider traefik' after the feature is released."
+        logger.info("Parsing Traefik configuration to GAL format")
+
+        try:
+            traefik_config = yaml.safe_load(provider_config)
+        except yaml.YAMLError as e:
+            raise ValueError(f"Invalid YAML: {e}")
+
+        if not traefik_config:
+            raise ValueError("Empty configuration")
+
+        self._import_warnings = []
+
+        # Traefik structure: http.routers, http.services, http.middlewares
+        # Create default global config
+        global_config = GlobalConfig(host="0.0.0.0", port=80, timeout="30s")
+
+        return Config(
+            version="1.0",
+            provider="traefik",
+            global_config=global_config,
+            services=self._parse_services(traefik_config),
         )
+
+    def _parse_services(self, traefik_config: dict) -> List[Service]:
+        """Parse Traefik services to GAL services."""
+        gal_services = []
+
+        http_config = traefik_config.get("http", {})
+        traefik_services = http_config.get("services", {})
+        traefik_routers = http_config.get("routers", {})
+        traefik_middlewares = http_config.get("middlewares", {})
+
+        for service_name, service_config in traefik_services.items():
+            service = self._parse_service(
+                service_name, service_config, traefik_routers, traefik_middlewares
+            )
+            if service:
+                gal_services.append(service)
+
+        return gal_services
+
+    def _parse_service(
+        self,
+        service_name: str,
+        service_config: dict,
+        traefik_routers: dict,
+        traefik_middlewares: dict,
+    ) -> Optional[Service]:
+        """Convert Traefik service to GAL service."""
+        # Parse load balancer config
+        load_balancer = service_config.get("loadBalancer", {})
+
+        if not load_balancer:
+            return None
+
+        # Parse servers (targets)
+        servers = load_balancer.get("servers", [])
+        targets = []
+
+        for server in servers:
+            url = server.get("url")  # Format: "http://host:port"
+
+            if not url:
+                continue
+
+            # Parse URL
+            parsed = urlparse(url)
+            host = parsed.hostname
+            port = parsed.port or 80
+
+            if not host:
+                continue
+
+            targets.append(UpstreamTarget(host=host, port=port))
+
+        if not targets:
+            return None
+
+        # Parse health check
+        health_check = self._parse_health_check(load_balancer)
+
+        # Parse sticky sessions
+        sticky = load_balancer.get("sticky", {})
+        sticky_sessions = sticky.get("cookie") is not None
+
+        cookie_name = None
+        if sticky_sessions:
+            cookie_config = sticky.get("cookie", {})
+            cookie_name = cookie_config.get("name", "lb")
+
+        # Upstream config
+        upstream = Upstream(
+            targets=targets,
+            load_balancer=LoadBalancerConfig(
+                algorithm="round_robin",  # Traefik default
+                sticky_sessions=sticky_sessions,
+                cookie_name=cookie_name,
+            ),
+            health_check=health_check,
+        )
+
+        # Parse routes for this service
+        routes = []
+        for router_name, router_config in traefik_routers.items():
+            if router_config.get("service") == service_name:
+                route = self._parse_router(
+                    router_name, router_config, traefik_middlewares
+                )
+                if route:
+                    routes.append(route)
+
+        return Service(
+            name=service_name,
+            type="rest",
+            protocol="http",
+            upstream=upstream,
+            routes=routes,
+        )
+
+    def _parse_health_check(self, load_balancer: dict) -> Optional[HealthCheckConfig]:
+        """Parse Traefik health check."""
+        health_check = load_balancer.get("healthCheck", {})
+
+        if not health_check:
+            return None
+
+        # Traefik OSS only supports passive health checks by default
+        # Active health checks require Traefik Plus
+        self._import_warnings.append(
+            "Traefik OSS only supports passive health checks - config may be simplified"
+        )
+
+        return HealthCheckConfig(
+            passive=PassiveHealthCheck(enabled=True, max_failures=3)  # Default
+        )
+
+    def _parse_router(
+        self, router_name: str, router_config: dict, traefik_middlewares: dict
+    ) -> Optional[Route]:
+        """Parse Traefik router to GAL route."""
+        # Parse rule (Traefik matcher)
+        rule = router_config.get("rule", "")
+
+        if not rule:
+            return None
+
+        # Extract path from rule
+        path_prefix = self._extract_path_from_rule(rule)
+
+        # Parse middlewares
+        middleware_names = router_config.get("middlewares", [])
+
+        rate_limit = None
+        authentication = None
+        headers = None
+        cors = None
+
+        for middleware_name in middleware_names:
+            if middleware_name not in traefik_middlewares:
+                continue
+
+            middleware_config = traefik_middlewares[middleware_name]
+
+            if "rateLimit" in middleware_config:
+                rate_limit = self._parse_rate_limit_middleware(
+                    middleware_config["rateLimit"]
+                )
+            elif "basicAuth" in middleware_config:
+                authentication = self._parse_basic_auth_middleware(
+                    middleware_config["basicAuth"]
+                )
+            elif "headers" in middleware_config:
+                headers = self._parse_headers_middleware(middleware_config["headers"])
+            elif "addPrefix" in middleware_config or "stripPrefix" in middleware_config:
+                # Path manipulation - not directly mappable to GAL
+                self._import_warnings.append(
+                    f"Path manipulation middleware '{middleware_name}' not imported"
+                )
+
+        # Check for CORS in headers middleware
+        if headers and headers.response_add:
+            cors = self._extract_cors_from_headers(headers)
+
+        return Route(
+            path_prefix=path_prefix,
+            rate_limit=rate_limit,
+            authentication=authentication,
+            headers=headers,
+            cors=cors,
+        )
+
+    def _extract_path_from_rule(self, rule: str) -> str:
+        """Extract path from Traefik rule.
+
+        Examples:
+            PathPrefix(`/api`) → /api
+            Host(`example.com`) && PathPrefix(`/api`) → /api
+            Path(`/api/v1`) → /api/v1
+        """
+        # Try PathPrefix first
+        path_match = re.search(r"PathPrefix\(`([^`]+)`\)", rule)
+        if path_match:
+            return path_match.group(1)
+
+        # Try exact Path
+        path_match = re.search(r"Path\(`([^`]+)`\)", rule)
+        if path_match:
+            return path_match.group(1)
+
+        # Default
+        return "/"
+
+    def _parse_rate_limit_middleware(self, config: dict) -> RateLimitConfig:
+        """Parse Traefik rateLimit middleware."""
+        average = config.get("average", 100)
+        burst = config.get("burst", 200)
+
+        # Traefik average is per second
+        return RateLimitConfig(
+            enabled=True,
+            requests_per_second=average,
+            burst=burst,
+            key_type="ip_address",
+        )
+
+    def _parse_basic_auth_middleware(self, config: dict) -> AuthenticationConfig:
+        """Parse Traefik basicAuth middleware."""
+        # Users are hashed in Traefik, cannot import plaintext
+        self._import_warnings.append(
+            "Basic auth users are hashed - configure manually in GAL"
+        )
+
+        return AuthenticationConfig(
+            enabled=True, type="basic", basic_auth=BasicAuthConfig(users={}, realm="Protected")
+        )
+
+    def _parse_headers_middleware(self, config: dict) -> HeaderManipulation:
+        """Parse Traefik headers middleware."""
+        custom_request_headers = config.get("customRequestHeaders", {})
+        custom_response_headers = config.get("customResponseHeaders", {})
+
+        request_add = custom_request_headers if custom_request_headers else None
+        response_add = custom_response_headers if custom_response_headers else None
+
+        return HeaderManipulation(request_add=request_add, response_add=response_add)
+
+    def _extract_cors_from_headers(
+        self, headers: HeaderManipulation
+    ) -> Optional[CORSPolicy]:
+        """Extract CORS config from response headers."""
+        if not headers.response_add:
+            return None
+
+        cors_headers = {}
+        for key, value in headers.response_add.items():
+            if key.startswith("Access-Control-"):
+                cors_headers[key] = value
+
+        if not cors_headers:
+            return None
+
+        # Build CORS config
+        allowed_origins_str = cors_headers.get("Access-Control-Allow-Origin", "*")
+        allowed_origins = (
+            [allowed_origins_str]
+            if allowed_origins_str != "*"
+            else ["*"]
+        )
+
+        allowed_methods_str = cors_headers.get(
+            "Access-Control-Allow-Methods", "GET,POST,PUT,DELETE"
+        )
+        allowed_methods = allowed_methods_str.split(",")
+
+        allowed_headers_str = cors_headers.get("Access-Control-Allow-Headers")
+        allowed_headers = allowed_headers_str.split(",") if allowed_headers_str else None
+
+        allow_credentials = (
+            cors_headers.get("Access-Control-Allow-Credentials") == "true"
+        )
+
+        max_age = cors_headers.get("Access-Control-Max-Age", "86400")
+
+        # Remove CORS headers from response_add (they're now in cors config)
+        for key in list(headers.response_add.keys()):
+            if key.startswith("Access-Control-"):
+                del headers.response_add[key]
+
+        return CORSPolicy(
+            enabled=True,
+            allowed_origins=allowed_origins,
+            allowed_methods=allowed_methods,
+            allowed_headers=allowed_headers,
+            allow_credentials=allow_credentials,
+            max_age=max_age,
+        )
+
+    def get_import_warnings(self) -> List[str]:
+        """Return warnings from last import."""
+        return getattr(self, "_import_warnings", [])
