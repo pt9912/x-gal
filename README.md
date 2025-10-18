@@ -23,14 +23,14 @@ Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong
 - ✅ **Strukturiertes Logging** mit konfigurierbaren Log-Levels
 - ✅ **Reines Python** - kein Go erforderlich!
 - ✅ **CI/CD Ready** - GitHub Actions Workflows integriert
-- ✅ **Umfassende Tests** - 379 Tests mit 89% Coverage
+- ✅ **Umfassende Tests** - 385 Tests mit 89% Coverage
 - 🆕 **Traffic Management** - Rate Limiting, Circuit Breaker, Health Checks & Load Balancing
 - 🆕 **Security** - Authentication (Basic, API Key, JWT), Header Manipulation, CORS
 - 🆕 **WebSocket Support** - Real-time bidirectional communication (all 6 providers)
 - 🆕 **Body Transformation** - Request/Response body manipulation with dynamic fields
 - 🆕 **Timeout & Retry** - Connection/read/send timeouts, automatic retries with exponential backoff
 - 🆕 **Logging & Observability** - Structured logging (JSON), Prometheus/OpenTelemetry metrics, log sampling, custom fields
-- 🚀 **Config Import** (v1.3.0) - Import existing Envoy configs to GAL format (`gal import-config`)
+- 🚀 **Config Import** (v1.3.0) - Import existing Envoy, Kong configs to GAL format (`gal import-config`)
 
 ## Installation
 
@@ -205,6 +205,7 @@ python gal-cli.py generate-all --config CONFIG --output-dir OUTPUT
 
 # 🚀 Provider-Config zu GAL importieren (v1.3.0)
 python gal-cli.py import-config --provider envoy --input envoy.yaml --output gal-config.yaml
+python gal-cli.py import-config --provider kong --input kong.yaml --output gal-config.yaml
 
 # Konfigurationsinformationen anzeigen
 python gal-cli.py info --config CONFIG
@@ -325,7 +326,7 @@ pytest -v --log-cli-level=DEBUG
 
 ### Test-Suite
 
-- **364 Tests** mit **89% Code Coverage**
+- **385 Tests** mit **89% Code Coverage**
 - Unit Tests für alle Module
 - Provider-spezifische Tests (Envoy, Kong, APISIX, Traefik, Nginx, HAProxy)
 - CLI Tests mit Click CliRunner

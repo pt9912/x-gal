@@ -556,7 +556,7 @@ routes:
 
 **Focus:** Import/Migration & Provider Portability
 **Status:** 🚧 In Development (siehe [docs/v1.3.0-PLAN.md](docs/v1.3.0-PLAN.md))
-**Progress:** 1/8 Features (12.5%)
+**Progress:** 2/8 Features (25.0%)
 **Estimated Effort:** 10-12 Wochen
 
 ### Mission
@@ -566,14 +566,14 @@ routes:
 ### High Priority Features
 
 #### 1. Config Import (Provider → GAL)
-**Status:** 🚧 In Development (Envoy ✅ IMPLEMENTED)
-**Effort:** 8 Wochen (1/8 Wochen completed)
+**Status:** 🚧 In Development (Envoy ✅, Kong ✅ IMPLEMENTED)
+**Effort:** 8 Wochen (2/8 Wochen completed)
 
 Reverse Engineering: Provider-spezifische Configs nach GAL konvertieren.
 
 **Unterstützte Import-Formate:**
 - ✅ **Envoy** (envoy.yaml → gal-config.yaml) - **✅ IMPLEMENTED** (Commit: 652a78d)
-- 🔄 **Kong** (kong.yaml → gal-config.yaml)
+- ✅ **Kong** (kong.yaml/kong.json → gal-config.yaml) - **✅ IMPLEMENTED** (Commit: 93845e7)
 - 🔄 **APISIX** (apisix.json → gal-config.yaml)
 - 🔄 **Traefik** (traefik.yaml → gal-config.yaml)
 - 🔄 **Nginx** (nginx.conf → gal-config.yaml)
@@ -639,6 +639,29 @@ class Provider(ABC):
   - ✅ Listeners + routes → Routes (path prefix)
   - ✅ Multiple clusters → Multiple services
 - **Example:** See `/tmp/test-envoy-import.yaml` and `/tmp/gal-imported.yaml`
+
+**Kong Implementation Summary (✅ COMPLETE):**
+- **Provider:** gal/providers/kong.py:765-1210 (KongProvider.parse() + 15 helper methods, ~470 lines)
+- **CLI:** gal-cli.py:225-368 (import-config command - already implemented)
+- **Tests:** tests/test_import_kong.py (21 tests, all passing ✅)
+- **Coverage:** kong.py: 8% → 37% (improved by 29%)
+- **Supported Features:**
+  - ✅ Services & Upstreams (URL parsing: http://host:port)
+  - ✅ Targets with weights
+  - ✅ Load Balancing (4 algorithms: round-robin, least-connections, consistent-hashing, latency)
+  - ✅ Active Health Checks (http_path, interval, timeout, thresholds)
+  - ✅ Passive Health Checks (max_failures monitoring)
+  - ✅ Rate Limiting (second/minute/hour/day conversion to req/s)
+  - ✅ API Key Authentication (key_names extraction)
+  - ✅ Basic Authentication (with security warning)
+  - ✅ JWT Authentication (algorithm mapping, with security warning)
+  - ✅ Request Header Transformation (add/remove with "Header:Value" parsing)
+  - ✅ Response Header Transformation (add/remove)
+  - ✅ CORS (origins, methods, headers, credentials, max_age)
+  - ✅ Multiple Services & Routes
+  - ✅ YAML & JSON format support
+- **Import Warnings:** ⚠️ API keys, Basic auth credentials, JWT secrets not imported (security)
+- **Example:** See docs/v1.3.0-PLAN.md Feature 2 for detailed input/output examples
 
 #### 2. Config Validation & Compatibility Checker
 **Status:** 🔄 Planned
@@ -863,7 +886,7 @@ gal migrate
 ### Version Timeline:
 - **v1.1.0 (Q4 2025):** ✅ Released - Traffic Management & Security
 - **v1.2.0 (Q1 2026):** ✅ **COMPLETE** (100% - 6/6 Features) - New Providers & Features 🎉
-- **v1.3.0 (Q2 2026):** 🚧 **In Development** (12.5% - 1/8 Features) - Import/Migration (Envoy ✅)
+- **v1.3.0 (Q2 2026):** 🚧 **In Development** (25.0% - 2/8 Features) - Import/Migration (Envoy ✅, Kong ✅)
 - **v1.4.0 (Q3 2026):** Concept - Advanced Traffic & Multi-Cloud + gRPC Transformations
 - **v1.5.0 (Q4 2026):** Concept - Enterprise Features & Developer UX + **Caddy Provider**
 - **v2.0+ (2027+):** Vision - Advanced Features & Extensibility
