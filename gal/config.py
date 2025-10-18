@@ -221,6 +221,7 @@ class Route:
         authentication: Optional authentication configuration for this route
         headers: Optional header manipulation configuration for this route
         cors: Optional CORS policy configuration for this route
+        websocket: Optional WebSocket configuration for this route
         circuit_breaker: Optional circuit breaker configuration for this route
 
     Example:
@@ -234,6 +235,7 @@ class Route:
     authentication: Optional['AuthenticationConfig'] = None
     headers: Optional['HeaderManipulation'] = None
     cors: Optional['CORSPolicy'] = None
+    websocket: Optional['WebSocketConfig'] = None
     circuit_breaker: Optional['CircuitBreakerConfig'] = None
 
 
@@ -506,6 +508,45 @@ class CORSPolicy:
 
 
 @dataclass
+class WebSocketConfig:
+    """WebSocket configuration for routes.
+
+    Enables WebSocket support for real-time bidirectional communication,
+    commonly used for chat applications, live dashboards, and streaming updates.
+
+    Provider Support:
+        - Envoy: Native WebSocket support via HTTP/1.1 Upgrade
+        - Kong: Native WebSocket support
+        - APISIX: Native WebSocket support
+        - Traefik: Native WebSocket support
+        - Nginx: WebSocket support via proxy_http_version 1.1
+        - HAProxy: Native WebSocket support
+
+    Attributes:
+        enabled: Whether WebSocket is enabled for this route (default: True)
+        idle_timeout: Maximum idle time before connection is closed (default: "300s")
+        ping_interval: Interval for sending ping frames to keep connection alive (default: "30s")
+        max_message_size: Maximum message size in bytes (default: 1MB)
+        compression: Enable per-message compression (default: False)
+
+    Example:
+        >>> ws = WebSocketConfig(
+        ...     enabled=True,
+        ...     idle_timeout="600s",
+        ...     ping_interval="60s",
+        ...     compression=True
+        ... )
+        >>> ws.idle_timeout
+        '600s'
+    """
+    enabled: bool = True
+    idle_timeout: str = "300s"  # 5 minutes
+    ping_interval: str = "30s"
+    max_message_size: int = 1048576  # 1MB
+    compression: bool = False
+
+
+@dataclass
 class CircuitBreakerConfig:
     """Circuit breaker configuration for routes.
 
@@ -771,6 +812,11 @@ class Config:
                 if 'cors' in route_data:
                     cors_policy = CORSPolicy(**route_data['cors'])
 
+                # Parse route-level WebSocket
+                websocket = None
+                if 'websocket' in route_data:
+                    websocket = WebSocketConfig(**route_data['websocket'])
+
                 # Parse route-level circuit breaker
                 circuit_breaker = None
                 if 'circuit_breaker' in route_data:
@@ -783,6 +829,7 @@ class Config:
                     authentication=authentication,
                     headers=route_headers,
                     cors=cors_policy,
+                    websocket=websocket,
                     circuit_breaker=circuit_breaker
                 )
                 routes.append(route)
