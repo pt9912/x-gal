@@ -1,0 +1,526 @@
+# ============================================================================
+# GAL Health Checks & Load Balancing - Example Configuration
+# ============================================================================
+#
+# This example demonstrates health check and load balancing configurations
+# for different use cases and providers.
+#
+# Provider: APISIX (change to 'kong', 'traefik', or 'envoy' as needed)
+# Features: Active/Passive Health Checks, Multiple Load Balancing Algorithms
+#
+# ============================================================================
+
+version: "1.0"
+provider: apisix
+
+global_config:
+  host: "0.0.0.0"
+  port: 9080
+  admin_port: 9180
+  timeout: "30s"
+
+services:
+  # ===========================================================================
+  # Example 1: Basic Active Health Checks
+  # ===========================================================================
+  # Use Case: Simple REST API with periodic health probing
+  # Features: Active health checks with custom endpoint
+  # ===========================================================================
+  - name: basic_api
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+      health_check:
+        active:
+          enabled: true
+          http_path: /health              # Health check endpoint
+          interval: "10s"                  # Check every 10 seconds
+          timeout: "5s"                    # Timeout per check
+          healthy_threshold: 2             # 2 successes → healthy
+          unhealthy_threshold: 3           # 3 failures → unhealthy
+          healthy_status_codes:
+            - 200
+            - 201
+            - 204
+    routes:
+      - path_prefix: /api/basic
+        methods: [GET, POST]
+
+  # ===========================================================================
+  # Example 2: Passive Health Checks (Circuit Breaker)
+  # ===========================================================================
+  # Use Case: Fast failure detection based on real traffic
+  # Features: Passive health checks without additional probing
+  # ===========================================================================
+  - name: passive_api
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8081
+      health_check:
+        passive:
+          enabled: true
+          max_failures: 5                  # Max consecutive failures
+          unhealthy_status_codes:
+            - 500
+            - 502
+            - 503
+            - 504
+    routes:
+      - path_prefix: /api/passive
+        methods: [GET, POST]
+
+  # ===========================================================================
+  # Example 3: Combined Active + Passive Health Checks (RECOMMENDED)
+  # ===========================================================================
+  # Use Case: Production-ready configuration with best of both worlds
+  # Features: Fast detection (passive) + auto-recovery (active)
+  # ===========================================================================
+  - name: combined_api
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8082
+      health_check:
+        active:
+          enabled: true
+          http_path: /actuator/health      # Spring Boot Actuator endpoint
+          interval: "15s"
+          timeout: "5s"
+          healthy_threshold: 2
+          unhealthy_threshold: 3
+          healthy_status_codes: [200, 204]
+        passive:
+          enabled: true
+          max_failures: 5
+          unhealthy_status_codes: [500, 502, 503, 504]
+    routes:
+      - path_prefix: /api/combined
+        methods: [GET, POST, PUT, DELETE]
+
+  # ===========================================================================
+  # Example 4: Round-Robin Load Balancing
+  # ===========================================================================
+  # Use Case: Distribute load evenly across multiple servers
+  # Features: Round-robin algorithm with multiple targets
+  # ===========================================================================
+  - name: round_robin_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: api-1.internal
+          port: 8080
+          weight: 1
+        - host: api-2.internal
+          port: 8080
+          weight: 1
+        - host: api-3.internal
+          port: 8080
+          weight: 1
+      health_check:
+        active:
+          enabled: true
+          http_path: /health
+          interval: "10s"
+      load_balancer:
+        algorithm: round_robin
+    routes:
+      - path_prefix: /api/roundrobin
+        methods: [GET, POST]
+
+  # ===========================================================================
+  # Example 5: Weighted Load Balancing
+  # ===========================================================================
+  # Use Case: Distribute load based on server capacity
+  # Features: Weighted algorithm for heterogeneous servers
+  # Traffic Distribution: 50% / 30% / 20%
+  # ===========================================================================
+  - name: weighted_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: large-server.internal     # Big server (8 CPU)
+          port: 8080
+          weight: 5                        # 50% traffic
+        - host: medium-server.internal    # Medium server (4 CPU)
+          port: 8080
+          weight: 3                        # 30% traffic
+        - host: small-server.internal     # Small server (2 CPU)
+          port: 8080
+          weight: 2                        # 20% traffic
+      health_check:
+        active:
+          enabled: true
+          http_path: /health
+          interval: "10s"
+      load_balancer:
+        algorithm: weighted
+    routes:
+      - path_prefix: /api/weighted
+        methods: [GET, POST]
+
+  # ===========================================================================
+  # Example 6: Least Connections Load Balancing
+  # ===========================================================================
+  # Use Case: Long-running connections (WebSockets, Streaming)
+  # Features: Route to server with fewest active connections
+  # ===========================================================================
+  - name: least_conn_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: stream-1.internal
+          port: 8080
+          weight: 1
+        - host: stream-2.internal
+          port: 8080
+          weight: 1
+        - host: stream-3.internal
+          port: 8080
+          weight: 1
+      health_check:
+        active:
+          enabled: true
+          http_path: /health
+          interval: "10s"
+      load_balancer:
+        algorithm: least_conn
+    routes:
+      - path_prefix: /api/stream
+        methods: [GET, POST]
+
+  # ===========================================================================
+  # Example 7: IP Hash Load Balancing (Session Persistence)
+  # ===========================================================================
+  # Use Case: Stateful applications requiring session persistence
+  # Features: Consistent routing based on client IP
+  # ===========================================================================
+  - name: stateful_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: stateful-1.internal
+          port: 8080
+          weight: 1
+        - host: stateful-2.internal
+          port: 8080
+          weight: 1
+        - host: stateful-3.internal
+          port: 8080
+          weight: 1
+      health_check:
+        active:
+          enabled: true
+          http_path: /health
+          interval: "10s"
+      load_balancer:
+        algorithm: ip_hash
+    routes:
+      - path_prefix: /api/stateful
+        methods: [GET, POST]
+
+  # ===========================================================================
+  # Example 8: Canary Deployment (10% New Version)
+  # ===========================================================================
+  # Use Case: Gradual rollout of new version
+  # Features: Weighted load balancing for canary deployment
+  # Traffic: 90% → v1, 10% → v2
+  # ===========================================================================
+  - name: canary_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: api-v1.internal           # Old version
+          port: 8080
+          weight: 9                        # 90% traffic
+        - host: api-v2.internal           # New version (canary)
+          port: 8080
+          weight: 1                        # 10% traffic
+      health_check:
+        active:
+          enabled: true
+          http_path: /health
+          interval: "10s"
+        passive:
+          enabled: true
+          max_failures: 3
+      load_balancer:
+        algorithm: weighted
+    routes:
+      - path_prefix: /api/canary
+        methods: [GET, POST]
+
+  # ===========================================================================
+  # Example 9: High-Availability Payment Service
+  # ===========================================================================
+  # Use Case: Critical payment service requiring maximum availability
+  # Features: Aggressive health checks, multiple backends, fast failover
+  # ===========================================================================
+  - name: payment_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: payment-1.prod.internal
+          port: 8080
+          weight: 1
+        - host: payment-2.prod.internal
+          port: 8080
+          weight: 1
+        - host: payment-3.prod.internal
+          port: 8080
+          weight: 1
+      health_check:
+        active:
+          enabled: true
+          http_path: /actuator/health
+          interval: "5s"                   # Aggressive interval
+          timeout: "3s"
+          healthy_threshold: 2
+          unhealthy_threshold: 2           # Fast failure detection
+          healthy_status_codes: [200, 204]
+        passive:
+          enabled: true
+          max_failures: 3                  # Fast circuit breaking
+          unhealthy_status_codes: [500, 502, 503, 504]
+      load_balancer:
+        algorithm: round_robin
+    routes:
+      - path_prefix: /api/payments
+        methods: [GET, POST]
+
+  # ===========================================================================
+  # Example 10: Microservice with Service Mesh Pattern
+  # ===========================================================================
+  # Use Case: Microservice architecture with health checks at every layer
+  # Features: Comprehensive health checking, load balancing, resilience
+  # ===========================================================================
+  - name: user_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: user-svc-1.k8s.local
+          port: 8080
+          weight: 2
+        - host: user-svc-2.k8s.local
+          port: 8080
+          weight: 2
+        - host: user-svc-3.k8s.local
+          port: 8080
+          weight: 1
+      health_check:
+        active:
+          enabled: true
+          http_path: /health/live           # Kubernetes liveness probe
+          interval: "10s"
+          timeout: "5s"
+          healthy_threshold: 3
+          unhealthy_threshold: 2
+          healthy_status_codes: [200]
+        passive:
+          enabled: true
+          max_failures: 5
+          unhealthy_status_codes: [500, 502, 503, 504]
+      load_balancer:
+        algorithm: weighted
+    routes:
+      - path_prefix: /api/users
+        methods: [GET, POST, PUT, DELETE, PATCH]
+
+  # ===========================================================================
+  # Example 11: gRPC Service with Load Balancing
+  # ===========================================================================
+  # Use Case: gRPC microservice with multiple instances
+  # Features: gRPC protocol, health checks, load balancing
+  # ===========================================================================
+  - name: grpc_service
+    type: grpc
+    protocol: grpc
+    upstream:
+      targets:
+        - host: grpc-1.internal
+          port: 50051
+          weight: 1
+        - host: grpc-2.internal
+          port: 50051
+          weight: 1
+      health_check:
+        active:
+          enabled: true
+          http_path: /grpc.health.v1.Health/Check  # gRPC health check
+          interval: "15s"
+          timeout: "5s"
+          healthy_threshold: 2
+          unhealthy_threshold: 3
+      load_balancer:
+        algorithm: round_robin
+    routes:
+      - path_prefix: /grpc.UserService
+        methods: [POST]
+
+  # ===========================================================================
+  # Example 12: Blue-Green Deployment
+  # ===========================================================================
+  # Use Case: Zero-downtime deployment with instant switch
+  # Features: Weighted LB for gradual traffic shift
+  # Initial: 100% Blue, 0% Green
+  # Switch: Change weights to 0% Blue, 100% Green
+  # ===========================================================================
+  - name: blue_green_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: api-blue.internal          # Currently active
+          port: 8080
+          weight: 10                       # 100% traffic
+        - host: api-green.internal         # New version (warming up)
+          port: 8080
+          weight: 0                        # 0% traffic (ready to switch)
+      health_check:
+        active:
+          enabled: true
+          http_path: /health
+          interval: "10s"
+          healthy_threshold: 3             # Ensure stable before switch
+      load_balancer:
+        algorithm: weighted
+    routes:
+      - path_prefix: /api/bluegreen
+        methods: [GET, POST]
+
+  # ===========================================================================
+  # Example 13: Sticky Sessions (Traefik-specific)
+  # ===========================================================================
+  # Use Case: Session-based applications requiring affinity
+  # Features: Cookie-based sticky sessions
+  # Note: Best supported on Traefik provider
+  # ===========================================================================
+  - name: sticky_session_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: web-1.internal
+          port: 8080
+          weight: 1
+        - host: web-2.internal
+          port: 8080
+          weight: 1
+      health_check:
+        active:
+          enabled: true
+          http_path: /health
+          interval: "10s"
+      load_balancer:
+        algorithm: round_robin
+        sticky_sessions: true
+        cookie_name: GALSERVICEID
+    routes:
+      - path_prefix: /api/sticky
+        methods: [GET, POST]
+
+  # ===========================================================================
+  # Example 14: Multi-Datacenter Setup
+  # ===========================================================================
+  # Use Case: Geo-distributed backends across multiple datacenters
+  # Features: Weighted LB favoring local DC, health checks for failover
+  # ===========================================================================
+  - name: multi_dc_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: api-dc1-1.internal         # Local DC (primary)
+          port: 8080
+          weight: 5                        # 50% traffic
+        - host: api-dc1-2.internal
+          port: 8080
+          weight: 5                        # 50% traffic
+        - host: api-dc2-1.internal         # Remote DC (backup)
+          port: 8080
+          weight: 0                        # 0% traffic (failover only)
+      health_check:
+        active:
+          enabled: true
+          http_path: /health
+          interval: "10s"
+          timeout: "5s"
+          healthy_threshold: 2
+          unhealthy_threshold: 2
+        passive:
+          enabled: true
+          max_failures: 3
+      load_balancer:
+        algorithm: weighted
+    routes:
+      - path_prefix: /api/multidc
+        methods: [GET, POST]
+
+  # ===========================================================================
+  # Example 15: Development/Staging Environment
+  # ===========================================================================
+  # Use Case: Non-production environment with relaxed health checks
+  # Features: Longer intervals, higher thresholds for stability
+  # ===========================================================================
+  - name: dev_api
+    type: rest
+    protocol: http
+    upstream:
+      host: dev-api.internal
+      port: 8080
+      health_check:
+        active:
+          enabled: true
+          http_path: /health
+          interval: "30s"                  # Relaxed interval
+          timeout: "10s"                   # Generous timeout
+          healthy_threshold: 1             # Fast recovery
+          unhealthy_threshold: 5           # Tolerate more failures
+          healthy_status_codes: [200, 201, 202, 204]
+    routes:
+      - path_prefix: /api/dev
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
+
+# ============================================================================
+# Notes:
+# ============================================================================
+#
+# 1. PROVIDER COMPATIBILITY:
+#    - Switch 'provider' field to test different gateways
+#    - Some features have provider-specific behaviors (see docs)
+#
+# 2. HEALTH CHECK BEST PRACTICES:
+#    - Combine active + passive for production
+#    - Use moderate intervals (10-30s) to avoid overwhelming backends
+#    - Ensure health endpoints are lightweight (fast response)
+#
+# 3. LOAD BALANCING ALGORITHM SELECTION:
+#    - round_robin: Homogeneous servers, REST APIs
+#    - weighted: Heterogeneous servers, canary deployments
+#    - least_conn: Long-running connections, WebSockets
+#    - ip_hash: Stateful apps, session persistence
+#
+# 4. TESTING THIS CONFIG:
+#    # Generate APISIX config
+#    gal generate examples/health-checks-example.yaml
+#
+#    # Test with different provider
+#    sed 's/provider: apisix/provider: kong/' examples/health-checks-example.yaml | gal generate -
+#
+# 5. MONITORING:
+#    - Monitor health check success rates
+#    - Alert on unhealthy backend counts
+#    - Track failover events
+#
+# ============================================================================
