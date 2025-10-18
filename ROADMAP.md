@@ -283,8 +283,8 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 ## 🚀 v1.2.0 (Q1 2026 - In Development)
 
 **Focus:** Neue Gateway-Provider & Erweiterte Features
-**Status:** 🚧 In Development (siehe [docs/v1.2.0-PLAN.md](docs/v1.2.0-PLAN.md))
-**Progress:** 66.7% (4 von 6 Features komplett)
+**Status:** ✅ **COMPLETE** (siehe [docs/v1.2.0-PLAN.md](docs/v1.2.0-PLAN.md))
+**Progress:** 100% (6 von 6 Features komplett) 🎉
 **Estimated Effort:** 11.5 Wochen
 
 ### High Priority Features
@@ -517,14 +517,32 @@ routes:
 
 ### Low Priority Features
 
-#### 6. Enhanced Logging & Observability (Optional)
-**Status:** 🔄 Pending
+#### 6. Enhanced Logging & Observability ✅
+**Status:** ✅ **IMPLEMENTED** (Commits: c57467d, 7df7a11, 9d799b3)
 **Effort:** 1.5 Wochen
-- **Structured Access Logs** (JSON)
-- **Custom Log Formats**
-- **Log Sampling**
-- **OpenTelemetry Integration** (Basic)
-- **Prometheus Metrics Export**
+- ✅ **Structured Access Logs** (JSON/text format)
+- ✅ **Custom Log Formats** (custom_fields support)
+- ✅ **Log Sampling** (sample_rate 0.0-1.0)
+- ✅ **OpenTelemetry Integration** (Envoy, Traefik)
+- ✅ **Prometheus Metrics Export** (All 6 providers)
+
+**Implementierung:**
+- Config Models: `LoggingConfig`, `MetricsConfig` (gal/config.py:798-849)
+- Providers: All 6 providers implement logging & metrics
+  - Envoy: JSON logs, sampling, Prometheus/OpenTelemetry (envoy.py:841-927)
+  - Kong: file-log, prometheus plugins (kong.py:481-525)
+  - APISIX: file-logger, prometheus plugins (apisix.py:389-431)
+  - Traefik: accessLog, prometheus metrics (traefik.py:439-480)
+  - Nginx: JSON log_format, log levels (nginx.py:220-258)
+  - HAProxy: Syslog logging, external exporters (haproxy.py:538-570)
+- Tests: `tests/test_logging_observability.py` (19 tests, all passing)
+- Dokumentation: `docs/guides/LOGGING_OBSERVABILITY.md` (1000+ lines, German)
+- Beispiele: `examples/logging-observability-example.yaml` (15 scenarios)
+
+**Feature Matrix:**
+- JSON Logs: Envoy ✅, Kong ✅, APISIX ✅, Traefik ✅, Nginx ✅, HAProxy ⚠️
+- Prometheus: Envoy ✅, Kong ✅, APISIX ✅, Traefik ✅, Nginx ⚠️, HAProxy ⚠️
+- OpenTelemetry: Envoy ✅, Traefik ✅ (Others require external collectors)
 
 ### Success Metrics
 - **6 Gateway Providers** (Envoy, Kong, APISIX, Traefik, Nginx, HAProxy)
@@ -828,7 +846,7 @@ gal migrate
 
 ### Version Timeline:
 - **v1.1.0 (Q4 2025):** ✅ Released - Traffic Management & Security
-- **v1.2.0 (Q1 2026):** 🚧 In Development (83.3% - 5/6 Features) - New Providers & Features
+- **v1.2.0 (Q1 2026):** ✅ **COMPLETE** (100% - 6/6 Features) - New Providers & Features 🎉
 - **v1.3.0 (Q2 2026):** 🔄 Planning - Import/Migration & Portability
 - **v1.4.0 (Q3 2026):** Concept - Advanced Traffic & Multi-Cloud + gRPC Transformations
 - **v1.5.0 (Q4 2026):** Concept - Enterprise Features & Developer UX + **Caddy Provider**
