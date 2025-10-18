@@ -23,7 +23,10 @@ Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong
 - ✅ **Strukturiertes Logging** mit konfigurierbaren Log-Levels
 - ✅ **Reines Python** - kein Go erforderlich!
 - ✅ **CI/CD Ready** - GitHub Actions Workflows integriert
-- ✅ **Umfassende Tests** - 291 Tests mit 89% Coverage
+- ✅ **Umfassende Tests** - 311 Tests mit 89% Coverage
+- 🆕 **Traffic Management** - Rate Limiting, Circuit Breaker, Health Checks & Load Balancing
+- 🆕 **Security** - Authentication (Basic, API Key, JWT), Header Manipulation, CORS
+- 🆕 **WebSocket Support** - Real-time bidirectional communication (all 6 providers)
 
 ## Installation
 
@@ -262,14 +265,28 @@ CONFIG_FILE=examples/gateway-config.yaml docker-compose --profile validate up ga
 
 ## Dokumentation
 
+### Grundlagen
 - [Schnellstart-Anleitung](docs/guides/QUICKSTART.md)
 - [Architektur-Übersicht](docs/architecture/ARCHITECTURE.md)
 - [Provider-Details](docs/guides/PROVIDERS.md)
 - [Transformations-Anleitung](docs/guides/TRANSFORMATIONS.md)
 - [Docker-Anleitung](docs/guides/DOCKER.md)
+
+### Feature-Guides
+- [Rate Limiting](docs/guides/RATE_LIMITING.md) - API-Schutz vor Überlastung
+- [Authentication](docs/guides/AUTHENTICATION.md) - Basic, API Key, JWT
+- [Headers](docs/guides/HEADERS.md) - Request/Response Header Manipulation
+- [CORS](docs/guides/CORS.md) - Cross-Origin Resource Sharing
+- [Circuit Breaker](docs/guides/CIRCUIT_BREAKER.md) - Fehlertoleranz & Resilienz
+- [Health Checks & Load Balancing](docs/guides/HEALTH_CHECKS.md) - Hochverfügbarkeit
+- [**WebSocket Support**](docs/guides/WEBSOCKET.md) - Real-time bidirectional communication
+- [Nginx Provider](docs/guides/NGINX.md) - Nginx-spezifische Features
+- [HAProxy Provider](docs/guides/HAPROXY.md) - HAProxy-spezifische Features
+
+### Roadmap & Changelog
 - [**Roadmap**](ROADMAP.md) - Geplante Features und Releases
 - [**v1.1.0 Plan**](docs/v1.1.0-PLAN.md) - v1.1.0 Implementierungsplan (100% abgeschlossen)
-- [**v1.2.0 Plan**](docs/v1.2.0-PLAN.md) - v1.2.0 Implementierungsplan (33.3% abgeschlossen)
+- [**v1.2.0 Plan**](docs/v1.2.0-PLAN.md) - v1.2.0 Implementierungsplan (50.0% abgeschlossen)
 - [Changelog](CHANGELOG.md)
 
 ## Testing & Development
