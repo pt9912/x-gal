@@ -291,6 +291,55 @@ class APISIXProvider(Provider):
                     }
                     route_config["plugins"]["api-breaker"] = cb_config
 
+                # Add timeout configuration if specified
+                if route.timeout:
+                    if "plugins" not in route_config:
+                        route_config["plugins"] = {}
+                    timeout = route.timeout
+                    # Parse timeout strings (e.g., "5s" -> 5)
+                    connect_seconds = int(timeout.connect.rstrip("sS"))
+                    send_seconds = int(timeout.send.rstrip("sS"))
+                    read_seconds = int(timeout.read.rstrip("sS"))
+                    route_config["plugins"]["timeout"] = {
+                        "connect": connect_seconds,
+                        "send": send_seconds,
+                        "read": read_seconds,
+                    }
+
+                # Add retry configuration if specified
+                if route.retry and route.retry.enabled:
+                    if "plugins" not in route_config:
+                        route_config["plugins"] = {}
+                    retry = route.retry
+                    # APISIX uses proxy-retry plugin
+                    # Map retry_on conditions to APISIX format
+                    retry_status_codes = []
+                    for condition in retry.retry_on:
+                        if condition == "http_502":
+                            retry_status_codes.append(502)
+                        elif condition == "http_503":
+                            retry_status_codes.append(503)
+                        elif condition == "http_504":
+                            retry_status_codes.append(504)
+                        elif condition == "http_5xx":
+                            retry_status_codes.extend([502, 503, 504])
+
+                    # Remove duplicates
+                    retry_status_codes = list(set(retry_status_codes))
+
+                    route_config["plugins"]["proxy-retry"] = {
+                        "retries": retry.attempts,
+                        "retry_timeout": int(retry.max_interval.rstrip("msMS")) if "ms" in retry.max_interval else int(retry.max_interval.rstrip("sS")) * 1000,
+                        "vars": [["status", "==", code] for code in retry_status_codes] if retry_status_codes else None,
+                    }
+
+                    # Remove None values
+                    route_config["plugins"]["proxy-retry"] = {
+                        k: v
+                        for k, v in route_config["plugins"]["proxy-retry"].items()
+                        if v is not None
+                    }
+
                 # Add WebSocket support if configured
                 if route.websocket and route.websocket.enabled:
                     route_config["enable_websocket"] = True

@@ -164,6 +164,61 @@ class EnvoyProvider(Provider):
                 output.append("                route:")
                 output.append(f"                  cluster: {service.name}_cluster")
 
+                # Add timeout configuration if specified
+                if route.timeout:
+                    timeout = route.timeout
+                    # Envoy uses timeout on route level for overall request timeout
+                    output.append(f"                  timeout: {timeout.read}")
+                    # idle_timeout for keep-alive connections
+                    output.append(f"                  idle_timeout: {timeout.idle}")
+
+                # Add retry policy if configured
+                if route.retry and route.retry.enabled:
+                    retry = route.retry
+                    output.append("                  retry_policy:")
+                    output.append(f"                    num_retries: {retry.attempts}")
+
+                    # Map retry_on conditions to Envoy format
+                    retry_conditions = []
+                    for condition in retry.retry_on:
+                        if condition == "connect_timeout":
+                            retry_conditions.append("connect-failure")
+                        elif condition == "http_5xx":
+                            retry_conditions.append("5xx")
+                        elif condition == "http_502":
+                            retry_conditions.append("retriable-status-codes")
+                        elif condition == "http_503":
+                            retry_conditions.append("retriable-status-codes")
+                        elif condition == "http_504":
+                            retry_conditions.append("retriable-status-codes")
+                        elif condition == "retriable_4xx":
+                            retry_conditions.append("retriable-4xx")
+                        elif condition == "reset":
+                            retry_conditions.append("reset")
+                        elif condition == "refused":
+                            retry_conditions.append("refused-stream")
+
+                    if retry_conditions:
+                        output.append(f"                    retry_on: {','.join(set(retry_conditions))}")
+
+                    # Add retriable status codes if specified
+                    retriable_codes = []
+                    for condition in retry.retry_on:
+                        if condition == "http_502":
+                            retriable_codes.append(502)
+                        elif condition == "http_503":
+                            retriable_codes.append(503)
+                        elif condition == "http_504":
+                            retriable_codes.append(504)
+
+                    if retriable_codes:
+                        output.append("                    retriable_status_codes:")
+                        for code in sorted(set(retriable_codes)):
+                            output.append(f"                    - {code}")
+
+                    # Add per-try timeout (base_interval for first try)
+                    output.append(f"                    per_try_timeout: {retry.base_interval}")
+
                 # Add WebSocket support if configured
                 if route.websocket and route.websocket.enabled:
                     ws = route.websocket
@@ -805,6 +860,15 @@ class EnvoyProvider(Provider):
             lb_policy = envoy_lb_map.get(algorithm, "ROUND_ROBIN")
 
         output.append(f"    lb_policy: {lb_policy}")
+
+        # Configure timeout (default connect timeout for cluster)
+        # Route-specific timeouts can override this
+        default_timeout = "5s"
+        for route in service.routes:
+            if route.timeout:
+                default_timeout = route.timeout.connect
+                break
+        output.append(f"    connect_timeout: {default_timeout}")
 
         # Configure ring hash for IP-based hashing
         if service.upstream.load_balancer and service.upstream.load_balancer.algorithm == "ip_hash":

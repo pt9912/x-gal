@@ -149,6 +149,8 @@ class TraefikProvider(Provider):
                     middlewares.append(f"{router_name}_cors")
                 if route.circuit_breaker and route.circuit_breaker.enabled:
                     middlewares.append(f"{router_name}_circuitbreaker")
+                if route.retry and route.retry.enabled:
+                    middlewares.append(f"{router_name}_retry")
 
                 # Body transformation - Traefik limitation
                 if route.body_transformation and route.body_transformation.enabled:
@@ -199,6 +201,11 @@ class TraefikProvider(Provider):
             for service in config.services
             for route in service.routes
         )
+        has_retry = any(
+            route.retry and route.retry.enabled
+            for service in config.services
+            for route in service.routes
+        )
 
         if (
             has_authentication
@@ -207,6 +214,7 @@ class TraefikProvider(Provider):
             or has_headers
             or has_cors
             or has_circuit_breakers
+            or has_retry
         ):
             output.append("  middlewares:")
 
@@ -400,6 +408,19 @@ class TraefikProvider(Provider):
                         output.append(f"        expression: '{expression}'")
                         output.append("")
 
+            # Retry middlewares (route-level)
+            for service in config.services:
+                for i, route in enumerate(service.routes):
+                    if route.retry and route.retry.enabled:
+                        router_name = f"{service.name}_router_{i}"
+                        retry = route.retry
+                        output.append(f"    {router_name}_retry:")
+                        output.append("      retry:")
+                        output.append(f"        attempts: {retry.attempts}")
+                        # Traefik uses initialInterval (equivalent to base_interval)
+                        output.append(f"        initialInterval: {retry.base_interval}")
+                        output.append("")
+
         result = "\n".join(output)
         logger.info(
             f"Traefik configuration generated: {len(result)} bytes, {len(config.services)} services"
@@ -464,6 +485,21 @@ class TraefikProvider(Provider):
             # Optional: Add responseForwarding for better WebSocket performance
             output.append("        responseForwarding:")
             output.append("          flushInterval: 100ms")
+
+        # Configure timeout if any route has timeout configured
+        has_timeout = any(route.timeout for route in service.routes)
+        if has_timeout:
+            # Find the first route with timeout configuration
+            for route in service.routes:
+                if route.timeout:
+                    timeout = route.timeout
+                    output.append("        serversTransport:")
+                    # Traefik uses forwardingTimeouts
+                    output.append("          forwardingTimeouts:")
+                    output.append(f"            dialTimeout: {timeout.connect}")
+                    output.append(f"            responseHeaderTimeout: {timeout.read}")
+                    output.append(f"            idleConnTimeout: {timeout.idle}")
+                    break
 
     def deploy(
         self, config: Config, output_file: Optional[str] = None, api_url: Optional[str] = None

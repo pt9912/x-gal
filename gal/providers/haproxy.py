@@ -385,6 +385,56 @@ class HAProxyProvider(Provider):
                     output.append(f"    timeout tunnel {ws.idle_timeout}")
                     break
 
+        # Timeout configuration (from first route with timeout configured)
+        has_timeout = any(route.timeout for route in service.routes)
+        if has_timeout:
+            for route in service.routes:
+                if route.timeout:
+                    timeout = route.timeout
+                    output.append(f"    timeout connect {timeout.connect}")
+                    output.append(f"    timeout server {timeout.read}")
+                    # timeout client is set in frontend, but we can also set it here
+                    output.append(f"    timeout client {timeout.idle}")
+                    break
+
+        # Retry configuration (from first route with retry configured)
+        has_retry = any(route.retry and route.retry.enabled for route in service.routes)
+        if has_retry:
+            for route in service.routes:
+                if route.retry and route.retry.enabled:
+                    retry = route.retry
+                    # HAProxy retry-on conditions
+                    retry_conditions = []
+                    for condition in retry.retry_on:
+                        if condition == "connect_timeout":
+                            retry_conditions.append("conn-failure")
+                        elif condition == "http_5xx":
+                            retry_conditions.append("500 502 503 504")
+                        elif condition == "http_502":
+                            retry_conditions.append("502")
+                        elif condition == "http_503":
+                            retry_conditions.append("503")
+                        elif condition == "http_504":
+                            retry_conditions.append("504")
+                        elif condition == "reset":
+                            retry_conditions.append("conn-failure")
+                        elif condition == "refused":
+                            retry_conditions.append("conn-failure")
+
+                    if retry_conditions:
+                        # Flatten and deduplicate
+                        all_conditions = []
+                        seen = set()
+                        for cond in retry_conditions:
+                            for part in cond.split():
+                                if part not in seen:
+                                    all_conditions.append(part)
+                                    seen.add(part)
+                        output.append(f"    retry-on {' '.join(all_conditions)}")
+                        # HAProxy uses retries for attempts
+                        output.append(f"    retries {retry.attempts}")
+                    break
+
         # Health checks
         if service.upstream and service.upstream.health_check:
             hc = service.upstream.health_check
