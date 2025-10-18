@@ -675,6 +675,12 @@ gal migrate
   - Geographic Location
 
 #### gRPC Enhancements
+- **gRPC Transformations** (Request/Response Body Manipulation)
+  - Proto Descriptor Management (.proto, .desc files)
+  - Add/Remove/Rename Protobuf fields
+  - Per-Provider Implementation (Envoy: Lua/Wasm, Kong: Plugin, APISIX: Lua, Nginx: OpenResty, HAProxy: Lua, Traefik: Middleware)
+  - Volume Mounts for Proto Files
+  - Template Variable Support ({{uuid}}, {{timestamp}})
 - **gRPC-Web Support**
 - **gRPC Transcoding** (gRPC ↔ REST)
 - **gRPC Load Balancing**
@@ -788,9 +794,9 @@ gal migrate
 
 ### Version Timeline:
 - **v1.1.0 (Q4 2025):** ✅ Released - Traffic Management & Security
-- **v1.2.0 (Q1 2026):** 🚧 In Development (33.3%) - New Providers & Features
+- **v1.2.0 (Q1 2026):** 🚧 In Development (83.3% - 5/6 Features) - New Providers & Features
 - **v1.3.0 (Q2 2026):** 🔄 Planning - Import/Migration & Portability
-- **v1.4.0 (Q3 2026):** Concept - Advanced Traffic & Multi-Cloud
+- **v1.4.0 (Q3 2026):** Concept - Advanced Traffic & Multi-Cloud + gRPC Transformations
 - **v1.5.0 (Q4 2026):** Concept - Enterprise Features & Developer UX
 - **v2.0+ (2027+):** Vision - Advanced Features & Extensibility
 
