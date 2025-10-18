@@ -7,11 +7,13 @@ from .kong import KongProvider
 from .apisix import APISIXProvider
 from .traefik import TraefikProvider
 from .nginx import NginxProvider
+from .haproxy import HAProxyProvider
 
 __all__ = [
     "EnvoyProvider",
     "KongProvider",
     "APISIXProvider",
     "TraefikProvider",
-    "NginxProvider"
+    "NginxProvider",
+    "HAProxyProvider"
 ]

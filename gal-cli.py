@@ -14,7 +14,8 @@ from gal.providers import (
     KongProvider,
     APISIXProvider,
     TraefikProvider,
-    NginxProvider
+    NginxProvider,
+    HAProxyProvider
 )
 
 # Configure logging
@@ -57,6 +58,7 @@ def generate(config, provider, output):
         manager.register_provider(APISIXProvider())
         manager.register_provider(TraefikProvider())
         manager.register_provider(NginxProvider())
+        manager.register_provider(HAProxyProvider())
 
         cfg = manager.load_config(config)
         
@@ -92,6 +94,7 @@ def validate(config):
         manager.register_provider(APISIXProvider())
         manager.register_provider(TraefikProvider())
         manager.register_provider(NginxProvider())
+        manager.register_provider(HAProxyProvider())
 
         cfg = manager.load_config(config)
         manager.validate(cfg)  # Validate with provider-specific rules
@@ -112,13 +115,14 @@ def validate(config):
 @click.option('--output-dir', '-o', default='generated', help='Output directory')
 def generate_all(config, output_dir):
     """Generate configurations for all providers"""
-    providers = ['envoy', 'kong', 'apisix', 'traefik', 'nginx']
+    providers = ['envoy', 'kong', 'apisix', 'traefik', 'nginx', 'haproxy']
     extensions = {
         'envoy': 'yaml',
         'kong': 'yaml',
         'apisix': 'json',
         'traefik': 'yaml',
-        'nginx': 'conf'
+        'nginx': 'conf',
+        'haproxy': 'cfg'
     }
     
     try:
@@ -128,6 +132,7 @@ def generate_all(config, output_dir):
         manager.register_provider(APISIXProvider())
         manager.register_provider(TraefikProvider())
         manager.register_provider(NginxProvider())
+        manager.register_provider(HAProxyProvider())
 
         cfg = manager.load_config(config)
         original_provider = cfg.provider
@@ -218,6 +223,7 @@ def list_providers():
     click.echo("  • apisix  - Apache APISIX")
     click.echo("  • traefik - Traefik")
     click.echo("  • nginx   - Nginx Open Source")
+    click.echo("  • haproxy - HAProxy Load Balancer")
 
 
 if __name__ == '__main__':
