@@ -39,8 +39,15 @@ class HAProxyProvider(Provider):
         """Return provider name."""
         return "haproxy"
 
-    def validate(self, config: Config) -> None:
-        """Validate configuration for HAProxy-specific constraints."""
+    def validate(self, config: Config) -> bool:
+        """Validate configuration for HAProxy-specific constraints.
+
+        Args:
+            config: Configuration to validate
+
+        Returns:
+            True if validation passes
+        """
         warnings = []
 
         # Check for JWT authentication
@@ -57,6 +64,9 @@ class HAProxyProvider(Provider):
         if warnings:
             for warning in warnings:
                 logger.warning(f"HAProxy validation: {warning}")
+
+        logger.debug("HAProxy validation successful")
+        return True
 
     def generate(self, config: Config) -> str:
         """Generate haproxy.cfg configuration."""
