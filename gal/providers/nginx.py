@@ -266,11 +266,21 @@ class NginxProvider(Provider):
 
         # Backend servers with passive health checks
         for target in service.upstream.targets:
-            server_line = f"        server {target.host}:{target.port}"
+            # Handle both dict and UpstreamTarget object
+            if isinstance(target, dict):
+                target_host = target.get('host')
+                target_port = target.get('port')
+                target_weight = target.get('weight', 1)
+            else:
+                target_host = target.host
+                target_port = target.port
+                target_weight = target.weight if hasattr(target, 'weight') else 1
+
+            server_line = f"        server {target_host}:{target_port}"
 
             # Weight
-            if target.weight and target.weight != 1:
-                server_line += f" weight={target.weight}"
+            if target_weight and target_weight != 1:
+                server_line += f" weight={target_weight}"
 
             # Passive health check parameters
             if service.upstream.health_check and service.upstream.health_check.passive:
@@ -548,9 +558,15 @@ class NginxProvider(Provider):
             # Use upstream block
             upstream_name = f"upstream_{service.name}"
             proxy_url = f"http://{upstream_name}"
-        else:
+        elif hasattr(service, 'host') and hasattr(service, 'port'):
             # Direct backend
             proxy_url = f"http://{service.host}:{service.port}"
+        elif service.upstream:
+            # Fallback to upstream.host/port
+            proxy_url = f"http://{service.upstream.host}:{service.upstream.port}"
+        else:
+            # Should not happen if config is valid
+            raise ValueError(f"Service {service.name} has no valid upstream configuration")
 
         output.append("            # Proxy to backend")
         output.append(f"            proxy_pass {proxy_url};")

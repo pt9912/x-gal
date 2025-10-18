@@ -9,7 +9,13 @@ import logging
 from pathlib import Path
 
 from gal.manager import Manager
-from gal.providers import EnvoyProvider, KongProvider, APISIXProvider, TraefikProvider
+from gal.providers import (
+    EnvoyProvider,
+    KongProvider,
+    APISIXProvider,
+    TraefikProvider,
+    NginxProvider
+)
 
 # Configure logging
 logger = logging.getLogger()
@@ -50,7 +56,8 @@ def generate(config, provider, output):
         manager.register_provider(KongProvider())
         manager.register_provider(APISIXProvider())
         manager.register_provider(TraefikProvider())
-        
+        manager.register_provider(NginxProvider())
+
         cfg = manager.load_config(config)
         
         if provider:
@@ -84,6 +91,7 @@ def validate(config):
         manager.register_provider(KongProvider())
         manager.register_provider(APISIXProvider())
         manager.register_provider(TraefikProvider())
+        manager.register_provider(NginxProvider())
 
         cfg = manager.load_config(config)
         manager.validate(cfg)  # Validate with provider-specific rules
@@ -104,8 +112,14 @@ def validate(config):
 @click.option('--output-dir', '-o', default='generated', help='Output directory')
 def generate_all(config, output_dir):
     """Generate configurations for all providers"""
-    providers = ['envoy', 'kong', 'apisix', 'traefik']
-    extensions = {'envoy': 'yaml', 'kong': 'yaml', 'apisix': 'json', 'traefik': 'yaml'}
+    providers = ['envoy', 'kong', 'apisix', 'traefik', 'nginx']
+    extensions = {
+        'envoy': 'yaml',
+        'kong': 'yaml',
+        'apisix': 'json',
+        'traefik': 'yaml',
+        'nginx': 'conf'
+    }
     
     try:
         manager = Manager()
@@ -113,7 +127,8 @@ def generate_all(config, output_dir):
         manager.register_provider(KongProvider())
         manager.register_provider(APISIXProvider())
         manager.register_provider(TraefikProvider())
-        
+        manager.register_provider(NginxProvider())
+
         cfg = manager.load_config(config)
         original_provider = cfg.provider
         
@@ -202,6 +217,7 @@ def list_providers():
     click.echo("  • kong    - Kong API Gateway")
     click.echo("  • apisix  - Apache APISIX")
     click.echo("  • traefik - Traefik")
+    click.echo("  • nginx   - Nginx Open Source")
 
 
 if __name__ == '__main__':
