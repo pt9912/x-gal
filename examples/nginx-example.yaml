@@ -1,0 +1,489 @@
+# ============================================================================
+# GAL Nginx Provider - Example Configuration
+# ============================================================================
+#
+# This example demonstrates Nginx Open Source configurations for various
+# use cases including load balancing, rate limiting, authentication, headers,
+# and CORS.
+#
+# Provider: nginx
+# Features: Reverse Proxy, Load Balancing, Rate Limiting, Basic Auth,
+#           Headers, CORS, Passive Health Checks
+#
+# Generation: gal generate nginx-example.yaml --provider nginx > nginx.conf
+# Testing: nginx -t -c nginx.conf
+# Running: nginx -c $(pwd)/nginx.conf
+#
+# ============================================================================
+
+version: "1.0"
+provider: nginx
+
+global:
+  host: "0.0.0.0"
+  port: 80
+  timeout: "30s"
+
+services:
+  # ===========================================================================
+  # Example 1: Basic Reverse Proxy
+  # ===========================================================================
+  # Use Case: Simple reverse proxy to backend service
+  # Features: Basic proxy_pass configuration
+  # ===========================================================================
+  - name: basic_proxy
+    type: rest
+    protocol: http
+    host: backend.internal
+    port: 8080
+
+    routes:
+      - path_prefix: /api/basic
+        methods: [GET, POST, PUT, DELETE]
+
+  # ===========================================================================
+  # Example 2: Load Balancing - Round Robin (Default)
+  # ===========================================================================
+  # Use Case: Distribute traffic evenly across multiple servers
+  # Features: Multiple upstream targets, round-robin algorithm
+  # ===========================================================================
+  - name: round_robin_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: api-1.internal
+          port: 8080
+        - host: api-2.internal
+          port: 8080
+        - host: api-3.internal
+          port: 8080
+      load_balancer:
+        algorithm: round_robin  # Default, equally distributed
+
+    routes:
+      - path_prefix: /api/roundrobin
+
+  # ===========================================================================
+  # Example 3: Load Balancing - Least Connections
+  # ===========================================================================
+  # Use Case: Route to server with fewest active connections
+  # Features: Least connections algorithm for uneven request duration
+  # ===========================================================================
+  - name: least_conn_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: api-1.internal
+          port: 8080
+        - host: api-2.internal
+          port: 8080
+      load_balancer:
+        algorithm: least_conn  # Route to server with fewest connections
+
+    routes:
+      - path_prefix: /api/leastconn
+
+  # ===========================================================================
+  # Example 4: Load Balancing - IP Hash (Sticky Sessions)
+  # ===========================================================================
+  # Use Case: Session persistence based on client IP
+  # Features: IP hash algorithm for sticky sessions
+  # ===========================================================================
+  - name: sticky_session_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: session-1.internal
+          port: 8080
+        - host: session-2.internal
+          port: 8080
+      load_balancer:
+        algorithm: ip_hash  # Same client IP → same backend server
+
+    routes:
+      - path_prefix: /api/sessions
+
+  # ===========================================================================
+  # Example 5: Load Balancing - Weighted
+  # ===========================================================================
+  # Use Case: Distribute traffic based on server capacity
+  # Features: Weighted load balancing for heterogeneous servers
+  # ===========================================================================
+  - name: weighted_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: powerful-server.internal
+          port: 8080
+          weight: 3  # Gets 75% of traffic (3/4)
+        - host: small-server.internal
+          port: 8080
+          weight: 1  # Gets 25% of traffic (1/4)
+      load_balancer:
+        algorithm: weighted
+
+    routes:
+      - path_prefix: /api/weighted
+
+  # ===========================================================================
+  # Example 6: Passive Health Checks
+  # ===========================================================================
+  # Use Case: Automatic backend failover based on real traffic
+  # Features: Passive health checks with max_fails and fail_timeout
+  # ===========================================================================
+  - name: health_check_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: api-1.internal
+          port: 8080
+        - host: api-2.internal
+          port: 8080
+      health_check:
+        passive:
+          enabled: true
+          max_failures: 3  # Mark unhealthy after 3 consecutive failures
+          unhealthy_status_codes:
+            - 500
+            - 502
+            - 503
+            - 504
+
+    routes:
+      - path_prefix: /api/healthcheck
+
+  # ===========================================================================
+  # Example 7: Rate Limiting - IP-based
+  # ===========================================================================
+  # Use Case: Protect API from abuse and DDoS
+  # Features: IP-based rate limiting with burst capacity
+  # ===========================================================================
+  - name: rate_limited_api
+    type: rest
+    protocol: http
+    host: api.internal
+    port: 8080
+
+    routes:
+      - path_prefix: /api/ratelimit
+        rate_limit:
+          enabled: true
+          requests_per_second: 100  # 100 req/s sustained
+          burst: 200                # Allow bursts up to 200 req
+          key_type: ip_address      # Limit per client IP
+          response_status: 429      # HTTP 429 Too Many Requests
+
+  # ===========================================================================
+  # Example 8: Rate Limiting - Header-based (API Key)
+  # ===========================================================================
+  # Use Case: Different rate limits per API key
+  # Features: Header-based rate limiting
+  # ===========================================================================
+  - name: api_key_limited
+    type: rest
+    protocol: http
+    host: api.internal
+    port: 8080
+
+    routes:
+      - path_prefix: /api/premium
+        rate_limit:
+          enabled: true
+          requests_per_second: 1000  # Higher limit for premium users
+          burst: 2000
+          key_type: header
+          key_header: X-API-Key  # Limit per API key
+
+  # ===========================================================================
+  # Example 9: Basic Authentication
+  # ===========================================================================
+  # Use Case: Simple username/password protection
+  # Features: HTTP Basic Authentication with htpasswd
+  # Note: Create .htpasswd file with: htpasswd -c /etc/nginx/.htpasswd admin
+  # ===========================================================================
+  - name: basic_auth_api
+    type: rest
+    protocol: http
+    host: api.internal
+    port: 8080
+
+    routes:
+      - path_prefix: /api/protected
+        authentication:
+          enabled: true
+          type: basic
+          basic_auth:
+            users:
+              admin: "password"  # Note: Use htpasswd in production
+              user: "secret"
+            realm: "Protected API Area"
+
+  # ===========================================================================
+  # Example 10: Request/Response Header Manipulation
+  # ===========================================================================
+  # Use Case: Add security headers and tracking IDs
+  # Features: Add, set, and remove headers
+  # ===========================================================================
+  - name: headers_service
+    type: rest
+    protocol: http
+    host: api.internal
+    port: 8080
+
+    routes:
+      - path_prefix: /api/headers
+        headers:
+          # Request headers (sent to backend)
+          request_add:
+            X-Request-ID: "{{uuid}}"      # Add unique request ID
+            X-Gateway: "GAL-Nginx"
+            X-Timestamp: "{{now}}"         # Add ISO8601 timestamp
+          request_set:
+            User-Agent: "GAL-Gateway/1.0"
+          request_remove:
+            - X-Internal-Token             # Remove sensitive headers
+
+          # Response headers (sent to client)
+          response_add:
+            X-Frame-Options: "DENY"
+            X-Content-Type-Options: "nosniff"
+            X-XSS-Protection: "1; mode=block"
+          response_set:
+            Server: "GAL-Gateway"
+          response_remove:
+            - X-Powered-By  # Requires ngx_headers_more module
+
+  # ===========================================================================
+  # Example 11: CORS Configuration
+  # ===========================================================================
+  # Use Case: Enable cross-origin requests for SPA/Mobile Apps
+  # Features: Full CORS configuration with preflight handling
+  # ===========================================================================
+  - name: cors_api
+    type: rest
+    protocol: http
+    host: api.internal
+    port: 8080
+
+    routes:
+      - path_prefix: /api/cors
+        cors:
+          enabled: true
+          allowed_origins:
+            - "https://app.example.com"
+            - "https://www.example.com"
+          allowed_methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - OPTIONS
+          allowed_headers:
+            - Content-Type
+            - Authorization
+            - X-API-Key
+          expose_headers:
+            - X-Request-ID
+            - X-RateLimit-Remaining
+          allow_credentials: true
+          max_age: 86400  # 24 hours preflight cache
+
+  # ===========================================================================
+  # Example 12: Combined Features - Production API
+  # ===========================================================================
+  # Use Case: Production-ready API with all security features
+  # Features: Load balancing + rate limiting + auth + headers + CORS
+  # ===========================================================================
+  - name: production_api
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: api-1.internal
+          port: 8080
+          weight: 2
+        - host: api-2.internal
+          port: 8080
+          weight: 1
+      health_check:
+        passive:
+          enabled: true
+          max_failures: 3
+      load_balancer:
+        algorithm: least_conn
+
+    routes:
+      - path_prefix: /api/v1
+        rate_limit:
+          enabled: true
+          requests_per_second: 100
+          burst: 200
+          key_type: ip_address
+
+        authentication:
+          enabled: true
+          type: basic
+          basic_auth:
+            users:
+              admin: "admin_password"
+            realm: "Production API"
+
+        headers:
+          request_add:
+            X-Request-ID: "{{uuid}}"
+            X-Gateway: "GAL"
+          response_add:
+            X-Frame-Options: "DENY"
+            X-Content-Type-Options: "nosniff"
+
+        cors:
+          enabled: true
+          allowed_origins:
+            - "https://app.example.com"
+          allowed_methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+          allow_credentials: true
+
+  # ===========================================================================
+  # Example 13: Multiple Routes per Service
+  # ===========================================================================
+  # Use Case: Different configurations for different API versions
+  # Features: Multiple routes with different rate limits
+  # ===========================================================================
+  - name: versioned_api
+    type: rest
+    protocol: http
+    host: api.internal
+    port: 8080
+
+    routes:
+      # v1 API - Legacy, lower rate limit
+      - path_prefix: /api/v1
+        rate_limit:
+          enabled: true
+          requests_per_second: 50
+          burst: 100
+
+      # v2 API - Current, higher rate limit
+      - path_prefix: /api/v2
+        rate_limit:
+          enabled: true
+          requests_per_second: 200
+          burst: 400
+
+      # v3 API - Beta, no rate limit
+      - path_prefix: /api/v3
+
+  # ===========================================================================
+  # Example 14: Microservices Architecture
+  # ===========================================================================
+  # Use Case: Multiple microservices behind single gateway
+  # Features: Multiple services with different backends
+  # ===========================================================================
+  - name: user_service
+    type: rest
+    protocol: http
+    host: user-service.internal
+    port: 8080
+    routes:
+      - path_prefix: /api/users
+
+  - name: order_service
+    type: rest
+    protocol: http
+    host: order-service.internal
+    port: 8081
+    routes:
+      - path_prefix: /api/orders
+        rate_limit:
+          enabled: true
+          requests_per_second: 50
+
+  - name: payment_service
+    type: rest
+    protocol: http
+    host: payment-service.internal
+    port: 8082
+    routes:
+      - path_prefix: /api/payments
+        authentication:
+          enabled: true
+          type: basic
+          basic_auth:
+            users:
+              admin: "secure_password"
+
+  # ===========================================================================
+  # Example 15: Static Content + API Hybrid
+  # ===========================================================================
+  # Use Case: Serve static content and proxy API requests
+  # Features: Nginx excels at serving static files
+  # Note: Static content serving requires manual nginx.conf additions
+  # ===========================================================================
+  - name: hybrid_service
+    type: rest
+    protocol: http
+    host: app-backend.internal
+    port: 8080
+
+    routes:
+      # API requests (proxied to backend)
+      - path_prefix: /api
+        rate_limit:
+          enabled: true
+          requests_per_second: 100
+
+      # WebSocket endpoint (proxied to backend)
+      - path_prefix: /ws
+
+# ===========================================================================
+# DEPLOYMENT INSTRUCTIONS
+# ===========================================================================
+#
+# 1. Generate nginx.conf:
+#    gal generate nginx-example.yaml --provider nginx > nginx.conf
+#
+# 2. Create .htpasswd for Basic Auth:
+#    htpasswd -c /etc/nginx/.htpasswd admin
+#    htpasswd /etc/nginx/.htpasswd user
+#
+# 3. Test configuration:
+#    nginx -t -c nginx.conf
+#
+# 4. Run Nginx:
+#    # Production
+#    sudo cp nginx.conf /etc/nginx/nginx.conf
+#    sudo nginx -s reload
+#
+#    # Local testing
+#    nginx -c $(pwd)/nginx.conf
+#
+# 5. Check logs:
+#    tail -f /var/log/nginx/access.log
+#    tail -f /var/log/nginx/error.log
+#
+# ===========================================================================
+# NOTES
+# ===========================================================================
+#
+# Nginx Open Source Limitations:
+# - No Active Health Checks (use Nginx Plus or passive health checks)
+# - JWT Authentication requires OpenResty/Lua
+# - API Key Authentication requires Lua or external auth
+# - Circuit Breaker requires Lua scripting
+# - Response header removal requires ngx_headers_more module
+#
+# For advanced features, consider:
+# - Nginx Plus (commercial, adds active HC, JWT, dynamic config)
+# - OpenResty (Nginx + LuaJIT, adds Lua scripting)
+# - Other GAL providers (Kong, APISIX, Traefik, Envoy)
+#
+# ===========================================================================
