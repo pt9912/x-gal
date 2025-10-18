@@ -556,7 +556,7 @@ routes:
 
 **Focus:** Import/Migration & Provider Portability
 **Status:** 🚧 In Development (siehe [docs/v1.3.0-PLAN.md](docs/v1.3.0-PLAN.md))
-**Progress:** 2/8 Features (25.0%)
+**Progress:** 3/8 Features (37.5%)
 **Estimated Effort:** 10-12 Wochen
 
 ### Mission
@@ -566,15 +566,15 @@ routes:
 ### High Priority Features
 
 #### 1. Config Import (Provider → GAL)
-**Status:** 🚧 In Development (Envoy ✅, Kong ✅ IMPLEMENTED)
-**Effort:** 8 Wochen (2/8 Wochen completed)
+**Status:** 🚧 In Development (Envoy ✅, Kong ✅, APISIX ✅ IMPLEMENTED)
+**Effort:** 8 Wochen (3/8 Wochen completed)
 
 Reverse Engineering: Provider-spezifische Configs nach GAL konvertieren.
 
 **Unterstützte Import-Formate:**
 - ✅ **Envoy** (envoy.yaml → gal-config.yaml) - **✅ IMPLEMENTED** (Commit: 652a78d)
 - ✅ **Kong** (kong.yaml/kong.json → gal-config.yaml) - **✅ IMPLEMENTED** (Commit: 93845e7)
-- 🔄 **APISIX** (apisix.json → gal-config.yaml)
+- ✅ **APISIX** (apisix.yaml/apisix.json → gal-config.yaml) - **✅ IMPLEMENTED** (Commit: 4378d95)
 - 🔄 **Traefik** (traefik.yaml → gal-config.yaml)
 - 🔄 **Nginx** (nginx.conf → gal-config.yaml)
 - 🔄 **HAProxy** (haproxy.cfg → gal-config.yaml)
@@ -662,6 +662,30 @@ class Provider(ABC):
   - ✅ YAML & JSON format support
 - **Import Warnings:** ⚠️ API keys, Basic auth credentials, JWT secrets not imported (security)
 - **Example:** See docs/v1.3.0-PLAN.md Feature 2 for detailed input/output examples
+
+**APISIX Implementation Summary (✅ COMPLETE):**
+- **Provider:** gal/providers/apisix.py:904-1292 (APISIXProvider.parse() + 15 helper methods, ~390 lines)
+- **CLI:** gal-cli.py:225-368 (import-config command - already implemented)
+- **Tests:** tests/test_import_apisix.py (22 tests, all passing ✅)
+- **Coverage:** apisix.py: 8% → 33% (improved by 25%)
+- **Supported Features:**
+  - ✅ Services & Upstreams (ID-based linking)
+  - ✅ Nodes with weights ({"host:port": weight} dict format)
+  - ✅ Load Balancing (4 algorithms: roundrobin, chash, ewma, least_conn)
+  - ✅ Active Health Checks (http_path, interval, timeout, healthy/unhealthy thresholds)
+  - ✅ Passive Health Checks (outlier detection)
+  - ✅ Rate Limiting (limit-req leaky bucket, limit-count fixed window with conversion)
+  - ✅ API Key Authentication (header-based)
+  - ✅ Basic Authentication (with security warning)
+  - ✅ JWT Authentication (with security warning)
+  - ✅ Request Header Transformation (proxy-rewrite plugin)
+  - ✅ Response Header Transformation (response-rewrite plugin)
+  - ✅ CORS (origins, methods, headers, credentials, max_age)
+  - ✅ Circuit Breaker warning (api-breaker plugin)
+  - ✅ Multiple Services & Routes
+  - ✅ YAML & JSON format support
+- **Import Warnings:** ⚠️ API keys, Basic auth credentials, JWT secrets, Circuit breaker plugin not imported (security/manual review)
+- **Example:** See docs/v1.3.0-PLAN.md Feature 3 for detailed input/output examples
 
 #### 2. Config Validation & Compatibility Checker
 **Status:** 🔄 Planned
