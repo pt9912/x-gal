@@ -23,13 +23,14 @@ Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong
 - ✅ **Strukturiertes Logging** mit konfigurierbaren Log-Levels
 - ✅ **Reines Python** - kein Go erforderlich!
 - ✅ **CI/CD Ready** - GitHub Actions Workflows integriert
-- ✅ **Umfassende Tests** - 364 Tests mit 89% Coverage
+- ✅ **Umfassende Tests** - 379 Tests mit 89% Coverage
 - 🆕 **Traffic Management** - Rate Limiting, Circuit Breaker, Health Checks & Load Balancing
 - 🆕 **Security** - Authentication (Basic, API Key, JWT), Header Manipulation, CORS
 - 🆕 **WebSocket Support** - Real-time bidirectional communication (all 6 providers)
 - 🆕 **Body Transformation** - Request/Response body manipulation with dynamic fields
 - 🆕 **Timeout & Retry** - Connection/read/send timeouts, automatic retries with exponential backoff
 - 🆕 **Logging & Observability** - Structured logging (JSON), Prometheus/OpenTelemetry metrics, log sampling, custom fields
+- 🚀 **Config Import** (v1.3.0) - Import existing Envoy configs to GAL format (`gal import-config`)
 
 ## Installation
 
@@ -201,6 +202,9 @@ python gal-cli.py validate --config CONFIG
 
 # Für alle Provider generieren
 python gal-cli.py generate-all --config CONFIG --output-dir OUTPUT
+
+# 🚀 Provider-Config zu GAL importieren (v1.3.0)
+python gal-cli.py import-config --provider envoy --input envoy.yaml --output gal-config.yaml
 
 # Konfigurationsinformationen anzeigen
 python gal-cli.py info --config CONFIG
