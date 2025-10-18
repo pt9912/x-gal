@@ -349,6 +349,8 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 | **Body Transformation** | ✅ | ✅ | ✅ | ❌ | ✅ | ⚠️ |
 | **Timeout & Retry** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
+**Note:** **Caddy** Provider wird in v1.5.0 (Q4 2026) hinzugefügt - Developer-friendly mit automatischem HTTPS!
+
 ### Medium Priority Features
 
 #### 3. WebSocket Support ✅
@@ -700,6 +702,38 @@ gal migrate
 
 ### Features
 
+#### New Provider Support
+- **Caddy Provider**
+  - Moderne Web-Server mit automatischem HTTPS
+  - Einfache Caddyfile-Konfiguration
+  - JSON-API für dynamische Konfiguration
+  - HTTP/3 Support (QUIC)
+  - Reverse Proxy & Load Balancing
+  - Automatic TLS (Let's Encrypt, ZeroSSL)
+  - Native gRPC Support
+  - File Server & Template Engine
+  - Admin API für Management
+
+**Caddy Features:**
+- ✅ Load Balancing (passive health checks, round_robin, least_conn, ip_hash)
+- ✅ Active Health Checks (HTTP/HTTPS endpoints)
+- ⚠️ Rate Limiting (requires caddy-ratelimit plugin)
+- ⚠️ Authentication (Basic auth native, JWT via plugin)
+- ✅ Header Manipulation (native header directive)
+- ✅ CORS (via header directive)
+- ✅ Timeout & Retry (dial_timeout, read_timeout, write_timeout)
+- ⚠️ Circuit Breaker (via plugin)
+- ✅ WebSocket (native support)
+- ⚠️ Body Transformation (via Caddy modules/plugins)
+
+**Why Caddy for v1.5.0:**
+- Developer Experience Focus - extrem einfache Konfiguration
+- Automatisches HTTPS - Zero-Config TLS
+- HTTP/3 Ready - moderne Protokolle
+- Plugin System - erweiterbar
+- JSON API - dynamische Rekonfiguration
+- Perfect fit für "Developer Experience" Theme
+
 #### Web UI / Dashboard
 - **Visual Config Builder**
 - **Drag & Drop Route Configuration**
@@ -797,7 +831,7 @@ gal migrate
 - **v1.2.0 (Q1 2026):** 🚧 In Development (83.3% - 5/6 Features) - New Providers & Features
 - **v1.3.0 (Q2 2026):** 🔄 Planning - Import/Migration & Portability
 - **v1.4.0 (Q3 2026):** Concept - Advanced Traffic & Multi-Cloud + gRPC Transformations
-- **v1.5.0 (Q4 2026):** Concept - Enterprise Features & Developer UX
+- **v1.5.0 (Q4 2026):** Concept - Enterprise Features & Developer UX + **Caddy Provider**
 - **v2.0+ (2027+):** Vision - Advanced Features & Extensibility
 
 ---
