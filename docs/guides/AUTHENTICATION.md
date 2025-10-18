@@ -1,35 +1,35 @@
-# Authentication Guide
+# Authentication Anleitung
 
-GAL v1.1.0 introduces comprehensive authentication support across all gateway providers. This guide explains how to configure authentication for your APIs using Basic Auth, API Keys, and JWT.
+GAL v1.1.0 führt umfassende Authentication-Unterstützung für alle Gateway-Provider ein. Diese Anleitung erklärt, wie Sie Authentication für Ihre APIs mit Basic Auth, API Keys und JWT konfigurieren.
 
-## Table of Contents
+## Inhaltsverzeichnis
 
-- [Overview](#overview)
-- [Quick Start](#quick-start)
-- [Authentication Types](#authentication-types)
+- [Übersicht](#übersicht)
+- [Schnellstart](#schnellstart)
+- [Authentication-Typen](#authentication-typen)
   - [Basic Authentication](#basic-authentication)
   - [API Key Authentication](#api-key-authentication)
   - [JWT Authentication](#jwt-authentication)
-- [Configuration Options](#configuration-options)
-- [Provider-Specific Implementations](#provider-specific-implementations)
+- [Konfigurationsoptionen](#konfigurationsoptionen)
+- [Provider-spezifische Implementierungen](#provider-spezifische-implementierungen)
 - [Best Practices](#best-practices)
 - [Testing](#testing)
 - [Troubleshooting](#troubleshooting)
-- [Migration Guide](#migration-guide)
+- [Migrationsleitfaden](#migrationsleitfaden)
 
-## Overview
+## Übersicht
 
-Authentication ensures that only authorized users can access your APIs. GAL supports three authentication methods:
+Authentication stellt sicher, dass nur autorisierte Benutzer auf Ihre APIs zugreifen können. GAL unterstützt drei Authentication-Methoden:
 
-| Type | Use Case | Security Level | Complexity |
-|------|----------|----------------|------------|
-| **Basic Auth** | Internal tools, admin panels | Medium | Low |
-| **API Key** | Service-to-service, external APIs | Medium-High | Low |
-| **JWT** | Modern web/mobile apps, microservices | High | Medium |
+| Typ | Anwendungsfall | Sicherheitslevel | Komplexität |
+|-----|----------------|------------------|-------------|
+| **Basic Auth** | Interne Tools, Admin-Panels | Mittel | Niedrig |
+| **API Key** | Service-to-Service, Externe APIs | Mittel-Hoch | Niedrig |
+| **JWT** | Moderne Web/Mobile Apps, Microservices | Hoch | Mittel |
 
-## Quick Start
+## Schnellstart
 
-### API Key Authentication (Simplest)
+### API Key Authentication (Am einfachsten)
 
 ```yaml
 services:
@@ -51,7 +51,7 @@ services:
             in_location: header
 ```
 
-**Test with curl:**
+**Test mit curl:**
 ```bash
 curl -H "X-API-Key: your-secret-key-123" http://localhost:10000/api/protected
 ```
@@ -78,7 +78,7 @@ services:
             realm: "Admin Area"
 ```
 
-**Test with curl:**
+**Test mit curl:**
 ```bash
 curl -u admin:super_secret_password http://localhost:10000/api/admin
 ```
@@ -106,18 +106,18 @@ services:
               - RS256
 ```
 
-**Test with curl:**
+**Test mit curl:**
 ```bash
 curl -H "Authorization: Bearer YOUR_JWT_TOKEN" http://localhost:10000/api/user
 ```
 
-## Authentication Types
+## Authentication-Typen
 
 ### Basic Authentication
 
-HTTP Basic Authentication uses username/password credentials transmitted in HTTP headers.
+HTTP Basic Authentication verwendet Username/Password-Credentials, die in HTTP-Headern übertragen werden.
 
-#### Configuration
+#### Konfiguration
 
 ```yaml
 authentication:
@@ -132,41 +132,41 @@ authentication:
   fail_message: "Unauthorized"
 ```
 
-#### Parameters
+#### Parameter
 
-- `users` (dict): Username to password mapping
-- `realm` (string): Authentication realm displayed in browser prompt (default: "Protected")
-- `fail_status` (int): HTTP status code for auth failures (default: 401)
-- `fail_message` (string): Error message for auth failures
+- `users` (dict): Mapping von Benutzername zu Passwort
+- `realm` (string): Authentication-Realm im Browser-Prompt angezeigt (Standard: "Protected")
+- `fail_status` (int): HTTP-Statuscode bei Auth-Fehlern (Standard: 401)
+- `fail_message` (string): Fehlermeldung bei Auth-Fehlern
 
-#### Security Considerations
+#### Sicherheitsüberlegungen
 
-⚠️ **Important Security Notes:**
-- Passwords should be hashed (e.g., bcrypt, htpasswd format) in production
-- Always use HTTPS to protect credentials in transit
-- Avoid storing plaintext passwords in configuration files
-- Consider using environment variables or secrets management
+⚠️ **Wichtige Sicherheitshinweise:**
+- Passwörter sollten in Production gehasht sein (z.B. bcrypt, htpasswd-Format)
+- Verwenden Sie immer HTTPS, um Credentials während der Übertragung zu schützen
+- Speichern Sie niemals Klartext-Passwörter in Konfigurationsdateien
+- Erwägen Sie die Verwendung von Umgebungsvariablen oder Secrets Management
 
-**Production Example with htpasswd:**
+**Production-Beispiel mit htpasswd:**
 
 ```bash
-# Generate htpasswd hash
+# Generiere htpasswd-Hash
 htpasswd -nb admin secret_password
 
-# Output: admin:$apr1$XYZ123$HASH...
+# Ausgabe: admin:$apr1$XYZ123$HASH...
 ```
 
 ```yaml
 basic_auth:
   users:
-    admin: "$apr1$XYZ123$HASH..."  # htpasswd format
+    admin: "$apr1$XYZ123$HASH..."  # htpasswd-Format
 ```
 
 ### API Key Authentication
 
-API Key authentication uses static keys passed in headers or query parameters.
+API Key Authentication verwendet statische Keys, die in Headern oder Query-Parametern übergeben werden.
 
-#### Configuration - Header-based
+#### Konfiguration - Header-basiert
 
 ```yaml
 authentication:
@@ -181,7 +181,7 @@ authentication:
     in_location: header
 ```
 
-#### Configuration - Query Parameter
+#### Konfiguration - Query Parameter
 
 ```yaml
 authentication:
@@ -194,48 +194,48 @@ authentication:
     in_location: query
 ```
 
-**Usage:**
+**Verwendung:**
 ```bash
-# Header-based
+# Header-basiert
 curl -H "X-API-Key: key_123abc" http://localhost:10000/api
 
-# Query parameter
+# Query Parameter
 curl "http://localhost:10000/api?api_key=key_123abc"
 ```
 
-#### Parameters
+#### Parameter
 
-- `keys` (list): Valid API keys
-- `key_name` (string): Header or query parameter name (default: "X-API-Key")
-- `in_location` (string): "header" or "query" (default: "header")
+- `keys` (list): Gültige API Keys
+- `key_name` (string): Header- oder Query-Parameter-Name (Standard: "X-API-Key")
+- `in_location` (string): "header" oder "query" (Standard: "header")
 
 #### Best Practices
 
-✅ **Do:**
-- Use long, random keys (minimum 32 characters)
-- Rotate keys regularly
-- Use different keys for different clients
-- Log key usage for auditing
-- Use header-based auth over query parameters (more secure)
+✅ **Empfohlen:**
+- Verwenden Sie lange, zufällige Keys (mindestens 32 Zeichen)
+- Rotieren Sie Keys regelmäßig
+- Verwenden Sie unterschiedliche Keys für verschiedene Clients
+- Loggen Sie Key-Nutzung für Auditing
+- Verwenden Sie header-basierte Auth statt Query-Parameter (sicherer)
 
-❌ **Don't:**
-- Share keys across multiple services
-- Store keys in client-side code (mobile apps, JavaScript)
-- Use predictable key patterns
-- Log keys in application logs
+❌ **Vermeiden:**
+- Keys über mehrere Services hinweg teilen
+- Keys in Client-seitigem Code speichern (Mobile Apps, JavaScript)
+- Vorhersagbare Key-Muster verwenden
+- Keys in Anwendungslogs loggen
 
-**Key Generation Example:**
+**Key-Generierungs-Beispiel:**
 ```bash
-# Generate secure random key
+# Generiere sicheren Zufalls-Key
 openssl rand -hex 32
-# Output: 64-character hexadecimal string
+# Ausgabe: 64-Zeichen Hexadezimal-String
 ```
 
 ### JWT Authentication
 
-JSON Web Tokens (JWT) provide stateless, claims-based authentication.
+JSON Web Tokens (JWT) bieten zustandslose, claims-basierte Authentication.
 
-#### Configuration
+#### Konfiguration
 
 ```yaml
 authentication:
@@ -255,32 +255,32 @@ authentication:
   fail_message: "Invalid or missing JWT token"
 ```
 
-#### Parameters
+#### Parameter
 
-- `issuer` (string): Expected JWT issuer (iss claim)
-- `audience` (string): Expected JWT audience (aud claim)
-- `jwks_uri` (string): JSON Web Key Set endpoint URL
-- `algorithms` (list): Allowed signing algorithms (default: ["RS256"])
-- `required_claims` (list): Claims that must be present in the token
+- `issuer` (string): Erwarteter JWT-Aussteller (iss Claim)
+- `audience` (string): Erwartete JWT-Audience (aud Claim)
+- `jwks_uri` (string): JSON Web Key Set Endpoint-URL
+- `algorithms` (list): Erlaubte Signatur-Algorithmen (Standard: ["RS256"])
+- `required_claims` (list): Claims, die im Token vorhanden sein müssen
 
-#### Common JWT Algorithms
+#### Gängige JWT-Algorithmen
 
-| Algorithm | Type | Use Case |
-|-----------|------|----------|
-| **RS256** | RSA | Most common, public key verification |
-| **ES256** | ECDSA | Smaller signatures, modern choice |
-| **HS256** | HMAC | Symmetric, use only for internal services |
+| Algorithmus | Typ | Anwendungsfall |
+|-------------|-----|----------------|
+| **RS256** | RSA | Am häufigsten, Public Key Verification |
+| **ES256** | ECDSA | Kleinere Signaturen, moderne Wahl |
+| **HS256** | HMAC | Symmetrisch, nur für interne Services |
 
 #### JWKS (JSON Web Key Set)
 
-GAL automatically fetches and caches public keys from the JWKS endpoint.
+GAL holt und cached automatisch Public Keys vom JWKS-Endpoint.
 
-**Example JWKS endpoint:**
+**Beispiel JWKS-Endpoint:**
 ```
 https://auth.example.com/.well-known/jwks.json
 ```
 
-**JWKS structure:**
+**JWKS-Struktur:**
 ```json
 {
   "keys": [
@@ -297,18 +297,18 @@ https://auth.example.com/.well-known/jwks.json
 
 #### JWT Claims
 
-**Standard Claims:**
-- `iss` (issuer): Token issuer URL
-- `sub` (subject): User ID or identifier
-- `aud` (audience): Intended recipient
-- `exp` (expiration): Token expiration time
-- `iat` (issued at): Token creation time
-- `nbf` (not before): Token not valid before this time
+**Standard-Claims:**
+- `iss` (issuer): Token-Aussteller-URL
+- `sub` (subject): Benutzer-ID oder Identifikator
+- `aud` (audience): Vorgesehener Empfänger
+- `exp` (expiration): Token-Ablaufzeit
+- `iat` (issued at): Token-Erstellungszeit
+- `nbf` (not before): Token nicht gültig vor dieser Zeit
 
 **Custom Claims:**
-You can add custom claims (e.g., `email`, `roles`, `permissions`) and validate them in your backend.
+Sie können Custom Claims hinzufügen (z.B. `email`, `roles`, `permissions`) und diese in Ihrem Backend validieren.
 
-#### JWT Example
+#### JWT Beispiel
 
 **JWT Header:**
 ```json
@@ -332,53 +332,53 @@ You can add custom claims (e.g., `email`, `roles`, `permissions`) and validate t
 }
 ```
 
-## Configuration Options
+## Konfigurationsoptionen
 
-### Common Options
+### Gemeinsame Optionen
 
-All authentication types share these common options:
+Alle Authentication-Typen teilen diese gemeinsamen Optionen:
 
 ```yaml
 authentication:
-  enabled: true              # Enable/disable authentication
-  type: "api_key"           # Authentication type: "basic", "api_key", "jwt"
-  fail_status: 401           # HTTP status for auth failures (default: 401)
-  fail_message: "Unauthorized"  # Error message for failures
+  enabled: true              # Authentication aktivieren/deaktivieren
+  type: "api_key"           # Authentication-Typ: "basic", "api_key", "jwt"
+  fail_status: 401           # HTTP-Status bei Auth-Fehlern (Standard: 401)
+  fail_message: "Unauthorized"  # Fehlermeldung bei Fehlern
 ```
 
-### Type-Specific Options
+### Typ-spezifische Optionen
 
 #### Basic Auth
 ```yaml
 basic_auth:
-  users:                    # Username-password mapping
+  users:                    # Username-Passwort-Mapping
     username: "password"
-  realm: "Protected"        # Authentication realm
+  realm: "Protected"        # Authentication-Realm
 ```
 
 #### API Key
 ```yaml
 api_key:
-  keys:                     # List of valid API keys
+  keys:                     # Liste gültiger API Keys
     - "key1"
     - "key2"
-  key_name: "X-API-Key"     # Header or query param name
-  in_location: "header"     # "header" or "query"
+  key_name: "X-API-Key"     # Header- oder Query-Param-Name
+  in_location: "header"     # "header" oder "query"
 ```
 
 #### JWT
 ```yaml
 jwt:
-  issuer: "https://auth.example.com"        # Token issuer
-  audience: "api.example.com"               # Token audience
-  jwks_uri: "https://auth.example.com/..."  # JWKS endpoint
-  algorithms:                               # Allowed algorithms
+  issuer: "https://auth.example.com"        # Token-Aussteller
+  audience: "api.example.com"               # Token-Audience
+  jwks_uri: "https://auth.example.com/..."  # JWKS-Endpoint
+  algorithms:                               # Erlaubte Algorithmen
     - RS256
-  required_claims:                          # Required JWT claims
+  required_claims:                          # Erforderliche JWT-Claims
     - sub
 ```
 
-### Multiple Routes with Different Auth
+### Mehrere Routes mit unterschiedlicher Auth
 
 ```yaml
 services:
@@ -389,11 +389,11 @@ services:
       host: service.local
       port: 8080
     routes:
-      # Public endpoint - no auth
+      # Öffentlicher Endpoint - keine Auth
       - path_prefix: /api/public
         methods: [GET]
 
-      # API key protected
+      # API Key geschützt
       - path_prefix: /api/protected
         methods: [GET, POST]
         authentication:
@@ -401,7 +401,7 @@ services:
           api_key:
             keys: ["key123"]
 
-      # Admin - basic auth
+      # Admin - Basic Auth
       - path_prefix: /api/admin
         methods: [GET, POST, DELETE]
         authentication:
@@ -411,25 +411,25 @@ services:
               admin: "secret"
 ```
 
-## Provider-Specific Implementations
+## Provider-spezifische Implementierungen
 
 ### Kong
 
-Kong implements authentication using native plugins.
+Kong implementiert Authentication mit nativen Plugins.
 
 **Basic Auth:**
 - Plugin: `basic-auth`
-- Features: Consumer-based authentication, credential storage
+- Features: Consumer-basierte Authentication, Credential-Speicherung
 
 **API Key:**
 - Plugin: `key-auth`
-- Features: Flexible key location (header/query), consumer association
+- Features: Flexible Key-Location (Header/Query), Consumer-Zuordnung
 
 **JWT:**
 - Plugin: `jwt`
-- Features: JWKS support, claim verification, RS256/ES256/HS256
+- Features: JWKS-Support, Claim-Verifizierung, RS256/ES256/HS256
 
-**Generated Config Example:**
+**Generiertes Config-Beispiel:**
 ```yaml
 services:
   - name: test_service
@@ -445,21 +445,21 @@ services:
 
 ### APISIX
 
-APISIX implements authentication using plugins with JSON configuration.
+APISIX implementiert Authentication mit Plugins und JSON-Konfiguration.
 
 **Basic Auth:**
 - Plugin: `basic-auth`
-- Features: Consumer-based, flexible configuration
+- Features: Consumer-basiert, flexible Konfiguration
 
 **API Key:**
 - Plugin: `key-auth`
-- Features: Header and query parameter support
+- Features: Header- und Query-Parameter-Support
 
 **JWT:**
 - Plugin: `jwt-auth`
-- Features: Algorithm selection, issuer/audience validation
+- Features: Algorithmus-Auswahl, Issuer/Audience-Validierung
 
-**Generated Config Example:**
+**Generiertes Config-Beispiel:**
 ```json
 {
   "routes": [
@@ -477,24 +477,24 @@ APISIX implements authentication using plugins with JSON configuration.
 
 ### Traefik
 
-Traefik implements authentication using middleware.
+Traefik implementiert Authentication mit Middleware.
 
 **Basic Auth:**
 - Middleware: `basicAuth`
-- Features: Users list, realm configuration
-- Note: Use htpasswd format for production
+- Features: Benutzerliste, Realm-Konfiguration
+- Hinweis: Verwenden Sie htpasswd-Format für Production
 
 **API Key:**
 - Middleware: `forwardAuth`
-- Features: External validation service
-- Note: Requires external API key validator
+- Features: Externer Validierungsservice
+- Hinweis: Benötigt externen API-Key-Validator
 
 **JWT:**
 - Middleware: `forwardAuth`
-- Features: External JWT validation service
-- Note: Requires external JWT validator
+- Features: Externer JWT-Validierungsservice
+- Hinweis: Benötigt externen JWT-Validator
 
-**Generated Config Example:**
+**Generiertes Config-Beispiel:**
 ```yaml
 http:
   middlewares:
@@ -507,24 +507,24 @@ http:
 
 ### Envoy
 
-Envoy implements authentication using HTTP filters.
+Envoy implementiert Authentication mit HTTP-Filtern.
 
 **Basic Auth:**
 - Filter: `envoy.filters.http.lua`
-- Features: Inline Lua validation
-- Note: Production requires external auth service
+- Features: Inline Lua-Validierung
+- Hinweis: Production benötigt externen Auth-Service
 
 **API Key:**
 - Filter: `envoy.filters.http.lua`
-- Features: Header validation via Lua
-- Note: Production requires external validation
+- Features: Header-Validierung via Lua
+- Hinweis: Production benötigt externe Validierung
 
 **JWT:**
 - Filter: `envoy.filters.http.jwt_authn`
-- Features: Full JWT validation, JWKS support, native RS256/ES256
-- Note: Most robust JWT implementation
+- Features: Vollständige JWT-Validierung, JWKS-Support, natives RS256/ES256
+- Hinweis: Robusteste JWT-Implementierung
 
-**Generated Config Example:**
+**Generiertes Config-Beispiel:**
 ```yaml
 http_filters:
   - name: envoy.filters.http.jwt_authn
@@ -542,123 +542,123 @@ http_filters:
 
 ## Best Practices
 
-### General Security
+### Allgemeine Sicherheit
 
-1. **Always use HTTPS in production**
-   - Protects credentials and tokens in transit
-   - Required for Basic Auth and API Keys
-   - Recommended for all authentication types
+1. **Verwenden Sie immer HTTPS in Production**
+   - Schützt Credentials und Tokens während der Übertragung
+   - Erforderlich für Basic Auth und API Keys
+   - Empfohlen für alle Authentication-Typen
 
-2. **Use strong credentials**
-   - Passwords: Minimum 12 characters, mixed case, special characters
-   - API Keys: Minimum 32 characters, cryptographically random
-   - JWT secrets: Minimum 256 bits for HS256
+2. **Verwenden Sie starke Credentials**
+   - Passwörter: Mindestens 12 Zeichen, gemischte Groß-/Kleinschreibung, Sonderzeichen
+   - API Keys: Mindestens 32 Zeichen, kryptographisch zufällig
+   - JWT-Secrets: Mindestens 256 Bits für HS256
 
-3. **Rotate credentials regularly**
-   - API Keys: Every 90 days
-   - JWT signing keys: Every 6-12 months
-   - Passwords: Every 90 days or on compromise
+3. **Rotieren Sie Credentials regelmäßig**
+   - API Keys: Alle 90 Tage
+   - JWT-Signatur-Keys: Alle 6-12 Monate
+   - Passwörter: Alle 90 Tage oder bei Kompromittierung
 
-4. **Implement rate limiting**
-   - Combine authentication with rate limiting
-   - Protect against brute force attacks
-   - Use per-user or per-key limits
+4. **Implementieren Sie Rate Limiting**
+   - Kombinieren Sie Authentication mit Rate Limiting
+   - Schutz vor Brute-Force-Angriffen
+   - Verwenden Sie per-User- oder per-Key-Limits
 
-### Authentication Type Selection
+### Authentication-Typ-Auswahl
 
-**Use Basic Auth when:**
-- Internal tools and admin interfaces
-- Small number of known users
-- Simplicity is more important than advanced features
+**Verwenden Sie Basic Auth wenn:**
+- Interne Tools und Admin-Interfaces
+- Kleine Anzahl bekannter Benutzer
+- Einfachheit wichtiger als erweiterte Features
 
-**Use API Key when:**
-- Service-to-service communication
-- External API access for partners
-- Simple credential management needed
+**Verwenden Sie API Key wenn:**
+- Service-to-Service-Kommunikation
+- Externer API-Zugriff für Partner
+- Einfaches Credential-Management benötigt
 
-**Use JWT when:**
-- Modern web or mobile applications
-- Microservices architecture
-- Stateless authentication required
-- Short-lived tokens needed
-- Claims-based authorization required
+**Verwenden Sie JWT wenn:**
+- Moderne Web- oder Mobile-Anwendungen
+- Microservices-Architektur
+- Zustandslose Authentication erforderlich
+- Kurzlebige Tokens benötigt
+- Claims-basierte Authorization erforderlich
 
-### Production Considerations
+### Production-Überlegungen
 
-1. **Never hardcode credentials**
+1. **Niemals Credentials hardcoden**
    ```yaml
-   # Bad - hardcoded in config
+   # Schlecht - hardcoded in Config
    users:
      admin: "password123"
 
-   # Good - use environment variables
+   # Gut - Umgebungsvariablen verwenden
    users:
      admin: "${ADMIN_PASSWORD}"
    ```
 
-2. **Use secrets management**
+2. **Verwenden Sie Secrets Management**
    - HashiCorp Vault
    - AWS Secrets Manager
    - Kubernetes Secrets
    - Azure Key Vault
 
-3. **Implement proper logging**
-   - Log authentication attempts (success and failure)
-   - Don't log credentials or tokens
-   - Monitor for suspicious patterns
+3. **Implementieren Sie korrektes Logging**
+   - Loggen Sie Authentication-Versuche (Erfolg und Fehler)
+   - Loggen Sie keine Credentials oder Tokens
+   - Überwachen Sie verdächtige Muster
 
-4. **Add monitoring and alerting**
-   - Track authentication failure rates
-   - Alert on unusual patterns
-   - Monitor token expiration and rotation
+4. **Fügen Sie Monitoring und Alerting hinzu**
+   - Tracken Sie Authentication-Fehlerquoten
+   - Alarmieren bei ungewöhnlichen Mustern
+   - Überwachen Sie Token-Ablauf und Rotation
 
 ## Testing
 
 ### Testing Basic Auth
 
 ```bash
-# Valid credentials
+# Gültige Credentials
 curl -u admin:secret http://localhost:10000/api/admin
-# Expected: 200 OK
+# Erwartet: 200 OK
 
-# Invalid credentials
+# Ungültige Credentials
 curl -u admin:wrong http://localhost:10000/api/admin
-# Expected: 401 Unauthorized
+# Erwartet: 401 Unauthorized
 
-# Missing credentials
+# Fehlende Credentials
 curl http://localhost:10000/api/admin
-# Expected: 401 Unauthorized
+# Erwartet: 401 Unauthorized
 ```
 
 ### Testing API Key Auth
 
 ```bash
-# Valid API key in header
+# Gültiger API Key im Header
 curl -H "X-API-Key: key_123abc" http://localhost:10000/api/protected
-# Expected: 200 OK
+# Erwartet: 200 OK
 
-# Valid API key in query parameter
+# Gültiger API Key im Query-Parameter
 curl "http://localhost:10000/api/protected?api_key=key_123abc"
-# Expected: 200 OK
+# Erwartet: 200 OK
 
-# Invalid API key
+# Ungültiger API Key
 curl -H "X-API-Key: invalid_key" http://localhost:10000/api/protected
-# Expected: 401 Unauthorized
+# Erwartet: 401 Unauthorized
 
-# Missing API key
+# Fehlender API Key
 curl http://localhost:10000/api/protected
-# Expected: 401 Unauthorized
+# Erwartet: 401 Unauthorized
 ```
 
 ### Testing JWT Auth
 
-First, generate a test JWT token at https://jwt.io or using a library:
+Generieren Sie zuerst einen Test-JWT-Token auf https://jwt.io oder mit einer Bibliothek:
 
 ```python
 import jwt
 import time
 
-# Generate JWT
+# Generiere JWT
 payload = {
     "iss": "https://auth.example.com",
     "sub": "user123",
@@ -667,148 +667,148 @@ payload = {
     "iat": int(time.time())
 }
 
-# Use your private key
+# Verwenden Sie Ihren Private Key
 token = jwt.encode(payload, private_key, algorithm="RS256")
 ```
 
 ```bash
-# Valid JWT token
+# Gültiger JWT Token
 curl -H "Authorization: Bearer YOUR_JWT_TOKEN" http://localhost:10000/api/user
-# Expected: 200 OK
+# Erwartet: 200 OK
 
-# Invalid JWT token
+# Ungültiger JWT Token
 curl -H "Authorization: Bearer invalid.token.here" http://localhost:10000/api/user
-# Expected: 401 Unauthorized
+# Erwartet: 401 Unauthorized
 
-# Missing Authorization header
+# Fehlender Authorization-Header
 curl http://localhost:10000/api/user
-# Expected: 401 Unauthorized
+# Erwartet: 401 Unauthorized
 
-# Expired token
+# Abgelaufener Token
 curl -H "Authorization: Bearer EXPIRED_TOKEN" http://localhost:10000/api/user
-# Expected: 401 Unauthorized
+# Erwartet: 401 Unauthorized
 ```
 
-### Load Testing with Authentication
+### Load Testing mit Authentication
 
 ```bash
-# Apache Bench with API key
+# Apache Bench mit API Key
 ab -n 1000 -c 10 -H "X-API-Key: key_123abc" http://localhost:10000/api/protected
 
-# wrk with JWT
+# wrk mit JWT
 wrk -t4 -c100 -d30s -H "Authorization: Bearer YOUR_JWT" http://localhost:10000/api/user
 ```
 
 ## Troubleshooting
 
-### Common Issues
+### Häufige Probleme
 
-#### 1. 401 Unauthorized with correct credentials
+#### 1. 401 Unauthorized trotz korrekter Credentials
 
-**Symptom:** Authentication fails even with correct credentials
+**Symptom:** Authentication schlägt fehl trotz korrekter Credentials
 
-**Possible causes:**
-- Credentials not properly configured in gateway
-- Typo in username/password/key
-- Wrong authentication type configured
-- Case sensitivity issues
+**Mögliche Ursachen:**
+- Credentials nicht korrekt im Gateway konfiguriert
+- Tippfehler in Username/Passwort/Key
+- Falscher Authentication-Typ konfiguriert
+- Groß-/Kleinschreibungsprobleme
 
-**Solution:**
+**Lösung:**
 ```bash
-# Check generated config
+# Prüfe generierte Config
 python gal-cli.py generate -f examples/authentication-test.yaml
 
-# Verify credentials in output
-# For Basic Auth, check users section
-# For API Key, check keys list
-# For JWT, verify issuer/audience
+# Verifiziere Credentials in Ausgabe
+# Für Basic Auth, prüfe users-Sektion
+# Für API Key, prüfe keys-Liste
+# Für JWT, verifiziere issuer/audience
 ```
 
-#### 2. JWT validation fails
+#### 2. JWT-Validierung schlägt fehl
 
-**Symptom:** Valid JWT tokens are rejected
+**Symptom:** Gültige JWT-Tokens werden abgelehnt
 
-**Possible causes:**
-- Incorrect issuer or audience
-- JWKS endpoint unreachable
-- Token expired
-- Algorithm mismatch
-- Required claims missing
+**Mögliche Ursachen:**
+- Falscher Issuer oder Audience
+- JWKS-Endpoint nicht erreichbar
+- Token abgelaufen
+- Algorithmus-Mismatch
+- Erforderliche Claims fehlen
 
-**Solution:**
+**Lösung:**
 ```bash
-# Verify JWT at jwt.io
-# Check issuer matches configuration
-# Verify JWKS endpoint is accessible
+# Verifiziere JWT auf jwt.io
+# Prüfe ob Issuer mit Konfiguration übereinstimmt
+# Verifiziere JWKS-Endpoint ist erreichbar
 curl https://auth.example.com/.well-known/jwks.json
 
-# Check token expiration
-# Verify algorithm in JWT header matches config
+# Prüfe Token-Ablauf
+# Verifiziere Algorithmus im JWT-Header stimmt mit Config überein
 ```
 
-#### 3. API key not recognized
+#### 3. API Key wird nicht erkannt
 
-**Symptom:** API key in header/query is not validated
+**Symptom:** API Key im Header/Query wird nicht validiert
 
-**Possible causes:**
-- Key name mismatch (case sensitive)
-- Location mismatch (header vs query)
-- Key not in configured keys list
-- Special characters in key causing parsing issues
+**Mögliche Ursachen:**
+- Key-Name-Mismatch (case-sensitive)
+- Location-Mismatch (header vs query)
+- Key nicht in konfigurierter Keys-Liste
+- Sonderzeichen im Key verursachen Parsing-Probleme
 
-**Solution:**
+**Lösung:**
 ```yaml
-# Verify configuration
+# Verifiziere Konfiguration
 authentication:
   type: api_key
   api_key:
-    key_name: X-API-Key  # Must match exactly (case-sensitive)
-    in_location: header   # Must match request location
+    key_name: X-API-Key  # Muss exakt übereinstimmen (case-sensitive)
+    in_location: header   # Muss mit Request-Location übereinstimmen
     keys:
-      - "your_actual_key"  # Must match exactly
+      - "your_actual_key"  # Muss exakt übereinstimmen
 ```
 
-#### 4. Basic Auth prompts not appearing
+#### 4. Basic Auth Prompts erscheinen nicht
 
-**Symptom:** Browser doesn't show authentication prompt
+**Symptom:** Browser zeigt keinen Authentication-Prompt
 
-**Possible causes:**
-- Incorrect realm configuration
-- Previous cached credentials
-- Browser security settings
+**Mögliche Ursachen:**
+- Falsche Realm-Konfiguration
+- Vorher gecachte Credentials
+- Browser-Sicherheitseinstellungen
 
-**Solution:**
-- Clear browser cache and cookies
-- Test with curl first
-- Verify realm is configured correctly
+**Lösung:**
+- Browser-Cache und Cookies löschen
+- Zuerst mit curl testen
+- Verifizieren, dass Realm korrekt konfiguriert ist
 
-#### 5. JWKS fetch failures (Envoy)
+#### 5. JWKS Fetch-Fehler (Envoy)
 
-**Symptom:** Envoy cannot fetch JWKS
+**Symptom:** Envoy kann JWKS nicht abrufen
 
-**Possible causes:**
-- JWKS cluster not configured
-- DNS resolution failure
-- HTTPS certificate validation failure
-- Network connectivity issues
+**Mögliche Ursachen:**
+- JWKS-Cluster nicht konfiguriert
+- DNS-Auflösungsfehler
+- HTTPS-Zertifikat-Validierungsfehler
+- Netzwerkverbindungsprobleme
 
-**Solution:**
-- Verify JWKS URL is accessible
-- Check cluster configuration includes TLS settings
-- Test JWKS endpoint manually:
+**Lösung:**
+- Verifizieren Sie, dass JWKS-URL erreichbar ist
+- Prüfen Sie, dass Cluster-Konfiguration TLS-Einstellungen enthält
+- Testen Sie JWKS-Endpoint manuell:
 ```bash
 curl https://auth.example.com/.well-known/jwks.json
 ```
 
-### Debug Mode
+### Debug-Modus
 
-Enable debug logging for troubleshooting:
+Aktivieren Sie Debug-Logging für Troubleshooting:
 
 ```bash
-# Generate config with verbose output
+# Generiere Config mit ausführlicher Ausgabe
 python gal-cli.py generate -f config.yaml --verbose
 
-# Check gateway logs
+# Prüfe Gateway-Logs
 # Kong
 docker logs <kong-container>
 
@@ -822,34 +822,34 @@ docker logs <traefik-container>
 docker logs <envoy-container>
 ```
 
-## Migration Guide
+## Migrationsleitfaden
 
-### From v1.0.0 to v1.1.0
+### Von v1.0.0 zu v1.1.0
 
-Authentication is a new feature in v1.1.0. Existing configurations without authentication will continue to work.
+Authentication ist ein neues Feature in v1.1.0. Bestehende Konfigurationen ohne Authentication funktionieren weiterhin.
 
-**Adding authentication to existing routes:**
+**Authentication zu bestehenden Routes hinzufügen:**
 
 ```yaml
-# Before (v1.0.0)
+# Vorher (v1.0.0)
 routes:
   - path_prefix: /api/users
     methods: [GET, POST]
 
-# After (v1.1.0)
+# Nachher (v1.1.0)
 routes:
   - path_prefix: /api/users
     methods: [GET, POST]
-    authentication:  # New field
+    authentication:  # Neues Feld
       enabled: true
       type: api_key
       api_key:
         keys: ["your_key"]
 ```
 
-### Combining with Rate Limiting
+### Kombination mit Rate Limiting
 
-Authentication and rate limiting work together seamlessly:
+Authentication und Rate Limiting funktionieren nahtlos zusammen:
 
 ```yaml
 routes:
@@ -862,26 +862,26 @@ routes:
       enabled: true
       requests_per_second: 1000
       key_type: jwt_claim
-      key_claim: sub  # Rate limit per JWT subject
+      key_claim: sub  # Rate Limit pro JWT-Subject
 ```
 
-## Advanced Topics
+## Erweiterte Themen
 
-### Multi-tenancy with JWT Claims
+### Multi-Tenancy mit JWT Claims
 
-Use JWT claims for multi-tenant rate limiting:
+Verwenden Sie JWT Claims für Multi-Tenant Rate Limiting:
 
 ```yaml
 rate_limit:
   enabled: true
   key_type: jwt_claim
-  key_claim: tenant_id  # Custom claim
+  key_claim: tenant_id  # Custom Claim
   requests_per_second: 100
 ```
 
 ### OAuth 2.0 Integration
 
-GAL JWT support works with any OAuth 2.0 / OIDC provider:
+GAL JWT-Support funktioniert mit jedem OAuth 2.0 / OIDC-Provider:
 
 - Auth0
 - Okta
@@ -890,7 +890,7 @@ GAL JWT support works with any OAuth 2.0 / OIDC provider:
 - Azure AD
 - Google Cloud Identity
 
-Configure the JWKS endpoint from your OAuth provider:
+Konfigurieren Sie den JWKS-Endpoint von Ihrem OAuth-Provider:
 
 ```yaml
 jwt:
@@ -901,22 +901,22 @@ jwt:
 
 ### Custom Authentication
 
-For custom authentication requirements not covered by built-in types:
+Für Custom-Authentication-Anforderungen, die nicht von eingebauten Typen abgedeckt werden:
 
-1. **Traefik**: Use forwardAuth middleware with custom validation service
-2. **Envoy**: Use ext_authz filter with custom gRPC/HTTP service
-3. **Kong**: Develop custom plugin
-4. **APISIX**: Use serverless plugin with Lua code
+1. **Traefik**: Verwenden Sie forwardAuth Middleware mit Custom-Validierungsservice
+2. **Envoy**: Verwenden Sie ext_authz Filter mit Custom gRPC/HTTP-Service
+3. **Kong**: Entwickeln Sie Custom Plugin
+4. **APISIX**: Verwenden Sie Serverless Plugin mit Lua-Code
 
-## Summary
+## Zusammenfassung
 
-GAL v1.1.0 provides comprehensive authentication support:
+GAL v1.1.0 bietet umfassende Authentication-Unterstützung:
 
-✅ Three authentication types: Basic, API Key, JWT
-✅ All four gateway providers supported
-✅ Per-route authentication configuration
-✅ Combine with rate limiting
-✅ Production-ready JWT with JWKS support
-✅ Flexible credential management
+✅ Drei Authentication-Typen: Basic, API Key, JWT
+✅ Alle vier Gateway-Provider unterstützt
+✅ Per-Route Authentication-Konfiguration
+✅ Kombination mit Rate Limiting
+✅ Production-ready JWT mit JWKS-Support
+✅ Flexibles Credential-Management
 
-For questions or issues, visit: https://github.com/your-org/gal/issues
+Für Fragen oder Probleme, besuchen Sie: https://github.com/pt9912/x-gal/issues
