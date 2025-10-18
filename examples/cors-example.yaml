@@ -1,0 +1,427 @@
+# GAL CORS (Cross-Origin Resource Sharing) Example Configuration
+#
+# This example demonstrates all CORS capabilities:
+# - Single-Page Application (SPA) CORS
+# - Multiple allowed origins
+# - Public API without credentials
+# - API with custom headers
+# - Combined with authentication and rate limiting
+# - Development vs. production configurations
+# - Mobile app origins
+# - WebSocket CORS
+#
+# Compatible with all providers: Kong, APISIX, Traefik, Envoy
+
+version: "1.0"
+provider: kong  # Change to: kong, apisix, traefik, or envoy
+
+global:
+  host: 0.0.0.0
+  port: 10000
+  admin_port: 9901
+  timeout: 30s
+
+services:
+  # 1. Single-Page Application (SPA) - Most common use case
+  - name: spa_backend
+    type: rest
+    protocol: http
+    upstream:
+      host: api.example.com
+      port: 8080
+    routes:
+      - path_prefix: /api/v1
+        methods: [GET, POST, PUT, DELETE, OPTIONS]
+        cors:
+          enabled: true
+          # Allow specific frontend domain
+          allowed_origins:
+            - "https://app.example.com"
+          # Allow common HTTP methods
+          allowed_methods:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - OPTIONS
+          # Allow common headers
+          allowed_headers:
+            - Content-Type
+            - Authorization
+            - X-Requested-With
+          # Expose custom headers to browser
+          expose_headers:
+            - X-Request-ID
+            - X-Response-Time
+          # Allow cookies and auth headers
+          allow_credentials: true
+          # Cache preflight for 24 hours
+          max_age: 86400
+
+  # 2. Multiple Frontend Domains - For multi-domain applications
+  - name: multi_domain_api
+    type: rest
+    protocol: http
+    upstream:
+      host: api.backend.com
+      port: 8080
+    routes:
+      - path_prefix: /api/users
+        methods: [GET, POST, OPTIONS]
+        cors:
+          enabled: true
+          # Multiple allowed origins
+          allowed_origins:
+            - "https://app.example.com"        # Main application
+            - "https://admin.example.com"      # Admin panel
+            - "https://mobile.example.com"     # Mobile web app
+            - "https://beta.example.com"       # Beta testing
+          allowed_methods: [GET, POST, PUT, DELETE, OPTIONS]
+          allowed_headers: [Content-Type, Authorization]
+          allow_credentials: true
+
+  # 3. Public API - No credentials, open access
+  - name: public_api
+    type: rest
+    protocol: http
+    upstream:
+      host: public.api.com
+      port: 8080
+    routes:
+      - path_prefix: /api/public
+        methods: [GET, OPTIONS]
+        cors:
+          enabled: true
+          # Allow all origins (OK for public APIs)
+          allowed_origins: ["*"]
+          # Read-only methods
+          allowed_methods: [GET, OPTIONS]
+          # Minimal headers
+          allowed_headers: [Content-Type]
+          # NO credentials for public API!
+          allow_credentials: false
+          # Shorter cache for public APIs
+          max_age: 3600  # 1 hour
+
+  # 4. API with Custom Headers - For APIs with custom authentication
+  - name: api_with_custom_headers
+    type: rest
+    protocol: http
+    upstream:
+      host: custom.api.com
+      port: 8080
+    routes:
+      - path_prefix: /api/secure
+        methods: [GET, POST, OPTIONS]
+        cors:
+          enabled: true
+          allowed_origins: ["https://app.example.com"]
+          allowed_methods: [GET, POST, PUT, DELETE, OPTIONS]
+          # Allow custom headers
+          allowed_headers:
+            - Content-Type
+            - Authorization
+            - X-API-Key          # Custom API key header
+            - X-Client-ID        # Custom client identifier
+            - X-Request-ID       # Custom request tracking
+          # Expose rate limit headers
+          expose_headers:
+            - X-RateLimit-Limit
+            - X-RateLimit-Remaining
+            - X-RateLimit-Reset
+          allow_credentials: true
+
+  # 5. CORS with Authentication - Protected endpoints
+  - name: protected_api
+    type: rest
+    protocol: http
+    upstream:
+      host: protected.example.com
+      port: 8080
+    routes:
+      - path_prefix: /api/protected
+        methods: [GET, POST, OPTIONS]
+
+        # CORS Configuration
+        cors:
+          enabled: true
+          allowed_origins: ["https://app.example.com"]
+          allowed_methods: [GET, POST, PUT, DELETE, OPTIONS]
+          allowed_headers: [Content-Type, Authorization]
+          allow_credentials: true
+
+        # JWT Authentication
+        authentication:
+          enabled: true
+          type: jwt
+          jwt:
+            issuer: "https://auth.example.com"
+            audience: "api.example.com"
+            jwks_uri: "https://auth.example.com/.well-known/jwks.json"
+            algorithms: [RS256]
+
+  # 6. CORS + Rate Limiting + Authentication - Full stack
+  - name: enterprise_api
+    type: rest
+    protocol: http
+    upstream:
+      host: enterprise.api.com
+      port: 8080
+    routes:
+      - path_prefix: /api/enterprise
+        methods: [GET, POST, PUT, DELETE, OPTIONS]
+
+        # CORS
+        cors:
+          enabled: true
+          allowed_origins:
+            - "https://app.example.com"
+            - "https://enterprise.example.com"
+          allowed_methods: [GET, POST, PUT, DELETE, OPTIONS]
+          allowed_headers: [Content-Type, Authorization, X-API-Key]
+          expose_headers: [X-Request-ID, X-RateLimit-Remaining]
+          allow_credentials: true
+          max_age: 86400
+
+        # Rate Limiting
+        rate_limit:
+          enabled: true
+          requests_per_second: 100
+          burst: 200
+          key_type: header
+          key_header: X-API-Key
+
+        # API Key Authentication
+        authentication:
+          enabled: true
+          type: api_key
+          api_key:
+            keys: ["enterprise-key-123", "enterprise-key-456"]
+            key_name: X-API-Key
+            in_location: header
+
+  # 7. Development vs Production - Different configurations
+  - name: environment_aware_api
+    type: rest
+    protocol: http
+    upstream:
+      host: env.api.com
+      port: 8080
+    routes:
+      # Development endpoint - permissive CORS
+      - path_prefix: /api/dev
+        methods: [GET, POST, PUT, DELETE, OPTIONS]
+        cors:
+          enabled: true
+          allowed_origins: ["*"]  # Allow all in development
+          allowed_methods: [GET, POST, PUT, DELETE, OPTIONS]
+          allowed_headers: [Content-Type, Authorization, X-Debug-Mode]
+          allow_credentials: false  # No credentials with wildcard
+          max_age: 3600
+
+      # Production endpoint - strict CORS
+      - path_prefix: /api/prod
+        methods: [GET, POST, PUT, DELETE, OPTIONS]
+        cors:
+          enabled: true
+          allowed_origins:
+            - "https://app.example.com"
+            - "https://www.example.com"
+          allowed_methods: [GET, POST, PUT, DELETE, OPTIONS]
+          allowed_headers: [Content-Type, Authorization]
+          expose_headers: [X-Request-ID]
+          allow_credentials: true
+          max_age: 86400
+
+  # 8. Mobile App Origins - Including mobile-specific origins
+  - name: mobile_api
+    type: rest
+    protocol: http
+    upstream:
+      host: mobile.api.com
+      port: 8080
+    routes:
+      - path_prefix: /api/mobile
+        methods: [GET, POST, OPTIONS]
+        cors:
+          enabled: true
+          allowed_origins:
+            # Web application
+            - "https://app.example.com"
+            # Capacitor iOS
+            - "capacitor://localhost"
+            # Capacitor Android
+            - "http://localhost"
+            # Ionic Dev Server
+            - "http://localhost:8100"
+            # React Native
+            - "http://localhost:19006"
+          allowed_methods: [GET, POST, PUT, DELETE, OPTIONS]
+          allowed_headers:
+            - Content-Type
+            - Authorization
+            - X-Device-ID
+            - X-App-Version
+          allow_credentials: true
+
+  # 9. GraphQL API - CORS for GraphQL endpoints
+  - name: graphql_api
+    type: rest
+    protocol: http
+    upstream:
+      host: graphql.example.com
+      port: 8080
+    routes:
+      - path_prefix: /graphql
+        methods: [GET, POST, OPTIONS]
+        cors:
+          enabled: true
+          allowed_origins: ["https://app.example.com"]
+          allowed_methods: [GET, POST, OPTIONS]
+          allowed_headers:
+            - Content-Type
+            - Authorization
+            - X-Apollo-Tracing        # Apollo-specific
+            - X-GraphQL-Client-Name   # Client identification
+            - X-GraphQL-Client-Version
+          expose_headers:
+            - X-GraphQL-Complexity    # Query complexity
+          allow_credentials: true
+
+  # 10. WebSocket API - CORS for WebSocket connections
+  - name: websocket_api
+    type: rest
+    protocol: http
+    upstream:
+      host: ws.example.com
+      port: 8080
+    routes:
+      - path_prefix: /ws
+        methods: [GET, OPTIONS]  # WebSocket uses GET for upgrade
+        cors:
+          enabled: true
+          allowed_origins: ["https://app.example.com"]
+          allowed_methods: [GET, OPTIONS]
+          allowed_headers:
+            - Content-Type
+            - Authorization
+            - Sec-WebSocket-Protocol
+            - Sec-WebSocket-Extensions
+          allow_credentials: true
+
+  # 11. File Upload API - Large max_age for file uploads
+  - name: upload_api
+    type: rest
+    protocol: http
+    upstream:
+      host: upload.example.com
+      port: 8080
+    routes:
+      - path_prefix: /api/upload
+        methods: [POST, OPTIONS]
+        cors:
+          enabled: true
+          allowed_origins: ["https://app.example.com"]
+          allowed_methods: [POST, OPTIONS]
+          allowed_headers:
+            - Content-Type
+            - Authorization
+            - X-File-Name
+            - X-File-Size
+          expose_headers:
+            - X-Upload-ID
+            - X-Upload-Progress
+          allow_credentials: true
+          max_age: 86400  # Cache preflight for 24h
+
+  # 12. Third-Party Integration - Allow partner domains
+  - name: integration_api
+    type: rest
+    protocol: http
+    upstream:
+      host: integration.example.com
+      port: 8080
+    routes:
+      - path_prefix: /api/integration
+        methods: [GET, POST, OPTIONS]
+        cors:
+          enabled: true
+          allowed_origins:
+            - "https://app.example.com"       # Own domain
+            - "https://partner1.example.com"  # Partner 1
+            - "https://partner2.example.com"  # Partner 2
+          allowed_methods: [GET, POST, OPTIONS]
+          allowed_headers:
+            - Content-Type
+            - Authorization
+            - X-Integration-Key
+          expose_headers:
+            - X-Integration-Version
+          allow_credentials: true
+
+  # 13. Analytics API - High-frequency requests
+  - name: analytics_api
+    type: rest
+    protocol: http
+    upstream:
+      host: analytics.example.com
+      port: 8080
+    routes:
+      - path_prefix: /api/analytics
+        methods: [POST, OPTIONS]
+        cors:
+          enabled: true
+          allowed_origins:
+            - "https://app.example.com"
+            - "https://www.example.com"
+          allowed_methods: [POST, OPTIONS]
+          allowed_headers:
+            - Content-Type
+            - X-Analytics-Session-ID
+          # No credentials for analytics
+          allow_credentials: false
+          # Longer cache for high-frequency requests
+          max_age: 86400
+
+  # 14. Admin API - Restricted CORS for admin panel
+  - name: admin_api
+    type: rest
+    protocol: http
+    upstream:
+      host: admin.backend.com
+      port: 8080
+    routes:
+      - path_prefix: /api/admin
+        methods: [GET, POST, PUT, DELETE, OPTIONS]
+        cors:
+          enabled: true
+          # Only admin domain allowed
+          allowed_origins:
+            - "https://admin.example.com"
+          allowed_methods: [GET, POST, PUT, DELETE, OPTIONS]
+          allowed_headers:
+            - Content-Type
+            - Authorization
+            - X-Admin-Token
+          expose_headers:
+            - X-Request-ID
+            - X-Audit-ID
+          allow_credentials: true
+          # Shorter cache for admin endpoints
+          max_age: 3600
+
+  # 15. Disabled CORS - Example of disabled CORS
+  - name: internal_api
+    type: rest
+    protocol: http
+    upstream:
+      host: internal.backend.com
+      port: 8080
+    routes:
+      - path_prefix: /api/internal
+        methods: [GET, POST]
+        # CORS disabled for internal-only APIs
+        cors:
+          enabled: false
+
+plugins: []
