@@ -248,7 +248,11 @@ class KongProvider(Provider):
                                 elif isinstance(value, list):
                                     output.append(f"        {key}:")
                                     for item in value:
-                                        output.append(f"        - {item}")
+                                        # Quote wildcard * to avoid YAML alias interpretation
+                                        if item == "*":
+                                            output.append(f"        - '*'")
+                                        else:
+                                            output.append(f"        - {item}")
                                 else:
                                     output.append(f"        {key}: {value}")
 
