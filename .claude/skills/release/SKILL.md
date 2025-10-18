@@ -161,95 +161,108 @@ pip install -e .
   - Stoppe den Release-Prozess und informiere den Nutzer
 - Prüfe, dass `dist/` Verzeichnis erstellt wurde mit `.whl` und `.tar.gz` Dateien
 
-### 9. Git Commit und Tag erstellen
+### 9. Git Commit erstellen
 
-- Führe aus: `git add .`
-- Commit-Message: `chore: release v<VERSION>`
-- Tag erstellen: `git tag v<VERSION>`
+- Führe aus: `git add VERSION CHANGELOG.md RELEASE_NOTES.md`
+- Commit-Message: `chore: Bump version to <VERSION>`
+- Füge detaillierte Commit-Message hinzu mit:
+  - `VERSION: alte_version → neue_version`
+  - `CHANGELOG.md: Add v<VERSION> release notes (German)`
+  - `RELEASE_NOTES.md: v<VERSION> release notes (German)`
+  - Zusammenfassung der wichtigsten Änderungen
 - Füge die übliche Co-Authored-By Signatur hinzu
 
-### 10. Push zu GitHub
+### 10. Push zu GitHub (develop)
 
-- Führe aus: `git push`
-- Führe aus: `git push --tags`
+- Führe aus: `git push origin develop`
+- Warte kurz bis der Push verarbeitet wurde
 
-### 11. GitHub Actions beobachten (develop)
+### 11. GitHub Actions beobachten (develop - Tests)
 
-- **WICHTIG:** Warte auf den Abschluss der GitHub Actions
+- **WICHTIG:** Warte auf den Abschluss der Test-GitHub Actions auf develop
 - Führe aus: `gh run watch` um den Status zu überwachen
 - Falls Actions fehlschlagen:
   - Zeige die Fehler-Logs an
   - Stoppe den Release-Prozess
   - Informiere den Nutzer über das Problem
   - Gib Hinweise zur Fehlerbehebung
-  - **WICHTIG:** Merge NICHT in main, wenn Actions fehlgeschlagen sind
+  - **WICHTIG:** Erstelle KEINEN Tag, wenn Tests fehlgeschlagen sind
 - Falls Actions erfolgreich sind:
   - Informiere den Nutzer über den Erfolg
-  - Fahre mit dem Merge in main fort
+  - Fahre mit der Tag-Erstellung fort
 
-### 12. Develop in Main mergen
+### 12. Release Tag erstellen und pushen
+
+- **WICHTIG:** Tag wird von develop aus erstellt
+- Erstelle annotated Tag: `git tag -a v<VERSION> -m "Release v<VERSION> - <Kurztitel>"`
+- Füge erweiterte Tag-Message hinzu mit:
+  - Highlights der wichtigsten Features
+  - Statistiken (Features/Tests/Docs)
+  - Hinweis auf RELEASE_NOTES.md für Details
+- Push Tag zu GitHub: `git push origin v<VERSION>`
+- **WICHTIG:** Der Tag-Push triggert automatisch den Release-Workflow
+
+### 13. GitHub Release Workflow beobachten
+
+- **WICHTIG:** Das GitHub Release wird AUTOMATISCH erstellt durch den Tag-Push
+- Der `.github/workflows/release.yml` Workflow wird automatisch gestartet
+- Dieser Workflow führt folgende Jobs aus:
+  - **create-release:** Erstellt GitHub Release mit RELEASE_NOTES.md
+  - **build-artifacts:** Baut Distribution Packages (Wheel, Source, Archive)
+  - **publish-testpypi:** Veröffentlicht zu TestPyPI (nur bei Pre-Release Tags: -alpha, -beta, -rc)
+  - **publish-pypi:** Veröffentlicht zu PyPI (nur bei stabilen Tags ohne Pre-Release Suffix)
+- Beobachte den Release-Workflow: `gh run watch <run-id>`
+- Prüfe alle Jobs:
+  - ✅ Create GitHub Release
+  - ✅ Build Release Artifacts
+  - ✅ Publish to PyPI (bei stabilen Releases, wenn PYPI_API_TOKEN konfiguriert)
+  - ⊝ Publish to TestPyPI (übersprungen bei stabilen Releases)
+- Falls der Workflow fehlschlägt:
+  - Zeige die Fehler an
+  - Informiere den Nutzer
+  - Gib Hinweise zur Fehlerbehebung
+  - **WICHTIG:** Bei PyPI-Fehlern: Prüfe ob PYPI_API_TOKEN und TEST_PYPI_API_TOKEN Secrets konfiguriert sind
+- Zeige die Release-URL an: `https://github.com/pt9912/x-gal/releases/tag/v<VERSION>`
+- Zeige PyPI-URL an (falls erfolgreich): `https://pypi.org/project/gal-gateway/`
+
+### 14. Develop in Main mergen
 
 - **WICHTIG:** Der Release muss auch im main Branch verfügbar sein
 - Wechsle zum main Branch: `git checkout main`
 - Pull neueste Änderungen: `git pull origin main`
-- Merge develop in main: `git merge develop`
+- Merge develop in main: `git merge develop --no-edit`
 - Falls Merge-Konflikte auftreten:
   - Zeige die Konflikte an
   - Informiere den Nutzer
   - Bitte um manuelle Konfliktlösung
   - Warte auf Bestätigung, bevor fortgefahren wird
 - Push zu main: `git push origin main`
-- **WICHTIG:** Beobachte GitHub Actions für main Branch
-- Führe aus: `gh run watch` um den Status zu überwachen
-- Falls Actions auf main fehlschlagen:
-  - Zeige die Fehler-Logs an
-  - Informiere den Nutzer über das Problem
 - Wechsle zurück zum develop Branch: `git checkout develop`
-
-### 13. GitHub Release erstellen
-
-- **WICHTIG:** Das GitHub Release wird AUTOMATISCH erstellt durch den Tag-Push
-- Der `.github/workflows/release.yml` Workflow wird automatisch gestartet
-- Dieser Workflow:
-  - Erstellt das GitHub Release mit RELEASE_NOTES.md
-  - Baut die Distribution Packages (Wheel und Source)
-  - Erstellt ein Source-Archiv (tar.gz)
-  - Lädt alle Artifacts zum Release hoch
-  - Veröffentlicht optional zu PyPI (aktuell deaktiviert)
-- Beobachte den Release-Workflow: `gh run watch`
-- Falls der Workflow fehlschlägt:
-  - Zeige die Fehler an
-  - Informiere den Nutzer
-  - Gib Hinweise zur Fehlerbehebung
-- Zeige die Release-URL an: `https://github.com/pt9912/x-gal/releases/tag/v<VERSION>`
-
-### 14. Zurück zu develop und synchronisieren
-
-- **WICHTIG:** Develop und Main müssen synchron bleiben
-- Wechsle zum develop Branch: `git checkout develop`
-- Pull neueste Änderungen von main: `git pull origin main`
-- Merge main in develop: `git merge main`
-- Falls Merge-Konflikte auftreten (sollte normalerweise nicht passieren):
-  - Zeige die Konflikte an
-  - Informiere den Nutzer
-  - Bitte um manuelle Konfliktlösung
-- Push zu develop: `git push origin develop`
 - Bestätige, dass develop und main jetzt synchron sind
 
 ### 15. Abschluss
 
 - Zeige eine Zusammenfassung aller durchgeführten Schritte
-- Informiere über nächste Schritte:
-  - PyPI Publishing ist aktuell deaktiviert (`.github/workflows/release.yml` - Zeile 78)
-  - Docker Images werden automatisch gebaut (bei aktiviertem Docker Workflow)
-  - Distribution Packages sind im GitHub Release verfügbar
+- Informiere über veröffentlichte Artifacts:
+  - ✅ GitHub Release erstellt mit RELEASE_NOTES.md
+  - ✅ Distribution Packages (Wheel, Source, Archive) hochgeladen
+  - ✅ PyPI Publishing automatisch (bei stabilen Releases mit konfiguriertem PYPI_API_TOKEN)
+  - ✅ TestPyPI Publishing automatisch (bei Pre-Release Tags mit TEST_PYPI_API_TOKEN)
+  - ✅ Docker Images werden automatisch gebaut (bei Tags)
 - Zeige Links:
   - GitHub Release URL: `https://github.com/pt9912/x-gal/releases/tag/v<VERSION>`
-  - GitHub Actions für develop: `https://github.com/pt9912/x-gal/actions`
-  - GitHub Actions für main: `https://github.com/pt9912/x-gal/actions`
-  - Docker Hub (falls konfiguriert): `ghcr.io/pt9912/x-gal:<VERSION>`
+  - PyPI Package (falls published): `https://pypi.org/project/gal-gateway/`
+  - GitHub Container Registry: `ghcr.io/pt9912/x-gal:v<VERSION>`
+  - GitHub Actions: `https://github.com/pt9912/x-gal/actions`
 - Bestätige, dass develop und main synchronisiert sind
-- Informiere über manuelle Installation: `pip install <Release-Artifact-URL>`
+- Zeige Installations-Befehle:
+  - Von PyPI (empfohlen): `pip install gal-gateway`
+  - Von Docker: `docker pull ghcr.io/pt9912/x-gal:v<VERSION>`
+  - Von Release-Artifact: `pip install <Release-Artifact-URL>`
+- **WICHTIG:** Falls PyPI Publishing fehlgeschlagen ist:
+  - Prüfe ob PYPI_API_TOKEN Secret konfiguriert ist
+  - Siehe docs/PYPI_PUBLISHING.md für Setup-Anleitung
+  - Falls nötig, manuelles Publishing: `twine upload dist/*`
 
 ## Fehlerbehandlung
 
