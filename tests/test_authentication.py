@@ -2,23 +2,25 @@
 Tests for authentication feature across all providers
 """
 
-import pytest
 import json
-from gal.providers.envoy import EnvoyProvider
-from gal.providers.kong import KongProvider
-from gal.providers.apisix import APISIXProvider
-from gal.providers.traefik import TraefikProvider
+
+import pytest
+
 from gal.config import (
-    Config,
-    Service,
-    Upstream,
-    Route,
-    GlobalConfig,
+    ApiKeyConfig,
     AuthenticationConfig,
     BasicAuthConfig,
-    ApiKeyConfig,
-    JwtConfig
+    Config,
+    GlobalConfig,
+    JwtConfig,
+    Route,
+    Service,
+    Upstream,
 )
+from gal.providers.apisix import APISIXProvider
+from gal.providers.envoy import EnvoyProvider
+from gal.providers.kong import KongProvider
+from gal.providers.traefik import TraefikProvider
 
 
 class TestAuthentication:
@@ -174,16 +176,14 @@ class TestAuthentication:
         route1 = Route(
             path_prefix="/api/public",
             authentication=AuthenticationConfig(
-                type="api_key",
-                api_key=ApiKeyConfig(keys=["key123"])
-            )
+                type="api_key", api_key=ApiKeyConfig(keys=["key123"])
+            ),
         )
         route2 = Route(
             path_prefix="/api/admin",
             authentication=AuthenticationConfig(
-                type="basic",
-                basic_auth=BasicAuthConfig(users={"admin": "secret"})
-            )
+                type="basic", basic_auth=BasicAuthConfig(users={"admin": "secret"})
+            ),
         )
 
         service = Service(
@@ -191,14 +191,11 @@ class TestAuthentication:
             type="rest",
             protocol="http",
             upstream=upstream,
-            routes=[route1, route2]
+            routes=[route1, route2],
         )
 
         config = Config(
-            version="1.0",
-            provider="kong",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="kong", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -214,25 +211,16 @@ class TestAuthentication:
         upstream = Upstream(host="test.local", port=8080)
 
         auth = AuthenticationConfig(
-            enabled=False,
-            type="api_key",
-            api_key=ApiKeyConfig(keys=["key123"])
+            enabled=False, type="api_key", api_key=ApiKeyConfig(keys=["key123"])
         )
         route = Route(path_prefix="/api", authentication=auth)
 
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         config = Config(
-            version="1.0",
-            provider="kong",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="kong", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -249,18 +237,11 @@ class TestAuthentication:
         route = Route(path_prefix="/api")  # No authentication
 
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         config = Config(
-            version="1.0",
-            provider="envoy",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="envoy", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -279,28 +260,18 @@ class TestAuthentication:
             issuer="https://auth.example.com",
             audience="api.example.com",
             jwks_uri="https://auth.example.com/.well-known/jwks.json",
-            algorithms=["ES256"]
+            algorithms=["ES256"],
         )
 
-        auth = AuthenticationConfig(
-            type="jwt",
-            jwt=jwt_config
-        )
+        auth = AuthenticationConfig(type="jwt", jwt=jwt_config)
         route = Route(path_prefix="/api", authentication=auth)
 
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         config = Config(
-            version="1.0",
-            provider="apisix",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="apisix", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -317,30 +288,17 @@ class TestAuthentication:
         global_config = GlobalConfig()
         upstream = Upstream(host="test.local", port=8080)
 
-        basic_auth = BasicAuthConfig(
-            users={"admin": "secret123"},
-            realm="Admin Area"
-        )
+        basic_auth = BasicAuthConfig(users={"admin": "secret123"}, realm="Admin Area")
 
-        auth = AuthenticationConfig(
-            type="basic",
-            basic_auth=basic_auth
-        )
+        auth = AuthenticationConfig(type="basic", basic_auth=basic_auth)
         route = Route(path_prefix="/api", authentication=auth)
 
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         config = Config(
-            version="1.0",
-            provider="traefik",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="traefik", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -354,31 +312,17 @@ class TestAuthentication:
         global_config = GlobalConfig()
         upstream = Upstream(host="test.local", port=8080)
 
-        api_key = ApiKeyConfig(
-            keys=["key123"],
-            key_name="api_key",
-            in_location="query"
-        )
+        api_key = ApiKeyConfig(keys=["key123"], key_name="api_key", in_location="query")
 
-        auth = AuthenticationConfig(
-            type="api_key",
-            api_key=api_key
-        )
+        auth = AuthenticationConfig(type="api_key", api_key=api_key)
         route = Route(path_prefix="/api", authentication=auth)
 
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         config = Config(
-            version="1.0",
-            provider="kong",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="kong", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -393,31 +337,19 @@ class TestAuthentication:
         upstream = Upstream(host="test.local", port=8080)
 
         basic_auth = BasicAuthConfig(
-            users={"admin": "secret123", "user": "password456"},
-            realm="API Gateway"
+            users={"admin": "secret123", "user": "password456"}, realm="API Gateway"
         )
 
-        auth = AuthenticationConfig(
-            enabled=True,
-            type="basic",
-            basic_auth=basic_auth
-        )
+        auth = AuthenticationConfig(enabled=True, type="basic", basic_auth=basic_auth)
 
         route = Route(path_prefix="/api", authentication=auth)
 
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         return Config(
-            version="1.0",
-            provider=provider_name,
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider=provider_name, global_config=global_config, services=[service]
         )
 
     def _create_config_with_api_key_auth(self, provider_name):
@@ -426,32 +358,19 @@ class TestAuthentication:
         upstream = Upstream(host="test.local", port=8080)
 
         api_key = ApiKeyConfig(
-            keys=["key123", "key456", "key789"],
-            key_name="X-API-Key",
-            in_location="header"
+            keys=["key123", "key456", "key789"], key_name="X-API-Key", in_location="header"
         )
 
-        auth = AuthenticationConfig(
-            enabled=True,
-            type="api_key",
-            api_key=api_key
-        )
+        auth = AuthenticationConfig(enabled=True, type="api_key", api_key=api_key)
 
         route = Route(path_prefix="/api", authentication=auth)
 
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         return Config(
-            version="1.0",
-            provider=provider_name,
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider=provider_name, global_config=global_config, services=[service]
         )
 
     def _create_config_with_jwt_auth(self, provider_name):
@@ -464,28 +383,17 @@ class TestAuthentication:
             audience="api.example.com",
             jwks_uri="https://auth.example.com/.well-known/jwks.json",
             algorithms=["RS256", "ES256"],
-            required_claims=["sub", "email"]
+            required_claims=["sub", "email"],
         )
 
-        auth = AuthenticationConfig(
-            enabled=True,
-            type="jwt",
-            jwt=jwt
-        )
+        auth = AuthenticationConfig(enabled=True, type="jwt", jwt=jwt)
 
         route = Route(path_prefix="/api", authentication=auth)
 
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         return Config(
-            version="1.0",
-            provider=provider_name,
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider=provider_name, global_config=global_config, services=[service]
         )

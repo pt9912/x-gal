@@ -2,26 +2,28 @@
 Tests for all provider implementations
 """
 
-import pytest
 import json
 import os
 import tempfile
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from gal.config import (
+    ComputedField,
+    Config,
+    GlobalConfig,
+    RateLimitConfig,
+    Route,
+    Service,
+    Transformation,
+    Upstream,
+    Validation,
+)
+from gal.providers.apisix import APISIXProvider
 from gal.providers.envoy import EnvoyProvider
 from gal.providers.kong import KongProvider
-from gal.providers.apisix import APISIXProvider
 from gal.providers.traefik import TraefikProvider
-from gal.config import (
-    Config,
-    Service,
-    Upstream,
-    Route,
-    GlobalConfig,
-    Transformation,
-    ComputedField,
-    Validation,
-    RateLimitConfig
-)
 
 
 class TestEnvoyProvider:
@@ -45,17 +47,10 @@ class TestEnvoyProvider:
         upstream = Upstream(host="test.local", port=8080)
         route = Route(path_prefix="/api")
         service = Service(
-            name="test",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
         config = Config(
-            version="1.0",
-            provider="envoy",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="envoy", global_config=global_config, services=[service]
         )
 
         with pytest.raises(ValueError, match="Port must be specified"):
@@ -82,17 +77,10 @@ class TestEnvoyProvider:
         upstream = Upstream(host="grpc.local", port=9090)
         route = Route(path_prefix="/myapp.Service")
         service = Service(
-            name="grpc_service",
-            type="grpc",
-            protocol="http2",
-            upstream=upstream,
-            routes=[route]
+            name="grpc_service", type="grpc", protocol="http2", upstream=upstream, routes=[route]
         )
         config = Config(
-            version="1.0",
-            provider="envoy",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="envoy", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -123,21 +111,21 @@ class TestEnvoyProvider:
             type="rest",
             protocol="http",
             upstream=Upstream(host="svc1.local", port=8080),
-            routes=[Route(path_prefix="/api/v1")]
+            routes=[Route(path_prefix="/api/v1")],
         )
         service2 = Service(
             name="service2",
             type="grpc",
             protocol="http2",
             upstream=Upstream(host="svc2.local", port=9090),
-            routes=[Route(path_prefix="/myapp.Service")]
+            routes=[Route(path_prefix="/myapp.Service")],
         )
 
         config = Config(
             version="1.0",
             provider="envoy",
             global_config=global_config,
-            services=[service1, service2]
+            services=[service1, service2],
         )
 
         result = provider.generate(config)
@@ -152,17 +140,10 @@ class TestEnvoyProvider:
         upstream = Upstream(host="test.local", port=8080)
         route = Route(path_prefix="/api")
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
         return Config(
-            version="1.0",
-            provider=provider_name,
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider=provider_name, global_config=global_config, services=[service]
         )
 
     def _create_config_with_transformation(self, provider_name):
@@ -173,9 +154,7 @@ class TestEnvoyProvider:
         transformation = Transformation(
             enabled=True,
             defaults={"status": "active"},
-            computed_fields=[
-                ComputedField(field="id", generator="uuid", prefix="test_")
-            ]
+            computed_fields=[ComputedField(field="id", generator="uuid", prefix="test_")],
         )
         service = Service(
             name="test_service",
@@ -183,13 +162,10 @@ class TestEnvoyProvider:
             protocol="http",
             upstream=upstream,
             routes=[route],
-            transformation=transformation
+            transformation=transformation,
         )
         return Config(
-            version="1.0",
-            provider=provider_name,
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider=provider_name, global_config=global_config, services=[service]
         )
 
 
@@ -229,17 +205,10 @@ class TestKongProvider:
         upstream = Upstream(host="grpc.local", port=9090)
         route = Route(path_prefix="/myapp.Service")
         service = Service(
-            name="grpc_service",
-            type="grpc",
-            protocol="http2",
-            upstream=upstream,
-            routes=[route]
+            name="grpc_service", type="grpc", protocol="http2", upstream=upstream, routes=[route]
         )
         config = Config(
-            version="1.0",
-            provider="kong",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="kong", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -254,17 +223,10 @@ class TestKongProvider:
         upstream = Upstream(host="test.local", port=8080)
         route = Route(path_prefix="/api/test", methods=["GET", "POST"])
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
         config = Config(
-            version="1.0",
-            provider="kong",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="kong", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -279,23 +241,17 @@ class TestKongProvider:
         global_config = GlobalConfig()
         upstream = Upstream(host="test.local", port=8080)
         route = Route(path_prefix="/api")
-        transformation = Transformation(
-            enabled=True,
-            defaults={"status": "active", "role": "user"}
-        )
+        transformation = Transformation(enabled=True, defaults={"status": "active", "role": "user"})
         service = Service(
             name="test_service",
             type="rest",
             protocol="http",
             upstream=upstream,
             routes=[route],
-            transformation=transformation
+            transformation=transformation,
         )
         config = Config(
-            version="1.0",
-            provider="kong",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="kong", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -311,17 +267,10 @@ class TestKongProvider:
         upstream = Upstream(host="test.local", port=8080)
         route = Route(path_prefix="/api")
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
         return Config(
-            version="1.0",
-            provider="kong",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="kong", global_config=global_config, services=[service]
         )
 
 
@@ -388,17 +337,10 @@ class TestAPISIXProvider:
         upstream = Upstream(host="test.local", port=8080)
         route = Route(path_prefix="/api/test", methods=["GET", "POST"])
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
         config = Config(
-            version="1.0",
-            provider="apisix",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="apisix", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -418,8 +360,8 @@ class TestAPISIXProvider:
             defaults={"status": "active"},
             computed_fields=[
                 ComputedField(field="id", generator="uuid", prefix="test_"),
-                ComputedField(field="created_at", generator="timestamp")
-            ]
+                ComputedField(field="created_at", generator="timestamp"),
+            ],
         )
         service = Service(
             name="test_service",
@@ -427,13 +369,10 @@ class TestAPISIXProvider:
             protocol="http",
             upstream=upstream,
             routes=[route],
-            transformation=transformation
+            transformation=transformation,
         )
         config = Config(
-            version="1.0",
-            provider="apisix",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="apisix", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -452,8 +391,8 @@ class TestAPISIXProvider:
             defaults={"status": "active", "count": 0},
             computed_fields=[
                 ComputedField(field="id", generator="uuid", prefix="usr_"),
-                ComputedField(field="timestamp", generator="timestamp")
-            ]
+                ComputedField(field="timestamp", generator="timestamp"),
+            ],
         )
         service = Service(
             name="test_service",
@@ -461,7 +400,7 @@ class TestAPISIXProvider:
             protocol="http",
             upstream=upstream,
             routes=[route],
-            transformation=transformation
+            transformation=transformation,
         )
 
         lua_code = provider._generate_lua_transformation(service)
@@ -481,17 +420,10 @@ class TestAPISIXProvider:
         upstream = Upstream(host="test.local", port=8080)
         route = Route(path_prefix="/api")
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
         return Config(
-            version="1.0",
-            provider="apisix",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="apisix", global_config=global_config, services=[service]
         )
 
 
@@ -556,16 +488,10 @@ class TestTraefikProvider:
             type="rest",
             protocol="http",
             upstream=upstream,
-            routes=[
-                Route(path_prefix="/api/v1"),
-                Route(path_prefix="/api/v2")
-            ]
+            routes=[Route(path_prefix="/api/v1"), Route(path_prefix="/api/v2")],
         )
         config = Config(
-            version="1.0",
-            provider="traefik",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="traefik", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -581,23 +507,17 @@ class TestTraefikProvider:
         global_config = GlobalConfig()
         upstream = Upstream(host="test.local", port=8080)
         route = Route(path_prefix="/api")
-        transformation = Transformation(
-            enabled=True,
-            defaults={"status": "active", "role": "user"}
-        )
+        transformation = Transformation(enabled=True, defaults={"status": "active", "role": "user"})
         service = Service(
             name="test_service",
             type="rest",
             protocol="http",
             upstream=upstream,
             routes=[route],
-            transformation=transformation
+            transformation=transformation,
         )
         config = Config(
-            version="1.0",
-            provider="traefik",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="traefik", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -617,7 +537,7 @@ class TestTraefikProvider:
 
         # Count how many times "middlewares:" appears
         # It should not appear in the output for services without transformations
-        lines = result.split('\n')
+        lines = result.split("\n")
         middleware_lines = [l for l in lines if l.strip() == "middlewares:"]
 
         # Should not have middlewares section at the end
@@ -629,17 +549,10 @@ class TestTraefikProvider:
         upstream = Upstream(host="test.local", port=8080)
         route = Route(path_prefix="/api")
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
         return Config(
-            version="1.0",
-            provider="traefik",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="traefik", global_config=global_config, services=[service]
         )
 
 
@@ -659,12 +572,12 @@ class TestProviderDeployment:
             assert os.path.exists(output_file)
 
             # Verify content
-            with open(output_file, 'r') as f:
+            with open(output_file, "r") as f:
                 content = f.read()
                 assert "static_resources:" in content
                 assert "test_service_cluster" in content
 
-    @patch('gal.providers.envoy.requests.get')
+    @patch("gal.providers.envoy.requests.get")
     def test_envoy_deploy_with_admin_api(self, mock_get):
         """Test Envoy deployment with Admin API check"""
         mock_response = MagicMock()
@@ -677,9 +590,7 @@ class TestProviderDeployment:
         with tempfile.TemporaryDirectory() as tmpdir:
             output_file = os.path.join(tmpdir, "envoy.yaml")
             result = provider.deploy(
-                config,
-                output_file=output_file,
-                admin_url="http://localhost:9901"
+                config, output_file=output_file, admin_url="http://localhost:9901"
             )
 
             assert result is True
@@ -698,13 +609,13 @@ class TestProviderDeployment:
             assert os.path.exists(output_file)
 
             # Verify content
-            with open(output_file, 'r') as f:
+            with open(output_file, "r") as f:
                 content = f.read()
                 assert "_format_version: '3.0'" in content
                 assert "services:" in content
 
-    @patch('gal.providers.kong.requests.post')
-    @patch('gal.providers.kong.requests.get')
+    @patch("gal.providers.kong.requests.post")
+    @patch("gal.providers.kong.requests.get")
     def test_kong_deploy_with_admin_api(self, mock_get, mock_post):
         """Test Kong deployment via Admin API"""
         mock_get.return_value = MagicMock(status_code=200)
@@ -716,9 +627,7 @@ class TestProviderDeployment:
         with tempfile.TemporaryDirectory() as tmpdir:
             output_file = os.path.join(tmpdir, "kong.yaml")
             result = provider.deploy(
-                config,
-                output_file=output_file,
-                admin_url="http://localhost:8001"
+                config, output_file=output_file, admin_url="http://localhost:8001"
             )
 
             assert result is True
@@ -738,13 +647,13 @@ class TestProviderDeployment:
             assert os.path.exists(output_file)
 
             # Verify content
-            with open(output_file, 'r') as f:
+            with open(output_file, "r") as f:
                 content = json.load(f)
                 assert "routes" in content
                 assert "services" in content
                 assert "upstreams" in content
 
-    @patch('gal.providers.apisix.requests.put')
+    @patch("gal.providers.apisix.requests.put")
     def test_apisix_deploy_with_admin_api(self, mock_put):
         """Test APISIX deployment via Admin API"""
         mock_response = MagicMock()
@@ -760,7 +669,7 @@ class TestProviderDeployment:
                 config,
                 output_file=output_file,
                 admin_url="http://localhost:9180",
-                api_key="test-key"
+                api_key="test-key",
             )
 
             assert result is True
@@ -780,13 +689,13 @@ class TestProviderDeployment:
             assert os.path.exists(output_file)
 
             # Verify content
-            with open(output_file, 'r') as f:
+            with open(output_file, "r") as f:
                 content = f.read()
                 assert "http:" in content
                 assert "routers:" in content
                 assert "services:" in content
 
-    @patch('gal.providers.traefik.requests.get')
+    @patch("gal.providers.traefik.requests.get")
     def test_traefik_deploy_with_api_check(self, mock_get):
         """Test Traefik deployment with API verification"""
         mock_response = MagicMock()
@@ -799,9 +708,7 @@ class TestProviderDeployment:
         with tempfile.TemporaryDirectory() as tmpdir:
             output_file = os.path.join(tmpdir, "traefik.yaml")
             result = provider.deploy(
-                config,
-                output_file=output_file,
-                api_url="http://localhost:8080"
+                config, output_file=output_file, api_url="http://localhost:8080"
             )
 
             assert result is True
@@ -826,15 +733,8 @@ class TestProviderDeployment:
         upstream = Upstream(host="test.local", port=8080)
         route = Route(path_prefix="/api")
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
         return Config(
-            version="1.0",
-            provider=provider_name,
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider=provider_name, global_config=global_config, services=[service]
         )

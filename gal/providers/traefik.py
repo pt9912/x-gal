@@ -5,12 +5,14 @@ Generates Traefik dynamic configuration in YAML format with support
 for HTTP routers, services, and middleware plugins.
 """
 
-import os
 import logging
-import requests
+import os
 from typing import Optional
-from ..provider import Provider
+
+import requests
+
 from ..config import Config
+from ..provider import Provider
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +127,7 @@ class TraefikProvider(Provider):
         output.append("")
         output.append("http:")
         output.append("  routers:")
-        
+
         for service in config.services:
             for i, route in enumerate(service.routes):
                 router_name = f"{service.name}_router_{i}"
@@ -166,29 +168,27 @@ class TraefikProvider(Provider):
                         output.append(f"        - {mw}")
 
                 output.append("")
-        
+
         output.append("  services:")
         for service in config.services:
             self._generate_traefik_service(service, output)
             output.append("")
-        
+
         # Middlewares for authentication, transformations, rate limiting, headers, and CORS
         has_authentication = any(
             route.authentication and route.authentication.enabled
             for service in config.services
             for route in service.routes
         )
-        has_transformations = any(s.transformation and s.transformation.enabled for s in config.services)
+        has_transformations = any(
+            s.transformation and s.transformation.enabled for s in config.services
+        )
         has_rate_limits = any(
             route.rate_limit and route.rate_limit.enabled
             for service in config.services
             for route in service.routes
         )
-        has_headers = any(
-            route.headers
-            for service in config.services
-            for route in service.routes
-        )
+        has_headers = any(route.headers for service in config.services for route in service.routes)
         has_cors = any(
             route.cors and route.cors.enabled
             for service in config.services
@@ -200,7 +200,14 @@ class TraefikProvider(Provider):
             for route in service.routes
         )
 
-        if has_authentication or has_transformations or has_rate_limits or has_headers or has_cors or has_circuit_breakers:
+        if (
+            has_authentication
+            or has_transformations
+            or has_rate_limits
+            or has_headers
+            or has_cors
+            or has_circuit_breakers
+        ):
             output.append("  middlewares:")
 
             # Authentication middlewares
@@ -227,7 +234,9 @@ class TraefikProvider(Provider):
                             # Traefik doesn't have native API key auth, use forwardAuth to external service
                             output.append(f"    {router_name}_auth:")
                             output.append("      forwardAuth:")
-                            output.append("        address: 'http://api-key-validator:8080/validate'")
+                            output.append(
+                                "        address: 'http://api-key-validator:8080/validate'"
+                            )
                             key_name = auth.api_key.key_name if auth.api_key else "X-API-Key"
                             output.append("        authRequestHeaders:")
                             output.append(f"          - '{key_name}'")
@@ -238,9 +247,13 @@ class TraefikProvider(Provider):
                             output.append(f"    {router_name}_auth:")
                             output.append("      forwardAuth:")
                             if auth.jwt and auth.jwt.jwks_uri:
-                                output.append(f"        address: 'http://jwt-validator:8080/validate'")
+                                output.append(
+                                    f"        address: 'http://jwt-validator:8080/validate'"
+                                )
                             else:
-                                output.append("        address: 'http://jwt-validator:8080/validate'")
+                                output.append(
+                                    "        address: 'http://jwt-validator:8080/validate'"
+                                )
                             output.append("        authRequestHeaders:")
                             output.append("          - 'Authorization'")
                             output.append("")
@@ -284,7 +297,9 @@ class TraefikProvider(Provider):
                         if headers.request_remove:
                             output.append("        customRequestHeaders:")
                             for header_name in headers.request_remove:
-                                output.append(f"          {header_name}: ''")  # Empty value removes header
+                                output.append(
+                                    f"          {header_name}: ''"
+                                )  # Empty value removes header
 
                         # Response headers
                         if headers.response_add:
@@ -294,12 +309,18 @@ class TraefikProvider(Provider):
                         if headers.response_remove:
                             output.append("        customResponseHeaders:")
                             for header_name in headers.response_remove:
-                                output.append(f"          {header_name}: ''")  # Empty value removes header
+                                output.append(
+                                    f"          {header_name}: ''"
+                                )  # Empty value removes header
                         output.append("")
 
             # Service-level header manipulation
             for service in config.services:
-                if service.transformation and service.transformation.enabled and service.transformation.headers:
+                if (
+                    service.transformation
+                    and service.transformation.enabled
+                    and service.transformation.headers
+                ):
                     headers = service.transformation.headers
                     output.append(f"    {service.name}_headers:")
                     output.append("      headers:")
@@ -347,7 +368,9 @@ class TraefikProvider(Provider):
                             output.append("        accessControlExposeHeaders:")
                             for header in cors.expose_headers:
                                 output.append(f"          - {header}")
-                        output.append(f"        accessControlAllowCredentials: {str(cors.allow_credentials).lower()}")
+                        output.append(
+                            f"        accessControlAllowCredentials: {str(cors.allow_credentials).lower()}"
+                        )
                         output.append(f"        accessControlMaxAge: {cors.max_age}")
                         output.append("")
 
@@ -378,7 +401,9 @@ class TraefikProvider(Provider):
                         output.append("")
 
         result = "\n".join(output)
-        logger.info(f"Traefik configuration generated: {len(result)} bytes, {len(config.services)} services")
+        logger.info(
+            f"Traefik configuration generated: {len(result)} bytes, {len(config.services)} services"
+        )
         return result
 
     def _generate_traefik_service(self, service, output: list):
@@ -403,11 +428,16 @@ class TraefikProvider(Provider):
             # Multiple targets mode
             for target in service.upstream.targets:
                 output.append(f"        - url: 'http://{target.host}:{target.port}'")
-                if service.upstream.load_balancer and service.upstream.load_balancer.algorithm == "weighted":
+                if (
+                    service.upstream.load_balancer
+                    and service.upstream.load_balancer.algorithm == "weighted"
+                ):
                     output.append(f"          weight: {target.weight}")
         else:
             # Simple mode (single host/port)
-            output.append(f"        - url: 'http://{service.upstream.host}:{service.upstream.port}'")
+            output.append(
+                f"        - url: 'http://{service.upstream.host}:{service.upstream.port}'"
+            )
 
         # Configure sticky sessions
         if service.upstream.load_balancer and service.upstream.load_balancer.sticky_sessions:
@@ -427,10 +457,7 @@ class TraefikProvider(Provider):
                 output.append(f"          timeout: {active.timeout}")
 
         # Configure WebSocket support if any route has WebSocket enabled
-        has_websocket = any(
-            route.websocket and route.websocket.enabled
-            for route in service.routes
-        )
+        has_websocket = any(route.websocket and route.websocket.enabled for route in service.routes)
         if has_websocket:
             # Traefik supports WebSocket automatically, but we ensure proper configuration
             output.append("        passHostHeader: true")
@@ -438,8 +465,9 @@ class TraefikProvider(Provider):
             output.append("        responseForwarding:")
             output.append("          flushInterval: 100ms")
 
-    def deploy(self, config: Config, output_file: Optional[str] = None,
-               api_url: Optional[str] = None) -> bool:
+    def deploy(
+        self, config: Config, output_file: Optional[str] = None, api_url: Optional[str] = None
+    ) -> bool:
         """Deploy Traefik configuration.
 
         Deploys configuration via file-based approach (Traefik File Provider).
@@ -488,7 +516,7 @@ class TraefikProvider(Provider):
             # Create directory if it doesn't exist
             os.makedirs(os.path.dirname(output_file) or ".", exist_ok=True)
 
-            with open(output_file, 'w') as f:
+            with open(output_file, "w") as f:
                 f.write(generated_config)
 
             logger.info(f"Traefik configuration successfully written to {output_file}")
@@ -501,7 +529,7 @@ class TraefikProvider(Provider):
 
         # Optionally verify Traefik API is reachable
         if api_url:
-            api_url = api_url.rstrip('/')
+            api_url = api_url.rstrip("/")
             logger.debug(f"Checking Traefik API at {api_url}")
             try:
                 # Check if Traefik API/Dashboard is reachable

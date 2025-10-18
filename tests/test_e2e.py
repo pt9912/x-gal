@@ -2,19 +2,20 @@
 End-to-End tests for complete workflows
 """
 
-import pytest
-import os
 import json
+import os
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
+
+from gal.config import Config
 from gal.manager import Manager
+from gal.providers.apisix import APISIXProvider
 from gal.providers.envoy import EnvoyProvider
 from gal.providers.kong import KongProvider
-from gal.providers.apisix import APISIXProvider
 from gal.providers.traefik import TraefikProvider
-from gal.config import Config
 
 
 class TestE2EBasicWorkflow:
@@ -24,7 +25,8 @@ class TestE2EBasicWorkflow:
     def config_file(self, tmp_path):
         """Create test configuration file"""
         config = tmp_path / "gateway-config.yaml"
-        config.write_text("""
+        config.write_text(
+            """
 version: "1.0"
 provider: envoy
 
@@ -55,7 +57,8 @@ services:
       validation:
         required_fields:
           - email
-""")
+"""
+        )
         return str(config)
 
     def test_complete_workflow_envoy(self, config_file, tmp_path):
@@ -87,7 +90,7 @@ services:
 
         # Step 5: Write to file
         output_file = tmp_path / "envoy.yaml"
-        with open(output_file, 'w') as f:
+        with open(output_file, "w") as f:
             f.write(result)
 
         # Step 6: Verify file exists and is readable
@@ -105,12 +108,7 @@ services:
         # Load config
         base_config = manager.load_config(config_file)
 
-        providers = {
-            'envoy': 'yaml',
-            'kong': 'yaml',
-            'apisix': 'json',
-            'traefik': 'yaml'
-        }
+        providers = {"envoy": "yaml", "kong": "yaml", "apisix": "json", "traefik": "yaml"}
 
         for provider_name, extension in providers.items():
             # Switch provider
@@ -119,7 +117,7 @@ services:
                 provider=provider_name,
                 global_config=base_config.global_config,
                 services=base_config.services,
-                plugins=base_config.plugins
+                plugins=base_config.plugins,
             )
 
             # Validate
@@ -132,7 +130,7 @@ services:
 
             # Write to file
             output_file = tmp_path / f"{provider_name}.{extension}"
-            with open(output_file, 'w') as f:
+            with open(output_file, "w") as f:
                 f.write(result)
 
             # Verify
@@ -147,7 +145,8 @@ class TestE2EWithDeployment:
     def config_file(self, tmp_path):
         """Create test configuration"""
         config = tmp_path / "deploy-config.yaml"
-        config.write_text("""
+        config.write_text(
+            """
 version: "1.0"
 provider: kong
 
@@ -164,7 +163,8 @@ services:
       port: 3000
     routes:
       - path_prefix: /api/v1
-""")
+"""
+        )
         return str(config)
 
     def test_load_generate_deploy_workflow(self, config_file, tmp_path):
@@ -184,10 +184,7 @@ services:
 
         # Deploy (file-based)
         output_file = tmp_path / "kong.yaml"
-        deployment_result = provider.deploy(
-            config,
-            output_file=str(output_file)
-        )
+        deployment_result = provider.deploy(config, output_file=str(output_file))
 
         assert deployment_result is True
         assert output_file.exists()
@@ -196,7 +193,7 @@ services:
         deployed_content = output_file.read_text()
         assert deployed_content == result
 
-    @patch('gal.providers.apisix.requests.put')
+    @patch("gal.providers.apisix.requests.put")
     def test_load_generate_deploy_with_api(self, mock_put, config_file, tmp_path):
         """Test: load → generate → deploy (via API)"""
         # Mock API responses
@@ -223,7 +220,7 @@ services:
             config,
             output_file=str(output_file),
             admin_url="http://localhost:9180",
-            api_key="test-key"
+            api_key="test-key",
         )
 
         assert deployment_result is True
@@ -240,7 +237,8 @@ class TestE2EMultiService:
     def multi_service_config(self, tmp_path):
         """Create config with multiple services"""
         config = tmp_path / "multi-service.yaml"
-        config.write_text("""
+        config.write_text(
+            """
 version: "1.0"
 provider: envoy
 
@@ -286,7 +284,8 @@ services:
     routes:
       - path_prefix: /api/payments
         methods: [POST]
-""")
+"""
+        )
         return str(config)
 
     def test_multi_service_workflow(self, multi_service_config, tmp_path):
@@ -325,14 +324,16 @@ class TestE2EErrorHandling:
     def test_invalid_yaml_syntax(self, tmp_path):
         """Test error handling for invalid YAML"""
         config_file = tmp_path / "invalid.yaml"
-        config_file.write_text("""
+        config_file.write_text(
+            """
 version: 1.0
 provider: envoy
 services:
   - name: test
     invalid_indent
       wrong: syntax
-""")
+"""
+        )
 
         manager = Manager()
         manager.register_provider(EnvoyProvider())
@@ -343,7 +344,8 @@ services:
     def test_missing_required_field(self, tmp_path):
         """Test error handling for missing required fields"""
         config_file = tmp_path / "missing-field.yaml"
-        config_file.write_text("""
+        config_file.write_text(
+            """
 version: "1.0"
 provider: envoy
 
@@ -353,7 +355,8 @@ services:
     # Missing upstream
     routes:
       - path_prefix: /api
-""")
+"""
+        )
 
         manager = Manager()
         manager.register_provider(EnvoyProvider())
@@ -364,7 +367,8 @@ services:
     def test_validation_error_port_zero(self, tmp_path):
         """Test validation error for port 0"""
         config_file = tmp_path / "port-zero.yaml"
-        config_file.write_text("""
+        config_file.write_text(
+            """
 version: "1.0"
 provider: envoy
 
@@ -381,7 +385,8 @@ services:
       port: 8080
     routes:
       - path_prefix: /api
-""")
+"""
+        )
 
         manager = Manager()
         manager.register_provider(EnvoyProvider())
@@ -394,7 +399,8 @@ services:
     def test_unknown_provider(self, tmp_path):
         """Test error handling for unknown provider"""
         config_file = tmp_path / "unknown-provider.yaml"
-        config_file.write_text("""
+        config_file.write_text(
+            """
 version: "1.0"
 provider: unknown_gateway
 
@@ -407,7 +413,8 @@ services:
       port: 8080
     routes:
       - path_prefix: /api
-""")
+"""
+        )
 
         manager = Manager()
         manager.register_provider(EnvoyProvider())
@@ -425,7 +432,8 @@ class TestE2ERealWorldScenario:
     def ecommerce_config(self, tmp_path):
         """E-commerce platform configuration"""
         config = tmp_path / "ecommerce.yaml"
-        config.write_text("""
+        config.write_text(
+            """
 version: "1.0"
 provider: apisix
 
@@ -505,7 +513,8 @@ services:
           - order_id
           - amount
           - payment_method
-""")
+"""
+        )
         return str(config)
 
     def test_ecommerce_complete_workflow(self, ecommerce_config, tmp_path):
@@ -534,16 +543,13 @@ services:
         assert len(config_data["upstreams"]) == 4
 
         # Verify transformations for order_management
-        order_service = next(
-            s for s in config_data["services"]
-            if s["id"] == "order_management"
-        )
+        order_service = next(s for s in config_data["services"] if s["id"] == "order_management")
         assert "plugins" in order_service
         assert "serverless-pre-function" in order_service["plugins"]
 
         # Write and verify deployment
         output_file = tmp_path / "ecommerce-apisix.json"
-        with open(output_file, 'w') as f:
+        with open(output_file, "w") as f:
             f.write(result)
 
         assert output_file.exists()
@@ -561,13 +567,13 @@ services:
 
         # Generate for all providers
         results = {}
-        for provider_name in ['apisix', 'envoy', 'kong']:
+        for provider_name in ["apisix", "envoy", "kong"]:
             config = Config(
                 version=base_config.version,
                 provider=provider_name,
                 global_config=base_config.global_config,
                 services=base_config.services,
-                plugins=base_config.plugins
+                plugins=base_config.plugins,
             )
 
             result = manager.generate(config)
@@ -578,13 +584,13 @@ services:
             assert len(result) > 100
 
         # Verify each provider generated different formats
-        assert '"routes"' in results['apisix']  # JSON
-        assert 'static_resources:' in results['envoy']  # YAML
-        assert '_format_version:' in results['kong']  # YAML
+        assert '"routes"' in results["apisix"]  # JSON
+        assert "static_resources:" in results["envoy"]  # YAML
+        assert "_format_version:" in results["kong"]  # YAML
 
         # All should reference the same services
         for result in results.values():
-            assert 'user_auth_service' in result or 'auth-grpc' in result
-            assert 'product_catalog' in result or 'catalog-api' in result
-            assert 'order_management' in result or 'orders-api' in result
-            assert 'payment_processing' in result or 'payments-api' in result
+            assert "user_auth_service" in result or "auth-grpc" in result
+            assert "product_catalog" in result or "catalog-api" in result
+            assert "order_management" in result or "orders-api" in result
+            assert "payment_processing" in result or "payments-api" in result

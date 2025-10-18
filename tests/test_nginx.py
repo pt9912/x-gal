@@ -7,27 +7,28 @@ authentication, headers, CORS, and passive health checks.
 """
 
 import pytest
-from gal.providers.nginx import NginxProvider
+
 from gal.config import (
+    ActiveHealthCheck,
+    ApiKeyConfig,
+    AuthenticationConfig,
+    BasicAuthConfig,
+    CircuitBreakerConfig,
     Config,
+    CORSPolicy,
+    GlobalConfig,
+    HeaderManipulation,
+    HealthCheckConfig,
+    JwtConfig,
+    LoadBalancerConfig,
+    PassiveHealthCheck,
+    RateLimitConfig,
+    Route,
     Service,
     Upstream,
     UpstreamTarget,
-    Route,
-    GlobalConfig,
-    RateLimitConfig,
-    AuthenticationConfig,
-    BasicAuthConfig,
-    ApiKeyConfig,
-    JwtConfig,
-    HeaderManipulation,
-    CORSPolicy,
-    CircuitBreakerConfig,
-    HealthCheckConfig,
-    ActiveHealthCheck,
-    PassiveHealthCheck,
-    LoadBalancerConfig
 )
+from gal.providers.nginx import NginxProvider
 
 
 class TestNginxProvider:
@@ -51,27 +52,20 @@ class TestNginxProvider:
         upstream = Upstream(
             targets=[
                 UpstreamTarget(host="api-1.local", port=8080),
-                UpstreamTarget(host="api-2.local", port=8080)
+                UpstreamTarget(host="api-2.local", port=8080),
             ],
             health_check=HealthCheckConfig(
                 active=ActiveHealthCheck(enabled=True, http_path="/health")
-            )
+            ),
         )
 
         route = Route(path_prefix="/api")
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         config = Config(
-            version="1.0",
-            provider="nginx",
-            global_config=GlobalConfig(),
-            services=[service]
+            version="1.0", provider="nginx", global_config=GlobalConfig(), services=[service]
         )
 
         provider.validate(config)
@@ -90,9 +84,9 @@ class TestNginxProvider:
                 jwt=JwtConfig(
                     issuer="https://auth.example.com",
                     audience="api",
-                    jwks_uri="https://auth.example.com/.well-known/jwks.json"
-                )
-            )
+                    jwks_uri="https://auth.example.com/.well-known/jwks.json",
+                ),
+            ),
         )
 
         service = Service(
@@ -100,14 +94,11 @@ class TestNginxProvider:
             type="rest",
             protocol="http",
             upstream=Upstream(targets=[UpstreamTarget(host="api.local", port=8080)]),
-            routes=[route]
+            routes=[route],
         )
 
         config = Config(
-            version="1.0",
-            provider="nginx",
-            global_config=GlobalConfig(),
-            services=[service]
+            version="1.0", provider="nginx", global_config=GlobalConfig(), services=[service]
         )
 
         provider.validate(config)
@@ -119,11 +110,7 @@ class TestNginxProvider:
 
         route = Route(
             path_prefix="/api",
-            circuit_breaker=CircuitBreakerConfig(
-                enabled=True,
-                max_failures=5,
-                timeout="30s"
-            )
+            circuit_breaker=CircuitBreakerConfig(enabled=True, max_failures=5, timeout="30s"),
         )
 
         service = Service(
@@ -131,14 +118,11 @@ class TestNginxProvider:
             type="rest",
             protocol="http",
             upstream=Upstream(targets=[UpstreamTarget(host="api.local", port=8080)]),
-            routes=[route]
+            routes=[route],
         )
 
         config = Config(
-            version="1.0",
-            provider="nginx",
-            global_config=GlobalConfig(),
-            services=[service]
+            version="1.0", provider="nginx", global_config=GlobalConfig(), services=[service]
         )
 
         provider.validate(config)
@@ -168,24 +152,17 @@ class TestNginxProvider:
         upstream = Upstream(
             targets=[
                 UpstreamTarget(host="api-1.internal", port=8080, weight=2),
-                UpstreamTarget(host="api-2.internal", port=8080, weight=1)
+                UpstreamTarget(host="api-2.internal", port=8080, weight=1),
             ]
         )
 
         route = Route(path_prefix="/api")
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         config = Config(
-            version="1.0",
-            provider="nginx",
-            global_config=GlobalConfig(port=80),
-            services=[service]
+            version="1.0", provider="nginx", global_config=GlobalConfig(port=80), services=[service]
         )
 
         result = provider.generate(config)
@@ -237,25 +214,18 @@ class TestNginxProvider:
         upstream = Upstream(
             targets=[
                 UpstreamTarget(host="api-1.internal", port=8080, weight=3),
-                UpstreamTarget(host="api-2.internal", port=8080, weight=1)
+                UpstreamTarget(host="api-2.internal", port=8080, weight=1),
             ],
-            load_balancer=LoadBalancerConfig(algorithm="weighted")
+            load_balancer=LoadBalancerConfig(algorithm="weighted"),
         )
 
         route = Route(path_prefix="/api")
         service = Service(
-            name="weighted_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="weighted_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         config = Config(
-            version="1.0",
-            provider="nginx",
-            global_config=GlobalConfig(),
-            services=[service]
+            version="1.0", provider="nginx", global_config=GlobalConfig(), services=[service]
         )
 
         result = provider.generate(config)
@@ -271,31 +241,22 @@ class TestNginxProvider:
         upstream = Upstream(
             targets=[
                 UpstreamTarget(host="api-1.internal", port=8080),
-                UpstreamTarget(host="api-2.internal", port=8080)
+                UpstreamTarget(host="api-2.internal", port=8080),
             ],
             health_check=HealthCheckConfig(
                 passive=PassiveHealthCheck(
-                    enabled=True,
-                    max_failures=3,
-                    unhealthy_status_codes=[500, 502, 503]
+                    enabled=True, max_failures=3, unhealthy_status_codes=[500, 502, 503]
                 )
-            )
+            ),
         )
 
         route = Route(path_prefix="/api")
         service = Service(
-            name="health_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="health_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         config = Config(
-            version="1.0",
-            provider="nginx",
-            global_config=GlobalConfig(),
-            services=[service]
+            version="1.0", provider="nginx", global_config=GlobalConfig(), services=[service]
         )
 
         result = provider.generate(config)
@@ -314,8 +275,8 @@ class TestNginxProvider:
                 requests_per_second=100,
                 burst=200,
                 key_type="ip_address",
-                response_status=429
-            )
+                response_status=429,
+            ),
         )
 
         service = Service(
@@ -323,14 +284,11 @@ class TestNginxProvider:
             type="rest",
             protocol="http",
             upstream=Upstream(targets=[UpstreamTarget(host="api.local", port=8080)]),
-            routes=[route]
+            routes=[route],
         )
 
         config = Config(
-            version="1.0",
-            provider="nginx",
-            global_config=GlobalConfig(),
-            services=[service]
+            version="1.0", provider="nginx", global_config=GlobalConfig(), services=[service]
         )
 
         result = provider.generate(config)
@@ -352,8 +310,8 @@ class TestNginxProvider:
                 requests_per_second=50,
                 burst=100,
                 key_type="header",
-                key_header="X-API-Key"
-            )
+                key_header="X-API-Key",
+            ),
         )
 
         service = Service(
@@ -361,14 +319,11 @@ class TestNginxProvider:
             type="rest",
             protocol="http",
             upstream=Upstream(targets=[UpstreamTarget(host="api.local", port=8080)]),
-            routes=[route]
+            routes=[route],
         )
 
         config = Config(
-            version="1.0",
-            provider="nginx",
-            global_config=GlobalConfig(),
-            services=[service]
+            version="1.0", provider="nginx", global_config=GlobalConfig(), services=[service]
         )
 
         result = provider.generate(config)
@@ -385,11 +340,8 @@ class TestNginxProvider:
             authentication=AuthenticationConfig(
                 enabled=True,
                 type="basic",
-                basic_auth=BasicAuthConfig(
-                    users={"admin": "password"},
-                    realm="Protected API"
-                )
-            )
+                basic_auth=BasicAuthConfig(users={"admin": "password"}, realm="Protected API"),
+            ),
         )
 
         service = Service(
@@ -397,14 +349,11 @@ class TestNginxProvider:
             type="rest",
             protocol="http",
             upstream=Upstream(targets=[UpstreamTarget(host="api.local", port=8080)]),
-            routes=[route]
+            routes=[route],
         )
 
         config = Config(
-            version="1.0",
-            provider="nginx",
-            global_config=GlobalConfig(),
-            services=[service]
+            version="1.0", provider="nginx", global_config=GlobalConfig(), services=[service]
         )
 
         result = provider.generate(config)
@@ -423,11 +372,9 @@ class TestNginxProvider:
                 enabled=True,
                 type="api_key",
                 api_key=ApiKeyConfig(
-                    keys=["key_123abc"],
-                    key_name="X-API-Key",
-                    in_location="header"
-                )
-            )
+                    keys=["key_123abc"], key_name="X-API-Key", in_location="header"
+                ),
+            ),
         )
 
         service = Service(
@@ -435,14 +382,11 @@ class TestNginxProvider:
             type="rest",
             protocol="http",
             upstream=Upstream(targets=[UpstreamTarget(host="api.local", port=8080)]),
-            routes=[route]
+            routes=[route],
         )
 
         config = Config(
-            version="1.0",
-            provider="nginx",
-            global_config=GlobalConfig(),
-            services=[service]
+            version="1.0", provider="nginx", global_config=GlobalConfig(), services=[service]
         )
 
         result = provider.generate(config)
@@ -462,9 +406,9 @@ class TestNginxProvider:
                 jwt=JwtConfig(
                     issuer="https://auth.example.com",
                     audience="api",
-                    jwks_uri="https://auth.example.com/.well-known/jwks.json"
-                )
-            )
+                    jwks_uri="https://auth.example.com/.well-known/jwks.json",
+                ),
+            ),
         )
 
         service = Service(
@@ -472,14 +416,11 @@ class TestNginxProvider:
             type="rest",
             protocol="http",
             upstream=Upstream(targets=[UpstreamTarget(host="api.local", port=8080)]),
-            routes=[route]
+            routes=[route],
         )
 
         config = Config(
-            version="1.0",
-            provider="nginx",
-            global_config=GlobalConfig(),
-            services=[service]
+            version="1.0", provider="nginx", global_config=GlobalConfig(), services=[service]
         )
 
         result = provider.generate(config)
@@ -495,8 +436,8 @@ class TestNginxProvider:
             headers=HeaderManipulation(
                 request_add={"X-Request-ID": "{{uuid}}", "X-Gateway": "GAL"},
                 request_set={"User-Agent": "GAL-Gateway/1.0"},
-                request_remove=["X-Internal-Token"]
-            )
+                request_remove=["X-Internal-Token"],
+            ),
         )
 
         service = Service(
@@ -504,14 +445,11 @@ class TestNginxProvider:
             type="rest",
             protocol="http",
             upstream=Upstream(targets=[UpstreamTarget(host="api.local", port=8080)]),
-            routes=[route]
+            routes=[route],
         )
 
         config = Config(
-            version="1.0",
-            provider="nginx",
-            global_config=GlobalConfig(),
-            services=[service]
+            version="1.0", provider="nginx", global_config=GlobalConfig(), services=[service]
         )
 
         result = provider.generate(config)
@@ -531,8 +469,8 @@ class TestNginxProvider:
             headers=HeaderManipulation(
                 response_add={"X-Frame-Options": "DENY", "X-Content-Type-Options": "nosniff"},
                 response_set={"Server": "GAL-Gateway"},
-                response_remove=["X-Powered-By"]
-            )
+                response_remove=["X-Powered-By"],
+            ),
         )
 
         service = Service(
@@ -540,14 +478,11 @@ class TestNginxProvider:
             type="rest",
             protocol="http",
             upstream=Upstream(targets=[UpstreamTarget(host="api.local", port=8080)]),
-            routes=[route]
+            routes=[route],
         )
 
         config = Config(
-            version="1.0",
-            provider="nginx",
-            global_config=GlobalConfig(),
-            services=[service]
+            version="1.0", provider="nginx", global_config=GlobalConfig(), services=[service]
         )
 
         result = provider.generate(config)
@@ -571,8 +506,8 @@ class TestNginxProvider:
                 allowed_headers=["Content-Type", "Authorization"],
                 expose_headers=["X-Request-ID"],
                 allow_credentials=True,
-                max_age=86400
-            )
+                max_age=86400,
+            ),
         )
 
         service = Service(
@@ -580,22 +515,26 @@ class TestNginxProvider:
             type="rest",
             protocol="http",
             upstream=Upstream(targets=[UpstreamTarget(host="api.local", port=8080)]),
-            routes=[route]
+            routes=[route],
         )
 
         config = Config(
-            version="1.0",
-            provider="nginx",
-            global_config=GlobalConfig(),
-            services=[service]
+            version="1.0", provider="nginx", global_config=GlobalConfig(), services=[service]
         )
 
         result = provider.generate(config)
 
         assert "# CORS Configuration" in result
-        assert "add_header 'Access-Control-Allow-Origin' 'https://app.example.com' always;" in result
-        assert "add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE' always;" in result
-        assert "add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;" in result
+        assert (
+            "add_header 'Access-Control-Allow-Origin' 'https://app.example.com' always;" in result
+        )
+        assert (
+            "add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE' always;" in result
+        )
+        assert (
+            "add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;"
+            in result
+        )
         assert "add_header 'Access-Control-Expose-Headers' 'X-Request-ID' always;" in result
         assert "add_header 'Access-Control-Allow-Credentials' 'true' always;" in result
         assert "add_header 'Access-Control-Max-Age' '86400' always;" in result
@@ -612,7 +551,7 @@ class TestNginxProvider:
             type="rest",
             protocol="http",
             upstream=Upstream(targets=[UpstreamTarget(host="svc1.local", port=8080)]),
-            routes=[Route(path_prefix="/api/v1")]
+            routes=[Route(path_prefix="/api/v1")],
         )
 
         service2 = Service(
@@ -620,14 +559,14 @@ class TestNginxProvider:
             type="rest",
             protocol="http",
             upstream=Upstream(targets=[UpstreamTarget(host="svc2.local", port=9090)]),
-            routes=[Route(path_prefix="/api/v2")]
+            routes=[Route(path_prefix="/api/v2")],
         )
 
         config = Config(
             version="1.0",
             provider="nginx",
             global_config=GlobalConfig(),
-            services=[service1, service2]
+            services=[service1, service2],
         )
 
         result = provider.generate(config)
@@ -649,15 +588,12 @@ class TestNginxProvider:
             routes=[
                 Route(path_prefix="/api/v1"),
                 Route(path_prefix="/api/v2"),
-                Route(path_prefix="/api/v3")
-            ]
+                Route(path_prefix="/api/v3"),
+            ],
         )
 
         config = Config(
-            version="1.0",
-            provider="nginx",
-            global_config=GlobalConfig(),
-            services=[service]
+            version="1.0", provider="nginx", global_config=GlobalConfig(), services=[service]
         )
 
         result = provider.generate(config)
@@ -675,14 +611,14 @@ class TestNginxProvider:
             type="rest",
             protocol="http",
             upstream=Upstream(targets=[UpstreamTarget(host="api.local", port=8080)]),
-            routes=[Route(path_prefix="/api")]
+            routes=[Route(path_prefix="/api")],
         )
 
         config = Config(
             version="1.0",
             provider="nginx",
             global_config=GlobalConfig(port=8888),
-            services=[service]
+            services=[service],
         )
 
         result = provider.generate(config)
@@ -696,50 +632,36 @@ class TestNginxProvider:
         upstream = Upstream(
             targets=[
                 UpstreamTarget(host="api-1.internal", port=8080, weight=2),
-                UpstreamTarget(host="api-2.internal", port=8080, weight=1)
+                UpstreamTarget(host="api-2.internal", port=8080, weight=1),
             ],
             health_check=HealthCheckConfig(
                 passive=PassiveHealthCheck(enabled=True, max_failures=3)
             ),
-            load_balancer=LoadBalancerConfig(algorithm="least_conn")
+            load_balancer=LoadBalancerConfig(algorithm="least_conn"),
         )
 
         route = Route(
             path_prefix="/api",
-            rate_limit=RateLimitConfig(
-                enabled=True,
-                requests_per_second=100,
-                burst=200
-            ),
+            rate_limit=RateLimitConfig(enabled=True, requests_per_second=100, burst=200),
             authentication=AuthenticationConfig(
-                enabled=True,
-                type="basic",
-                basic_auth=BasicAuthConfig(users={"admin": "password"})
+                enabled=True, type="basic", basic_auth=BasicAuthConfig(users={"admin": "password"})
             ),
             headers=HeaderManipulation(
-                request_add={"X-Request-ID": "{{uuid}}"},
-                response_add={"X-Frame-Options": "DENY"}
+                request_add={"X-Request-ID": "{{uuid}}"}, response_add={"X-Frame-Options": "DENY"}
             ),
             cors=CORSPolicy(
                 enabled=True,
                 allowed_origins=["https://app.example.com"],
-                allowed_methods=["GET", "POST"]
-            )
+                allowed_methods=["GET", "POST"],
+            ),
         )
 
         service = Service(
-            name="full_featured",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="full_featured", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         config = Config(
-            version="1.0",
-            provider="nginx",
-            global_config=GlobalConfig(port=80),
-            services=[service]
+            version="1.0", provider="nginx", global_config=GlobalConfig(port=80), services=[service]
         )
 
         result = provider.generate(config)
@@ -777,17 +699,10 @@ class TestNginxProvider:
         upstream = Upstream(targets=[UpstreamTarget(host="test.local", port=8080)])
         route = Route(path_prefix="/api")
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
         return Config(
-            version="1.0",
-            provider="nginx",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="nginx", global_config=global_config, services=[service]
         )
 
     def _create_lb_config(self, algorithm: str):
@@ -795,23 +710,16 @@ class TestNginxProvider:
         upstream = Upstream(
             targets=[
                 UpstreamTarget(host="api-1.internal", port=8080),
-                UpstreamTarget(host="api-2.internal", port=8080)
+                UpstreamTarget(host="api-2.internal", port=8080),
             ],
-            load_balancer=LoadBalancerConfig(algorithm=algorithm)
+            load_balancer=LoadBalancerConfig(algorithm=algorithm),
         )
 
         route = Route(path_prefix="/api")
         service = Service(
-            name="lb_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="lb_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         return Config(
-            version="1.0",
-            provider="nginx",
-            global_config=GlobalConfig(),
-            services=[service]
+            version="1.0", provider="nginx", global_config=GlobalConfig(), services=[service]
         )

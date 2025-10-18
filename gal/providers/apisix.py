@@ -6,12 +6,14 @@ serverless functions (Lua) for request transformations.
 """
 
 import json
-import os
 import logging
-import requests
+import os
 from typing import Optional
-from ..provider import Provider
+
+import requests
+
 from ..config import Config
+from ..provider import Provider
 
 logger = logging.getLogger(__name__)
 
@@ -114,22 +116,15 @@ class APISIXProvider(Provider):
             True
         """
         logger.info(f"Generating APISIX configuration for {len(config.services)} services")
-        apisix_config = {
-            "routes": [],
-            "upstreams": [],
-            "services": []
-        }
-        
+        apisix_config = {"routes": [], "upstreams": [], "services": []}
+
         for service in config.services:
             # Create upstream with health checks and load balancing
             upstream = self._generate_upstream(service)
             apisix_config["upstreams"].append(upstream)
-            
+
             # Create service with plugins
-            svc_config = {
-                "id": service.name,
-                "upstream_id": f"{service.name}_upstream"
-            }
+            svc_config = {"id": service.name, "upstream_id": f"{service.name}_upstream"}
 
             if service.transformation and service.transformation.enabled:
                 svc_config["plugins"] = {}
@@ -138,9 +133,7 @@ class APISIXProvider(Provider):
                 if service.transformation.defaults or service.transformation.computed_fields:
                     svc_config["plugins"]["serverless-pre-function"] = {
                         "phase": "rewrite",
-                        "functions": [
-                            self._generate_lua_transformation(service)
-                        ]
+                        "functions": [self._generate_lua_transformation(service)],
                     }
 
                 # Add service-level header manipulation
@@ -167,22 +160,26 @@ class APISIXProvider(Provider):
                         if headers.response_remove:
                             response_rewrite_config["headers"]["remove"] = headers.response_remove
                         svc_config["plugins"]["response-rewrite"] = response_rewrite_config
-            
+
             apisix_config["services"].append(svc_config)
-            
+
             # Create routes
             for route in service.routes:
                 route_config = {
                     "uri": f"{route.path_prefix}/*",
                     "name": f"{service.name}_route",
-                    "service_id": service.name
+                    "service_id": service.name,
                 }
 
                 if route.methods:
                     route_config["methods"] = route.methods
 
                 # Initialize plugins dict if needed
-                if (route.rate_limit and route.rate_limit.enabled) or (route.authentication and route.authentication.enabled) or route.headers:
+                if (
+                    (route.rate_limit and route.rate_limit.enabled)
+                    or (route.authentication and route.authentication.enabled)
+                    or route.headers
+                ):
                     if "plugins" not in route_config:
                         route_config["plugins"] = {}
 
@@ -196,10 +193,14 @@ class APISIXProvider(Provider):
                         in_location = auth.api_key.in_location if auth.api_key else "header"
                         route_config["plugins"]["key-auth"] = {
                             "header": key_name if in_location == "header" else None,
-                            "query": key_name if in_location == "query" else None
+                            "query": key_name if in_location == "query" else None,
                         }
                         # Remove None values
-                        route_config["plugins"]["key-auth"] = {k: v for k, v in route_config["plugins"]["key-auth"].items() if v is not None}
+                        route_config["plugins"]["key-auth"] = {
+                            k: v
+                            for k, v in route_config["plugins"]["key-auth"].items()
+                            if v is not None
+                        }
                     elif auth.type == "jwt":
                         jwt_config = {}
                         if auth.jwt:
@@ -208,7 +209,9 @@ class APISIXProvider(Provider):
                             if auth.jwt.audience:
                                 jwt_config["aud"] = auth.jwt.audience
                             if auth.jwt.algorithms:
-                                jwt_config["algorithm"] = auth.jwt.algorithms[0]  # APISIX supports one algorithm
+                                jwt_config["algorithm"] = auth.jwt.algorithms[
+                                    0
+                                ]  # APISIX supports one algorithm
                         route_config["plugins"]["jwt-auth"] = jwt_config if jwt_config else {}
 
                 # Add rate limiting plugin if configured
@@ -219,7 +222,7 @@ class APISIXProvider(Provider):
                         "rejected_code": route.rate_limit.response_status,
                         "rejected_msg": route.rate_limit.response_message,
                         "key": "remote_addr",  # or 'consumer_name', 'server_addr'
-                        "policy": "local"
+                        "policy": "local",
                     }
 
                 # Add header manipulation plugin if configured
@@ -261,7 +264,7 @@ class APISIXProvider(Provider):
                         "allow_methods": ",".join(cors.allowed_methods),
                         "allow_headers": ",".join(cors.allowed_headers),
                         "allow_credential": cors.allow_credentials,
-                        "max_age": cors.max_age
+                        "max_age": cors.max_age,
                     }
                     if cors.expose_headers:
                         cors_config["expose_headers"] = ",".join(cors.expose_headers)
@@ -273,18 +276,18 @@ class APISIXProvider(Provider):
                         route_config["plugins"] = {}
                     cb = route.circuit_breaker
                     # Parse timeout (e.g., "30s" -> 30)
-                    timeout_seconds = int(cb.timeout.rstrip('s'))
+                    timeout_seconds = int(cb.timeout.rstrip("s"))
                     cb_config = {
                         "break_response_code": cb.failure_response_code,
                         "max_breaker_sec": timeout_seconds,
                         "unhealthy": {
                             "http_statuses": cb.unhealthy_status_codes,
-                            "failures": cb.max_failures
+                            "failures": cb.max_failures,
                         },
                         "healthy": {
                             "http_statuses": cb.healthy_status_codes,
-                            "successes": cb.half_open_requests
-                        }
+                            "successes": cb.half_open_requests,
+                        },
                     }
                     route_config["plugins"]["api-breaker"] = cb_config
 
@@ -305,7 +308,7 @@ class APISIXProvider(Provider):
                         lua_request = self._generate_body_transformation_request_lua(bt.request)
                         route_config["plugins"]["serverless-pre-function"] = {
                             "phase": "rewrite",
-                            "functions": [lua_request]
+                            "functions": [lua_request],
                         }
 
                     # Response body transformation (serverless-post-function)
@@ -313,13 +316,15 @@ class APISIXProvider(Provider):
                         lua_response = self._generate_body_transformation_response_lua(bt.response)
                         route_config["plugins"]["serverless-post-function"] = {
                             "phase": "body_filter",
-                            "functions": [lua_response]
+                            "functions": [lua_response],
                         }
 
                 apisix_config["routes"].append(route_config)
 
         result = json.dumps(apisix_config, indent=2)
-        logger.info(f"APISIX configuration generated: {len(result)} bytes, {len(config.services)} services")
+        logger.info(
+            f"APISIX configuration generated: {len(result)} bytes, {len(config.services)} services"
+        )
         return result
 
     def _generate_upstream(self, service) -> dict:
@@ -347,7 +352,7 @@ class APISIXProvider(Provider):
         upstream = {
             "id": f"{service.name}_upstream",
             "type": "roundrobin",  # Default algorithm
-            "nodes": {}
+            "nodes": {},
         }
 
         # Determine if using targets mode or simple host/port mode
@@ -367,7 +372,7 @@ class APISIXProvider(Provider):
                 "round_robin": "roundrobin",
                 "least_conn": "least_conn",
                 "ip_hash": "chash",
-                "weighted": "roundrobin"  # Weighted uses roundrobin with node weights
+                "weighted": "roundrobin",  # Weighted uses roundrobin with node weights
             }
             algorithm = service.upstream.load_balancer.algorithm
             upstream["type"] = lb_algo_map.get(algorithm, "roundrobin")
@@ -392,12 +397,12 @@ class APISIXProvider(Provider):
                     "healthy": {
                         "interval": self._parse_duration(active.interval),
                         "successes": active.healthy_threshold,
-                        "http_statuses": active.healthy_status_codes
+                        "http_statuses": active.healthy_status_codes,
                     },
                     "unhealthy": {
                         "interval": self._parse_duration(active.interval),
-                        "http_failures": active.unhealthy_threshold
-                    }
+                        "http_failures": active.unhealthy_threshold,
+                    },
                 }
 
             # Passive health checks
@@ -407,12 +412,12 @@ class APISIXProvider(Provider):
                     "type": "http",
                     "healthy": {
                         "successes": 1,
-                        "http_statuses": [200, 201, 202, 204, 301, 302, 303, 304, 307, 308]
+                        "http_statuses": [200, 201, 202, 204, 301, 302, 303, 304, 307, 308],
                     },
                     "unhealthy": {
                         "http_failures": passive.max_failures,
-                        "http_statuses": passive.unhealthy_status_codes
-                    }
+                        "http_statuses": passive.unhealthy_status_codes,
+                    },
                 }
 
             if checks_config:
@@ -438,11 +443,11 @@ class APISIXProvider(Provider):
             60
         """
         duration = duration.strip()
-        if duration.endswith('s'):
+        if duration.endswith("s"):
             return int(duration[:-1])
-        elif duration.endswith('m'):
+        elif duration.endswith("m"):
             return int(duration[:-1]) * 60
-        elif duration.endswith('h'):
+        elif duration.endswith("h"):
             return int(duration[:-1]) * 3600
         else:
             # Assume seconds if no unit
@@ -483,14 +488,14 @@ class APISIXProvider(Provider):
         lua_code.append("  if body then")
         lua_code.append("    local json_body = cjson.decode(body)")
         lua_code.append("    if json_body then")
-        
+
         # Add defaults
         for key, value in service.transformation.defaults.items():
             if isinstance(value, str):
                 lua_code.append(f"      json_body.{key} = json_body.{key} or '{value}'")
             else:
                 lua_code.append(f"      json_body.{key} = json_body.{key} or {value}")
-        
+
         # Add computed fields
         for cf in service.transformation.computed_fields:
             if cf.generator == "timestamp":
@@ -499,9 +504,11 @@ class APISIXProvider(Provider):
                 lua_code.append("      end")
             elif cf.generator == "uuid":
                 lua_code.append(f"      if not json_body.{cf.field} then")
-                lua_code.append(f"        json_body.{cf.field} = '{cf.prefix}' .. core.utils.uuid()")
+                lua_code.append(
+                    f"        json_body.{cf.field} = '{cf.prefix}' .. core.utils.uuid()"
+                )
                 lua_code.append("      end")
-        
+
         lua_code.append("      ngx.req.set_body_data(cjson.encode(json_body))")
         lua_code.append("    end")
         lua_code.append("  end")
@@ -619,8 +626,13 @@ class APISIXProvider(Provider):
 
         return "\n".join(lua_code)
 
-    def deploy(self, config: Config, output_file: Optional[str] = None,
-               admin_url: Optional[str] = None, api_key: Optional[str] = None) -> bool:
+    def deploy(
+        self,
+        config: Config,
+        output_file: Optional[str] = None,
+        admin_url: Optional[str] = None,
+        api_key: Optional[str] = None,
+    ) -> bool:
         """Deploy APISIX configuration.
 
         Deploys configuration via APISIX Admin API or standalone file.
@@ -666,7 +678,7 @@ class APISIXProvider(Provider):
             # Create directory if it doesn't exist
             os.makedirs(os.path.dirname(output_file) or ".", exist_ok=True)
 
-            with open(output_file, 'w') as f:
+            with open(output_file, "w") as f:
                 f.write(generated_config)
 
             logger.info(f"APISIX configuration successfully written to {output_file}")
@@ -678,14 +690,11 @@ class APISIXProvider(Provider):
 
         # Optionally deploy via Admin API
         if admin_url:
-            admin_url = admin_url.rstrip('/')
+            admin_url = admin_url.rstrip("/")
             if api_key is None:
                 api_key = "edd1c9f034335f136f87ad84b625c8f1"  # Default APISIX API key
 
-            headers = {
-                "X-API-KEY": api_key,
-                "Content-Type": "application/json"
-            }
+            headers = {"X-API-KEY": api_key, "Content-Type": "application/json"}
 
             logger.debug(f"Deploying to APISIX Admin API at {admin_url}")
             try:
@@ -700,7 +709,7 @@ class APISIXProvider(Provider):
                         f"{admin_url}/apisix/admin/upstreams/{upstream_id}",
                         json=upstream,
                         headers=headers,
-                        timeout=10
+                        timeout=10,
                     )
                     if response.status_code in (200, 201):
                         print(f"✓ Deployed upstream: {upstream_id}")
@@ -716,7 +725,7 @@ class APISIXProvider(Provider):
                         f"{admin_url}/apisix/admin/services/{service_id}",
                         json=service,
                         headers=headers,
-                        timeout=10
+                        timeout=10,
                     )
                     if response.status_code in (200, 201):
                         print(f"✓ Deployed service: {service_id}")
@@ -732,7 +741,7 @@ class APISIXProvider(Provider):
                         f"{admin_url}/apisix/admin/routes/{route_id}",
                         json=route,
                         headers=headers,
-                        timeout=10
+                        timeout=10,
                     )
                     if response.status_code in (200, 201):
                         print(f"✓ Deployed route: {route.get('name', route_id)}")

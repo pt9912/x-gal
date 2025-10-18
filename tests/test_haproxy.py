@@ -3,9 +3,18 @@ Tests for HAProxy Provider
 """
 
 from gal.config import (
-    Config, GlobalConfig, Service, Route, Upstream, UpstreamTarget,
-    LoadBalancerConfig, HealthCheckConfig, ActiveHealthCheck,
-    RateLimitConfig, HeaderManipulation, CORSPolicy
+    ActiveHealthCheck,
+    Config,
+    CORSPolicy,
+    GlobalConfig,
+    HeaderManipulation,
+    HealthCheckConfig,
+    LoadBalancerConfig,
+    RateLimitConfig,
+    Route,
+    Service,
+    Upstream,
+    UpstreamTarget,
 )
 from gal.providers.haproxy import HAProxyProvider
 
@@ -30,9 +39,9 @@ class TestHAProxyProvider:
                     type="rest",
                     protocol="http",
                     upstream=Upstream(host="test.local", port=8080),
-                    routes=[Route(path_prefix="/api")]
+                    routes=[Route(path_prefix="/api")],
                 )
-            ]
+            ],
         )
 
         provider = HAProxyProvider()
@@ -76,11 +85,11 @@ class TestHAProxyProvider:
                             UpstreamTarget(host="api-1.local", port=8080),
                             UpstreamTarget(host="api-2.local", port=8080),
                         ],
-                        load_balancer=LoadBalancerConfig(algorithm="round_robin")
+                        load_balancer=LoadBalancerConfig(algorithm="round_robin"),
                     ),
-                    routes=[Route(path_prefix="/api")]
+                    routes=[Route(path_prefix="/api")],
                 )
-            ]
+            ],
         )
 
         provider = HAProxyProvider()
@@ -107,11 +116,11 @@ class TestHAProxyProvider:
                             UpstreamTarget(host="api-1.local", port=8080),
                             UpstreamTarget(host="api-2.local", port=8080),
                         ],
-                        load_balancer=LoadBalancerConfig(algorithm="least_conn")
+                        load_balancer=LoadBalancerConfig(algorithm="least_conn"),
                     ),
-                    routes=[Route(path_prefix="/api")]
+                    routes=[Route(path_prefix="/api")],
                 )
-            ]
+            ],
         )
 
         provider = HAProxyProvider()
@@ -136,11 +145,11 @@ class TestHAProxyProvider:
                             UpstreamTarget(host="api-1.local", port=8080, weight=3),
                             UpstreamTarget(host="api-2.local", port=8080, weight=1),
                         ],
-                        load_balancer=LoadBalancerConfig(algorithm="weighted")
+                        load_balancer=LoadBalancerConfig(algorithm="weighted"),
                     ),
-                    routes=[Route(path_prefix="/api")]
+                    routes=[Route(path_prefix="/api")],
                 )
-            ]
+            ],
         )
 
         provider = HAProxyProvider()
@@ -173,13 +182,13 @@ class TestHAProxyProvider:
                                 timeout="3s",
                                 healthy_threshold=2,
                                 unhealthy_threshold=3,
-                                healthy_status_codes=[200, 204]
+                                healthy_status_codes=[200, 204],
                             )
-                        )
+                        ),
                     ),
-                    routes=[Route(path_prefix="/api")]
+                    routes=[Route(path_prefix="/api")],
                 )
-            ]
+            ],
         )
 
         provider = HAProxyProvider()
@@ -210,12 +219,12 @@ class TestHAProxyProvider:
                                 requests_per_second=100,
                                 burst=200,
                                 key_type="ip_address",
-                                response_status=429
-                            )
+                                response_status=429,
+                            ),
                         )
-                    ]
+                    ],
                 )
-            ]
+            ],
         )
 
         provider = HAProxyProvider()
@@ -224,7 +233,10 @@ class TestHAProxyProvider:
         assert "frontend http_frontend" in result
         assert "stick-table type ip" in result
         assert "http-request track-sc0 src if is_api_route0" in result
-        assert "http-request deny deny_status 429 if is_api_route0 { sc_http_req_rate(0) gt 100 }" in result
+        assert (
+            "http-request deny deny_status 429 if is_api_route0 { sc_http_req_rate(0) gt 100 }"
+            in result
+        )
 
     def test_request_headers(self):
         """Test request header manipulation"""
@@ -244,12 +256,12 @@ class TestHAProxyProvider:
                             headers=HeaderManipulation(
                                 request_add={"X-Request-ID": "{{uuid}}", "X-Gateway": "GAL"},
                                 request_set={"User-Agent": "GAL/1.0"},
-                                request_remove=["X-Internal"]
-                            )
+                                request_remove=["X-Internal"],
+                            ),
                         )
-                    ]
+                    ],
                 )
-            ]
+            ],
         )
 
         provider = HAProxyProvider()
@@ -281,21 +293,33 @@ class TestHAProxyProvider:
                                 allowed_methods=["GET", "POST", "PUT", "DELETE"],
                                 allowed_headers=["Content-Type", "Authorization"],
                                 allow_credentials=True,
-                                max_age=86400
-                            )
+                                max_age=86400,
+                            ),
                         )
-                    ]
+                    ],
                 )
-            ]
+            ],
         )
 
         provider = HAProxyProvider()
         result = provider.generate(config)
 
-        assert 'http-response set-header Access-Control-Allow-Origin "https://app.example.com" if is_api_route0' in result
-        assert 'http-response set-header Access-Control-Allow-Methods "GET, POST, PUT, DELETE" if is_api_route0' in result
-        assert 'http-response set-header Access-Control-Allow-Headers "Content-Type, Authorization" if is_api_route0' in result
-        assert 'http-response set-header Access-Control-Allow-Credentials "true" if is_api_route0' in result
+        assert (
+            'http-response set-header Access-Control-Allow-Origin "https://app.example.com" if is_api_route0'
+            in result
+        )
+        assert (
+            'http-response set-header Access-Control-Allow-Methods "GET, POST, PUT, DELETE" if is_api_route0'
+            in result
+        )
+        assert (
+            'http-response set-header Access-Control-Allow-Headers "Content-Type, Authorization" if is_api_route0'
+            in result
+        )
+        assert (
+            'http-response set-header Access-Control-Allow-Credentials "true" if is_api_route0'
+            in result
+        )
         assert 'http-response set-header Access-Control-Max-Age "86400" if is_api_route0' in result
 
     def test_sticky_sessions(self):
@@ -315,14 +339,12 @@ class TestHAProxyProvider:
                             UpstreamTarget(host="api-2.local", port=8080),
                         ],
                         load_balancer=LoadBalancerConfig(
-                            algorithm="round_robin",
-                            sticky_sessions=True,
-                            cookie_name="GALID"
-                        )
+                            algorithm="round_robin", sticky_sessions=True, cookie_name="GALID"
+                        ),
                     ),
-                    routes=[Route(path_prefix="/api")]
+                    routes=[Route(path_prefix="/api")],
                 )
-            ]
+            ],
         )
 
         provider = HAProxyProvider()

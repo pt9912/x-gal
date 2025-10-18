@@ -9,18 +9,22 @@ Tests circuit breaker functionality across all providers:
 """
 
 import json
+
 import pytest
-from gal.config import Config, Service, Route, Upstream, GlobalConfig, CircuitBreakerConfig
-from gal.providers.kong import KongProvider
+
+from gal.config import CircuitBreakerConfig, Config, GlobalConfig, Route, Service, Upstream
 from gal.providers.apisix import APISIXProvider
-from gal.providers.traefik import TraefikProvider
 from gal.providers.envoy import EnvoyProvider
+from gal.providers.kong import KongProvider
+from gal.providers.traefik import TraefikProvider
 
 
 class TestCircuitBreaker:
     """Test Circuit Breaker pattern for all providers"""
 
-    def _create_config_with_circuit_breaker(self, provider_name: str, circuit_breaker: CircuitBreakerConfig):
+    def _create_config_with_circuit_breaker(
+        self, provider_name: str, circuit_breaker: CircuitBreakerConfig
+    ):
         """Helper to create test config with circuit breaker"""
         return Config(
             version="1.0",
@@ -36,23 +40,18 @@ class TestCircuitBreaker:
                         Route(
                             path_prefix="/api/v1",
                             methods=["GET", "POST"],
-                            circuit_breaker=circuit_breaker
+                            circuit_breaker=circuit_breaker,
                         )
-                    ]
+                    ],
                 )
-            ]
+            ],
         )
 
     # APISIX Tests
     def test_apisix_circuit_breaker_basic(self):
         """Test APISIX api-breaker plugin with basic configuration"""
         provider = APISIXProvider()
-        cb = CircuitBreakerConfig(
-            enabled=True,
-            max_failures=5,
-            timeout="30s",
-            half_open_requests=3
-        )
+        cb = CircuitBreakerConfig(enabled=True, max_failures=5, timeout="30s", half_open_requests=3)
         config = self._create_config_with_circuit_breaker("apisix", cb)
         result = provider.generate(config)
         config_json = json.loads(result)
@@ -66,10 +65,7 @@ class TestCircuitBreaker:
     def test_apisix_circuit_breaker_unhealthy_codes(self):
         """Test APISIX circuit breaker with custom unhealthy status codes"""
         provider = APISIXProvider()
-        cb = CircuitBreakerConfig(
-            enabled=True,
-            unhealthy_status_codes=[500, 502, 503, 504]
-        )
+        cb = CircuitBreakerConfig(enabled=True, unhealthy_status_codes=[500, 502, 503, 504])
         config = self._create_config_with_circuit_breaker("apisix", cb)
         result = provider.generate(config)
         config_json = json.loads(result)
@@ -80,10 +76,7 @@ class TestCircuitBreaker:
     def test_apisix_circuit_breaker_healthy_codes(self):
         """Test APISIX circuit breaker with custom healthy status codes"""
         provider = APISIXProvider()
-        cb = CircuitBreakerConfig(
-            enabled=True,
-            healthy_status_codes=[200, 201, 204]
-        )
+        cb = CircuitBreakerConfig(enabled=True, healthy_status_codes=[200, 201, 204])
         config = self._create_config_with_circuit_breaker("apisix", cb)
         result = provider.generate(config)
         config_json = json.loads(result)
@@ -94,10 +87,7 @@ class TestCircuitBreaker:
     def test_apisix_circuit_breaker_response_code(self):
         """Test APISIX circuit breaker with custom failure response code"""
         provider = APISIXProvider()
-        cb = CircuitBreakerConfig(
-            enabled=True,
-            failure_response_code=503
-        )
+        cb = CircuitBreakerConfig(enabled=True, failure_response_code=503)
         config = self._create_config_with_circuit_breaker("apisix", cb)
         result = provider.generate(config)
         config_json = json.loads(result)
@@ -110,9 +100,7 @@ class TestCircuitBreaker:
         """Test Traefik CircuitBreaker middleware with expression"""
         provider = TraefikProvider()
         cb = CircuitBreakerConfig(
-            enabled=True,
-            max_failures=5,
-            unhealthy_status_codes=[500, 502, 503, 504]
+            enabled=True, max_failures=5, unhealthy_status_codes=[500, 502, 503, 504]
         )
         config = self._create_config_with_circuit_breaker("traefik", cb)
         result = provider.generate(config)
@@ -125,11 +113,7 @@ class TestCircuitBreaker:
     def test_traefik_circuit_breaker_expression_format(self):
         """Test Traefik circuit breaker expression format"""
         provider = TraefikProvider()
-        cb = CircuitBreakerConfig(
-            enabled=True,
-            max_failures=5,
-            unhealthy_status_codes=[500, 505]
-        )
+        cb = CircuitBreakerConfig(enabled=True, max_failures=5, unhealthy_status_codes=[500, 505])
         config = self._create_config_with_circuit_breaker("traefik", cb)
         result = provider.generate(config)
 
@@ -142,9 +126,7 @@ class TestCircuitBreaker:
         """Test Traefik circuit breaker NetworkErrorRatio fallback"""
         provider = TraefikProvider()
         cb = CircuitBreakerConfig(
-            enabled=True,
-            max_failures=3,
-            unhealthy_status_codes=[]  # Empty list triggers fallback
+            enabled=True, max_failures=3, unhealthy_status_codes=[]  # Empty list triggers fallback
         )
         config = self._create_config_with_circuit_breaker("traefik", cb)
         result = provider.generate(config)
@@ -168,12 +150,7 @@ class TestCircuitBreaker:
     def test_envoy_circuit_breaker_basic(self):
         """Test Envoy outlier detection for circuit breaker"""
         provider = EnvoyProvider()
-        cb = CircuitBreakerConfig(
-            enabled=True,
-            max_failures=5,
-            timeout="30s",
-            half_open_requests=3
-        )
+        cb = CircuitBreakerConfig(enabled=True, max_failures=5, timeout="30s", half_open_requests=3)
         config = self._create_config_with_circuit_breaker("envoy", cb)
         result = provider.generate(config)
 
@@ -185,10 +162,7 @@ class TestCircuitBreaker:
     def test_envoy_circuit_breaker_consecutive_errors(self):
         """Test Envoy consecutive_5xx configuration"""
         provider = EnvoyProvider()
-        cb = CircuitBreakerConfig(
-            enabled=True,
-            max_failures=10
-        )
+        cb = CircuitBreakerConfig(enabled=True, max_failures=10)
         config = self._create_config_with_circuit_breaker("envoy", cb)
         result = provider.generate(config)
 
@@ -197,10 +171,7 @@ class TestCircuitBreaker:
     def test_envoy_circuit_breaker_ejection_time(self):
         """Test Envoy base ejection time configuration"""
         provider = EnvoyProvider()
-        cb = CircuitBreakerConfig(
-            enabled=True,
-            timeout="60s"
-        )
+        cb = CircuitBreakerConfig(enabled=True, timeout="60s")
         config = self._create_config_with_circuit_breaker("envoy", cb)
         result = provider.generate(config)
 
@@ -230,6 +201,7 @@ class TestCircuitBreaker:
     def test_kong_circuit_breaker_warning(self, caplog):
         """Test Kong logs warning when circuit breaker is configured"""
         import logging
+
         caplog.set_level(logging.WARNING)
 
         provider = KongProvider()
@@ -276,7 +248,7 @@ class TestCircuitBreaker:
         # Circuit breaker middleware should not be present
         assert "api_service_router_0_circuitbreaker:" not in result
         # Should not have circuitBreaker config
-        lines = result.split('\n')
+        lines = result.split("\n")
         assert not any("circuitBreaker:" in line for line in lines)
 
     def test_circuit_breaker_disabled_envoy(self):
@@ -292,6 +264,7 @@ class TestCircuitBreaker:
     def test_circuit_breaker_disabled_kong(self, caplog):
         """Test Kong does not log warning when circuit breaker is disabled"""
         import logging
+
         caplog.set_level(logging.WARNING)
 
         provider = KongProvider()
@@ -301,8 +274,7 @@ class TestCircuitBreaker:
 
         # Should not log warning when disabled
         circuit_breaker_warnings = [
-            record for record in caplog.records
-            if "circuit breaker" in record.message.lower()
+            record for record in caplog.records if "circuit breaker" in record.message.lower()
         ]
         assert len(circuit_breaker_warnings) == 0
 
@@ -322,12 +294,9 @@ class TestCircuitBreaker:
                     routes=[
                         Route(
                             path_prefix="/api/v1",
-                            circuit_breaker=CircuitBreakerConfig(
-                                enabled=True,
-                                max_failures=3
-                            )
+                            circuit_breaker=CircuitBreakerConfig(enabled=True, max_failures=3),
                         )
-                    ]
+                    ],
                 ),
                 Service(
                     name="service2",
@@ -337,14 +306,11 @@ class TestCircuitBreaker:
                     routes=[
                         Route(
                             path_prefix="/api/v2",
-                            circuit_breaker=CircuitBreakerConfig(
-                                enabled=True,
-                                max_failures=7
-                            )
+                            circuit_breaker=CircuitBreakerConfig(enabled=True, max_failures=7),
                         )
-                    ]
-                )
-            ]
+                    ],
+                ),
+            ],
         )
 
         provider = EnvoyProvider()

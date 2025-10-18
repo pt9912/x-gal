@@ -11,16 +11,16 @@ Tests WebSocket functionality across all providers:
 """
 
 import json
+
 import pytest
-from gal.config import (
-    Config, Service, Route, Upstream, GlobalConfig, WebSocketConfig
-)
-from gal.providers.envoy import EnvoyProvider
-from gal.providers.kong import KongProvider
+
+from gal.config import Config, GlobalConfig, Route, Service, Upstream, WebSocketConfig
 from gal.providers.apisix import APISIXProvider
-from gal.providers.traefik import TraefikProvider
-from gal.providers.nginx import NginxProvider
+from gal.providers.envoy import EnvoyProvider
 from gal.providers.haproxy import HAProxyProvider
+from gal.providers.kong import KongProvider
+from gal.providers.nginx import NginxProvider
+from gal.providers.traefik import TraefikProvider
 
 
 class TestWebSocketSupport:
@@ -37,18 +37,10 @@ class TestWebSocketSupport:
                     name="websocket_service",
                     type="rest",
                     protocol="http",
-                    upstream=Upstream(
-                        host="ws-server.local",
-                        port=8080
-                    ),
-                    routes=[
-                        Route(
-                            path_prefix="/ws",
-                            websocket=websocket
-                        )
-                    ]
+                    upstream=Upstream(host="ws-server.local", port=8080),
+                    routes=[Route(path_prefix="/ws", websocket=websocket)],
                 )
-            ]
+            ],
         )
 
     # Envoy Tests
@@ -72,7 +64,7 @@ class TestWebSocketSupport:
             enabled=True,
             idle_timeout="600s",  # 10 minutes
             ping_interval="20s",
-            max_message_size=2097152  # 2MB
+            max_message_size=2097152,  # 2MB
         )
         config = self._create_config_with_websocket("envoy", ws)
         result = provider.generate(config)
@@ -93,9 +85,9 @@ class TestWebSocketSupport:
                     type="rest",
                     protocol="http",
                     upstream=Upstream(host="api.local", port=8080),
-                    routes=[Route(path_prefix="/api")]
+                    routes=[Route(path_prefix="/api")],
                 )
-            ]
+            ],
         )
         result = provider.generate(config)
 
@@ -105,11 +97,7 @@ class TestWebSocketSupport:
     def test_envoy_websocket_with_compression(self):
         """Test Envoy WebSocket with compression enabled"""
         provider = EnvoyProvider()
-        ws = WebSocketConfig(
-            enabled=True,
-            compression=True,
-            max_message_size=1048576
-        )
+        ws = WebSocketConfig(enabled=True, compression=True, max_message_size=1048576)
         config = self._create_config_with_websocket("envoy", ws)
         result = provider.generate(config)
 
@@ -133,11 +121,7 @@ class TestWebSocketSupport:
     def test_kong_websocket_with_timeouts(self):
         """Test Kong WebSocket with custom timeouts"""
         provider = KongProvider()
-        ws = WebSocketConfig(
-            enabled=True,
-            idle_timeout="1200s",  # 20 minutes
-            ping_interval="15s"
-        )
+        ws = WebSocketConfig(enabled=True, idle_timeout="1200s", ping_interval="15s")  # 20 minutes
         config = self._create_config_with_websocket("kong", ws)
         result = provider.generate(config)
 
@@ -172,9 +156,9 @@ class TestWebSocketSupport:
                     type="rest",
                     protocol="http",
                     upstream=Upstream(host="api.local", port=8080),
-                    routes=[Route(path_prefix="/api")]
+                    routes=[Route(path_prefix="/api")],
                 )
-            ]
+            ],
         )
         result = provider.generate(config)
 
@@ -186,10 +170,7 @@ class TestWebSocketSupport:
     def test_apisix_websocket_with_timeout(self):
         """Test APISIX WebSocket with custom timeout"""
         provider = APISIXProvider()
-        ws = WebSocketConfig(
-            enabled=True,
-            idle_timeout="900s"
-        )
+        ws = WebSocketConfig(enabled=True, idle_timeout="900s")
         config = self._create_config_with_websocket("apisix", ws)
         result = provider.generate(config)
 
@@ -213,10 +194,7 @@ class TestWebSocketSupport:
     def test_traefik_websocket_with_flush_interval(self):
         """Test Traefik WebSocket configuration"""
         provider = TraefikProvider()
-        ws = WebSocketConfig(
-            enabled=True,
-            ping_interval="10s"
-        )
+        ws = WebSocketConfig(enabled=True, ping_interval="10s")
         config = self._create_config_with_websocket("traefik", ws)
         result = provider.generate(config)
 
@@ -233,21 +211,18 @@ class TestWebSocketSupport:
 
         # Nginx requires proxy_http_version 1.1 and Upgrade headers
         assert "proxy_http_version 1.1;" in result
-        assert 'proxy_set_header Upgrade $http_upgrade;' in result
+        assert "proxy_set_header Upgrade $http_upgrade;" in result
         assert 'proxy_set_header Connection "upgrade";' in result
 
     def test_nginx_websocket_with_timeout(self):
         """Test Nginx WebSocket with custom timeout"""
         provider = NginxProvider()
-        ws = WebSocketConfig(
-            enabled=True,
-            idle_timeout="600s"
-        )
+        ws = WebSocketConfig(enabled=True, idle_timeout="600s")
         config = self._create_config_with_websocket("nginx", ws)
         result = provider.generate(config)
 
         assert "proxy_http_version 1.1;" in result
-        assert 'proxy_set_header Upgrade $http_upgrade;' in result
+        assert "proxy_set_header Upgrade $http_upgrade;" in result
         # Nginx uses proxy_read_timeout for idle timeout
         assert "proxy_read_timeout 600s;" in result
 
@@ -264,14 +239,14 @@ class TestWebSocketSupport:
                     type="rest",
                     protocol="http",
                     upstream=Upstream(host="api.local", port=8080),
-                    routes=[Route(path_prefix="/api")]
+                    routes=[Route(path_prefix="/api")],
                 )
-            ]
+            ],
         )
         result = provider.generate(config)
 
         # Should not have WebSocket-specific headers
-        assert 'proxy_set_header Upgrade $http_upgrade;' not in result
+        assert "proxy_set_header Upgrade $http_upgrade;" not in result
         assert 'proxy_set_header Connection "upgrade";' not in result
 
     # HAProxy Tests
@@ -288,10 +263,7 @@ class TestWebSocketSupport:
     def test_haproxy_websocket_with_timeout(self):
         """Test HAProxy WebSocket with custom timeout"""
         provider = HAProxyProvider()
-        ws = WebSocketConfig(
-            enabled=True,
-            idle_timeout="1800s"  # 30 minutes
-        )
+        ws = WebSocketConfig(enabled=True, idle_timeout="1800s")  # 30 minutes
         config = self._create_config_with_websocket("haproxy", ws)
         result = provider.generate(config)
 
@@ -311,9 +283,9 @@ class TestWebSocketSupport:
                     type="rest",
                     protocol="http",
                     upstream=Upstream(host="api.local", port=8080),
-                    routes=[Route(path_prefix="/api")]
+                    routes=[Route(path_prefix="/api")],
                 )
-            ]
+            ],
         )
         result = provider.generate(config)
 
@@ -340,23 +312,20 @@ class TestWebSocketSupport:
                     routes=[
                         Route(
                             path_prefix="/ws/chat",
-                            websocket=WebSocketConfig(
-                                enabled=True,
-                                idle_timeout="600s"
-                            ),
+                            websocket=WebSocketConfig(enabled=True, idle_timeout="600s"),
                             authentication=AuthenticationConfig(
                                 enabled=True,
                                 type="jwt",
                                 jwt=JwtConfig(
                                     issuer="https://auth.example.com",
                                     audience="chat-api",
-                                    jwks_uri="https://auth.example.com/.well-known/jwks.json"
-                                )
-                            )
+                                    jwks_uri="https://auth.example.com/.well-known/jwks.json",
+                                ),
+                            ),
                         )
-                    ]
+                    ],
                 )
-            ]
+            ],
         )
         result = provider.generate(config)
 
@@ -384,31 +353,26 @@ class TestWebSocketSupport:
                     routes=[
                         Route(
                             path_prefix="/ws/dashboard",
-                            websocket=WebSocketConfig(
-                                enabled=True,
-                                compression=True
-                            ),
+                            websocket=WebSocketConfig(enabled=True, compression=True),
                             rate_limit=RateLimitConfig(
-                                enabled=True,
-                                requests_per_second=100,
-                                burst=200
-                            )
+                                enabled=True, requests_per_second=100, burst=200
+                            ),
                         )
-                    ]
+                    ],
                 )
-            ]
+            ],
         )
         result = provider.generate(config)
 
         # Should have both WebSocket and rate limiting
         assert "proxy_http_version 1.1;" in result
-        assert 'proxy_set_header Upgrade $http_upgrade;' in result
+        assert "proxy_set_header Upgrade $http_upgrade;" in result
         assert "limit_req_zone" in result
         assert "limit_req" in result
 
     def test_apisix_websocket_with_load_balancing(self):
         """Test APISIX WebSocket with load balancing"""
-        from gal.config import UpstreamTarget, LoadBalancerConfig
+        from gal.config import LoadBalancerConfig, UpstreamTarget
 
         provider = APISIXProvider()
         config = Config(
@@ -424,22 +388,20 @@ class TestWebSocketSupport:
                         targets=[
                             UpstreamTarget(host="game-1.local", port=8080, weight=3),
                             UpstreamTarget(host="game-2.local", port=8080, weight=2),
-                            UpstreamTarget(host="game-3.local", port=8080, weight=1)
+                            UpstreamTarget(host="game-3.local", port=8080, weight=1),
                         ],
-                        load_balancer=LoadBalancerConfig(algorithm="weighted")
+                        load_balancer=LoadBalancerConfig(algorithm="weighted"),
                     ),
                     routes=[
                         Route(
                             path_prefix="/ws/game",
                             websocket=WebSocketConfig(
-                                enabled=True,
-                                idle_timeout="60s",
-                                ping_interval="5s"
-                            )
+                                enabled=True, idle_timeout="60s", ping_interval="5s"
+                            ),
                         )
-                    ]
+                    ],
                 )
-            ]
+            ],
         )
         result = provider.generate(config)
 

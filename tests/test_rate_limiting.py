@@ -2,21 +2,23 @@
 Tests for rate limiting feature across all providers
 """
 
-import pytest
 import json
-from gal.providers.envoy import EnvoyProvider
-from gal.providers.kong import KongProvider
-from gal.providers.apisix import APISIXProvider
-from gal.providers.traefik import TraefikProvider
+
+import pytest
+
 from gal.config import (
     Config,
-    Service,
-    Upstream,
-    Route,
     GlobalConfig,
+    RateLimitConfig,
+    Route,
+    Service,
     Transformation,
-    RateLimitConfig
+    Upstream,
 )
+from gal.providers.apisix import APISIXProvider
+from gal.providers.envoy import EnvoyProvider
+from gal.providers.kong import KongProvider
+from gal.providers.traefik import TraefikProvider
 
 
 class TestRateLimiting:
@@ -85,11 +87,11 @@ class TestRateLimiting:
 
         route1 = Route(
             path_prefix="/api/public",
-            rate_limit=RateLimitConfig(requests_per_second=100, burst=200)
+            rate_limit=RateLimitConfig(requests_per_second=100, burst=200),
         )
         route2 = Route(
             path_prefix="/api/private",
-            rate_limit=RateLimitConfig(requests_per_second=50, burst=100)
+            rate_limit=RateLimitConfig(requests_per_second=50, burst=100),
         )
 
         service = Service(
@@ -97,14 +99,11 @@ class TestRateLimiting:
             type="rest",
             protocol="http",
             upstream=upstream,
-            routes=[route1, route2]
+            routes=[route1, route2],
         )
 
         config = Config(
-            version="1.0",
-            provider="kong",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="kong", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -123,10 +122,7 @@ class TestRateLimiting:
         rate_limit = RateLimitConfig(requests_per_second=100, burst=200)
         route = Route(path_prefix="/api", rate_limit=rate_limit)
 
-        transformation = Transformation(
-            enabled=True,
-            defaults={"status": "active"}
-        )
+        transformation = Transformation(enabled=True, defaults={"status": "active"})
 
         service = Service(
             name="test_service",
@@ -134,14 +130,11 @@ class TestRateLimiting:
             protocol="http",
             upstream=upstream,
             routes=[route],
-            transformation=transformation
+            transformation=transformation,
         )
 
         config = Config(
-            version="1.0",
-            provider="traefik",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="traefik", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -162,18 +155,11 @@ class TestRateLimiting:
         route = Route(path_prefix="/api", rate_limit=rate_limit)
 
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         config = Config(
-            version="1.0",
-            provider="kong",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="kong", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -192,23 +178,16 @@ class TestRateLimiting:
             requests_per_second=50,
             burst=100,
             response_status=503,
-            response_message="Service temporarily unavailable"
+            response_message="Service temporarily unavailable",
         )
         route = Route(path_prefix="/api", rate_limit=rate_limit)
 
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         config = Config(
-            version="1.0",
-            provider="apisix",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="apisix", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -216,7 +195,10 @@ class TestRateLimiting:
 
         route_config = config_json["routes"][0]
         assert route_config["plugins"]["limit-count"]["rejected_code"] == 503
-        assert route_config["plugins"]["limit-count"]["rejected_msg"] == "Service temporarily unavailable"
+        assert (
+            route_config["plugins"]["limit-count"]["rejected_msg"]
+            == "Service temporarily unavailable"
+        )
 
     def test_envoy_no_rate_limit(self):
         """Test Envoy without rate limiting"""
@@ -226,18 +208,11 @@ class TestRateLimiting:
         route = Route(path_prefix="/api")  # No rate limit
 
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         config = Config(
-            version="1.0",
-            provider="envoy",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="envoy", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -255,22 +230,15 @@ class TestRateLimiting:
             requests_per_second=100,
             burst=200,
             response_status=429,
-            response_message="Rate limit exceeded"
+            response_message="Rate limit exceeded",
         )
 
         route = Route(path_prefix="/api", rate_limit=rate_limit)
 
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         return Config(
-            version="1.0",
-            provider=provider_name,
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider=provider_name, global_config=global_config, services=[service]
         )

@@ -2,9 +2,10 @@
 Configuration models for GAL
 """
 
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass, field
 import logging
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ class GlobalConfig:
         >>> config.port
         8080
     """
+
     host: str = "0.0.0.0"
     port: int = 10000
     admin_port: int = 9901
@@ -48,6 +50,7 @@ class UpstreamTarget:
         >>> f"{target.host}:{target.port} (weight: {target.weight})"
         'api-1.internal:8080 (weight: 2)'
     """
+
     host: str
     port: int
     weight: int = 1
@@ -77,15 +80,14 @@ class ActiveHealthCheck:
         >>> check.http_path
         '/api/health'
     """
+
     enabled: bool = True
     http_path: str = "/health"
     interval: str = "10s"
     timeout: str = "5s"
     healthy_threshold: int = 2
     unhealthy_threshold: int = 3
-    healthy_status_codes: List[int] = field(
-        default_factory=lambda: [200, 201, 204]
-    )
+    healthy_status_codes: List[int] = field(default_factory=lambda: [200, 201, 204])
 
 
 @dataclass
@@ -108,11 +110,10 @@ class PassiveHealthCheck:
         >>> check.max_failures
         3
     """
+
     enabled: bool = True
     max_failures: int = 5
-    unhealthy_status_codes: List[int] = field(
-        default_factory=lambda: [500, 502, 503, 504]
-    )
+    unhealthy_status_codes: List[int] = field(default_factory=lambda: [500, 502, 503, 504])
 
 
 @dataclass
@@ -133,6 +134,7 @@ class HealthCheckConfig:
         >>> health.active.http_path
         '/health'
     """
+
     active: Optional[ActiveHealthCheck] = None
     passive: Optional[PassiveHealthCheck] = None
 
@@ -157,6 +159,7 @@ class LoadBalancerConfig:
         >>> lb.algorithm
         'least_conn'
     """
+
     algorithm: str = "round_robin"  # round_robin, least_conn, ip_hash, weighted
     sticky_sessions: bool = False
     cookie_name: str = "galSession"
@@ -200,6 +203,7 @@ class Upstream:
         >>> len(upstream.targets)
         2
     """
+
     host: str = ""
     port: int = 0
     targets: List[UpstreamTarget] = field(default_factory=list)
@@ -230,15 +234,16 @@ class Route:
         >>> route.path_prefix
         '/api/users'
     """
+
     path_prefix: str
     methods: Optional[List[str]] = None
-    rate_limit: Optional['RateLimitConfig'] = None
-    authentication: Optional['AuthenticationConfig'] = None
-    headers: Optional['HeaderManipulation'] = None
-    cors: Optional['CORSPolicy'] = None
-    websocket: Optional['WebSocketConfig'] = None
-    circuit_breaker: Optional['CircuitBreakerConfig'] = None
-    body_transformation: Optional['BodyTransformationConfig'] = None
+    rate_limit: Optional["RateLimitConfig"] = None
+    authentication: Optional["AuthenticationConfig"] = None
+    headers: Optional["HeaderManipulation"] = None
+    cors: Optional["CORSPolicy"] = None
+    websocket: Optional["WebSocketConfig"] = None
+    circuit_breaker: Optional["CircuitBreakerConfig"] = None
+    body_transformation: Optional["BodyTransformationConfig"] = None
 
 
 @dataclass
@@ -264,6 +269,7 @@ class ComputedField:
         >>> field.generator
         'uuid'
     """
+
     field: str
     generator: str  # uuid, timestamp, random
     prefix: str = ""
@@ -285,6 +291,7 @@ class Validation:
         >>> "email" in validation.required_fields
         True
     """
+
     required_fields: List[str] = field(default_factory=list)
 
 
@@ -315,6 +322,7 @@ class RateLimitConfig:
         >>> rate_limit.requests_per_second
         100
     """
+
     enabled: bool = True
     requests_per_second: int = 100
     burst: Optional[int] = None
@@ -348,6 +356,7 @@ class BasicAuthConfig:
         >>> "admin" in basic_auth.users
         True
     """
+
     users: Dict[str, str] = field(default_factory=dict)
     realm: str = "Protected"
 
@@ -372,6 +381,7 @@ class ApiKeyConfig:
         >>> len(api_key.keys)
         2
     """
+
     keys: List[str] = field(default_factory=list)
     key_name: str = "X-API-Key"
     in_location: str = "header"  # header or query
@@ -400,6 +410,7 @@ class JwtConfig:
         >>> jwt.issuer
         'https://auth.example.com'
     """
+
     issuer: str = ""
     audience: str = ""
     jwks_uri: str = ""
@@ -432,6 +443,7 @@ class AuthenticationConfig:
         >>> auth.type
         'api_key'
     """
+
     enabled: bool = True
     type: str = "api_key"  # basic, api_key, jwt
     basic_auth: Optional[BasicAuthConfig] = None
@@ -465,6 +477,7 @@ class HeaderManipulation:
         >>> headers.request_add["X-Custom-Header"]
         'value'
     """
+
     request_add: Dict[str, str] = field(default_factory=dict)
     request_set: Dict[str, str] = field(default_factory=dict)
     request_remove: List[str] = field(default_factory=list)
@@ -500,9 +513,12 @@ class CORSPolicy:
         >>> cors.allowed_origins[0]
         'https://example.com'
     """
+
     enabled: bool = True
     allowed_origins: List[str] = field(default_factory=lambda: ["*"])
-    allowed_methods: List[str] = field(default_factory=lambda: ["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+    allowed_methods: List[str] = field(
+        default_factory=lambda: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    )
     allowed_headers: List[str] = field(default_factory=lambda: ["Content-Type", "Authorization"])
     expose_headers: List[str] = field(default_factory=list)
     allow_credentials: bool = False
@@ -541,6 +557,7 @@ class WebSocketConfig:
         >>> ws.idle_timeout
         '600s'
     """
+
     enabled: bool = True
     idle_timeout: str = "300s"  # 5 minutes
     ping_interval: str = "30s"
@@ -567,6 +584,7 @@ class RequestBodyTransformation:
         ...     rename_fields={"old_name": "new_name"}
         ... )
     """
+
     add_fields: Dict[str, Any] = field(default_factory=dict)
     remove_fields: List[str] = field(default_factory=list)
     rename_fields: Dict[str, str] = field(default_factory=dict)
@@ -589,6 +607,7 @@ class ResponseBodyTransformation:
         ...     add_fields={"server_timestamp": "{{now}}"}
         ... )
     """
+
     filter_fields: List[str] = field(default_factory=list)
     add_fields: Dict[str, Any] = field(default_factory=dict)
 
@@ -626,6 +645,7 @@ class BodyTransformationConfig:
         ...     )
         ... )
     """
+
     enabled: bool = True
     request: Optional[RequestBodyTransformation] = None
     response: Optional[ResponseBodyTransformation] = None
@@ -670,6 +690,7 @@ class CircuitBreakerConfig:
         >>> cb.max_failures
         5
     """
+
     enabled: bool = True
     max_failures: int = 5
     timeout: str = "30s"
@@ -711,6 +732,7 @@ class Transformation:
         >>> trans.defaults["status"]
         'active'
     """
+
     enabled: bool = True
     defaults: Dict[str, Any] = field(default_factory=dict)
     computed_fields: List[ComputedField] = field(default_factory=list)
@@ -745,6 +767,7 @@ class Service:
         >>> service.name
         'user_service'
     """
+
     name: str
     type: str  # grpc or rest
     protocol: str
@@ -773,6 +796,7 @@ class Plugin:
         >>> plugin.config["requests_per_second"]
         100
     """
+
     name: str
     enabled: bool = True
     config: Dict[str, Any] = field(default_factory=dict)
@@ -802,6 +826,7 @@ class Config:
         >>> config.provider
         'envoy'
     """
+
     version: str
     provider: str
     global_config: GlobalConfig
@@ -809,7 +834,7 @@ class Config:
     plugins: List[Plugin] = field(default_factory=list)
 
     @classmethod
-    def from_yaml(cls, filepath: str) -> 'Config':
+    def from_yaml(cls, filepath: str) -> "Config":
         """Load configuration from YAML file.
 
         Parses a YAML configuration file and creates a Config object
@@ -834,7 +859,7 @@ class Config:
         """
         logger.debug(f"Loading configuration from {filepath}")
         try:
-            with open(filepath, 'r') as f:
+            with open(filepath, "r") as f:
                 data = yaml.safe_load(f)
         except FileNotFoundError as e:
             logger.error(f"Configuration file not found: {filepath}")
@@ -844,137 +869,137 @@ class Config:
             raise
 
         # Parse global config
-        global_data = data.get('global', {})
+        global_data = data.get("global", {})
         global_config = GlobalConfig(**global_data)
         logger.debug(f"Parsed global config: {global_config.host}:{global_config.port}")
-        
+
         # Parse services
         services = []
-        for svc_data in data.get('services', []):
-            upstream = Upstream(**svc_data['upstream'])
+        for svc_data in data.get("services", []):
+            upstream = Upstream(**svc_data["upstream"])
 
             # Parse routes with optional rate limiting, authentication, headers, and CORS
             routes = []
-            for route_data in svc_data['routes']:
+            for route_data in svc_data["routes"]:
                 rate_limit = None
-                if 'rate_limit' in route_data:
-                    rate_limit = RateLimitConfig(**route_data['rate_limit'])
+                if "rate_limit" in route_data:
+                    rate_limit = RateLimitConfig(**route_data["rate_limit"])
 
                 authentication = None
-                if 'authentication' in route_data:
-                    auth_data = route_data['authentication']
-                    auth_type = auth_data.get('type', 'api_key')
+                if "authentication" in route_data:
+                    auth_data = route_data["authentication"]
+                    auth_type = auth_data.get("type", "api_key")
 
                     # Parse type-specific configuration
                     basic_auth = None
                     api_key = None
                     jwt = None
 
-                    if auth_type == 'basic' and 'basic_auth' in auth_data:
-                        basic_auth = BasicAuthConfig(**auth_data['basic_auth'])
-                    elif auth_type == 'api_key' and 'api_key' in auth_data:
-                        api_key = ApiKeyConfig(**auth_data['api_key'])
-                    elif auth_type == 'jwt' and 'jwt' in auth_data:
-                        jwt = JwtConfig(**auth_data['jwt'])
+                    if auth_type == "basic" and "basic_auth" in auth_data:
+                        basic_auth = BasicAuthConfig(**auth_data["basic_auth"])
+                    elif auth_type == "api_key" and "api_key" in auth_data:
+                        api_key = ApiKeyConfig(**auth_data["api_key"])
+                    elif auth_type == "jwt" and "jwt" in auth_data:
+                        jwt = JwtConfig(**auth_data["jwt"])
 
                     authentication = AuthenticationConfig(
-                        enabled=auth_data.get('enabled', True),
+                        enabled=auth_data.get("enabled", True),
                         type=auth_type,
                         basic_auth=basic_auth,
                         api_key=api_key,
                         jwt=jwt,
-                        fail_status=auth_data.get('fail_status', 401),
-                        fail_message=auth_data.get('fail_message', 'Unauthorized')
+                        fail_status=auth_data.get("fail_status", 401),
+                        fail_message=auth_data.get("fail_message", "Unauthorized"),
                     )
 
                 # Parse route-level headers
                 route_headers = None
-                if 'headers' in route_data:
-                    route_headers = HeaderManipulation(**route_data['headers'])
+                if "headers" in route_data:
+                    route_headers = HeaderManipulation(**route_data["headers"])
 
                 # Parse route-level CORS
                 cors_policy = None
-                if 'cors' in route_data:
-                    cors_policy = CORSPolicy(**route_data['cors'])
+                if "cors" in route_data:
+                    cors_policy = CORSPolicy(**route_data["cors"])
 
                 # Parse route-level WebSocket
                 websocket = None
-                if 'websocket' in route_data:
-                    websocket = WebSocketConfig(**route_data['websocket'])
+                if "websocket" in route_data:
+                    websocket = WebSocketConfig(**route_data["websocket"])
 
                 # Parse route-level circuit breaker
                 circuit_breaker = None
-                if 'circuit_breaker' in route_data:
-                    circuit_breaker = CircuitBreakerConfig(**route_data['circuit_breaker'])
+                if "circuit_breaker" in route_data:
+                    circuit_breaker = CircuitBreakerConfig(**route_data["circuit_breaker"])
 
                 # Parse route-level body transformation
                 body_transformation = None
-                if 'body_transformation' in route_data:
-                    bt_data = route_data['body_transformation']
+                if "body_transformation" in route_data:
+                    bt_data = route_data["body_transformation"]
                     request_transform = None
-                    if 'request' in bt_data:
-                        request_transform = RequestBodyTransformation(**bt_data['request'])
+                    if "request" in bt_data:
+                        request_transform = RequestBodyTransformation(**bt_data["request"])
 
                     response_transform = None
-                    if 'response' in bt_data:
-                        response_transform = ResponseBodyTransformation(**bt_data['response'])
+                    if "response" in bt_data:
+                        response_transform = ResponseBodyTransformation(**bt_data["response"])
 
                     body_transformation = BodyTransformationConfig(
-                        enabled=bt_data.get('enabled', True),
+                        enabled=bt_data.get("enabled", True),
                         request=request_transform,
-                        response=response_transform
+                        response=response_transform,
                     )
 
                 route = Route(
-                    path_prefix=route_data['path_prefix'],
-                    methods=route_data.get('methods'),
+                    path_prefix=route_data["path_prefix"],
+                    methods=route_data.get("methods"),
                     rate_limit=rate_limit,
                     authentication=authentication,
                     headers=route_headers,
                     cors=cors_policy,
                     websocket=websocket,
                     circuit_breaker=circuit_breaker,
-                    body_transformation=body_transformation
+                    body_transformation=body_transformation,
                 )
                 routes.append(route)
-            
+
             transformation = None
-            if 'transformation' in svc_data:
-                trans_data = svc_data['transformation']
+            if "transformation" in svc_data:
+                trans_data = svc_data["transformation"]
                 computed_fields = [
-                    ComputedField(**cf) for cf in trans_data.get('computed_fields', [])
+                    ComputedField(**cf) for cf in trans_data.get("computed_fields", [])
                 ]
                 validation = None
-                if 'validation' in trans_data:
-                    validation = Validation(**trans_data['validation'])
+                if "validation" in trans_data:
+                    validation = Validation(**trans_data["validation"])
 
                 # Parse transformation headers
                 trans_headers = None
-                if 'headers' in trans_data:
-                    trans_headers = HeaderManipulation(**trans_data['headers'])
+                if "headers" in trans_data:
+                    trans_headers = HeaderManipulation(**trans_data["headers"])
 
                 transformation = Transformation(
-                    enabled=trans_data.get('enabled', True),
-                    defaults=trans_data.get('defaults', {}),
+                    enabled=trans_data.get("enabled", True),
+                    defaults=trans_data.get("defaults", {}),
                     computed_fields=computed_fields,
-                    metadata=trans_data.get('metadata', {}),
+                    metadata=trans_data.get("metadata", {}),
                     validation=validation,
-                    headers=trans_headers
+                    headers=trans_headers,
                 )
-            
+
             service = Service(
-                name=svc_data['name'],
-                type=svc_data['type'],
-                protocol=svc_data['protocol'],
+                name=svc_data["name"],
+                type=svc_data["type"],
+                protocol=svc_data["protocol"],
                 upstream=upstream,
                 routes=routes,
-                transformation=transformation
+                transformation=transformation,
             )
             services.append(service)
-        
+
         # Parse plugins
         plugins = []
-        for plugin_data in data.get('plugins', []):
+        for plugin_data in data.get("plugins", []):
             plugin = Plugin(**plugin_data)
             plugins.append(plugin)
 
@@ -982,13 +1007,13 @@ class Config:
         logger.info(f"Configuration loaded: provider={data['provider']}, services={len(services)}")
 
         return cls(
-            version=data['version'],
-            provider=data['provider'],
+            version=data["version"],
+            provider=data["provider"],
             global_config=global_config,
             services=services,
-            plugins=plugins
+            plugins=plugins,
         )
-    
+
     def get_service(self, name: str) -> Optional[Service]:
         """Get service by name.
 
@@ -1007,7 +1032,7 @@ class Config:
             if svc.name == name:
                 return svc
         return None
-    
+
     def get_grpc_services(self) -> List[Service]:
         """Get all gRPC services.
 
@@ -1019,8 +1044,8 @@ class Config:
             >>> len(grpc_services)
             3
         """
-        return [s for s in self.services if s.type == 'grpc']
-    
+        return [s for s in self.services if s.type == "grpc"]
+
     def get_rest_services(self) -> List[Service]:
         """Get all REST services.
 
@@ -1032,4 +1057,4 @@ class Config:
             >>> all(s.type == "rest" for s in rest_services)
             True
         """
-        return [s for s in self.services if s.type == 'rest']
+        return [s for s in self.services if s.type == "rest"]
