@@ -1,0 +1,699 @@
+# Logging & Observability Examples
+# GAL v1.2.0 Feature 6
+#
+# Diese Datei enthält verschiedene Beispiele für Logging und Observability-Konfigurationen.
+# Jedes Beispiel zeigt einen spezifischen Anwendungsfall.
+
+# ============================================================================
+# Beispiel 1: Basic JSON Logging
+# ============================================================================
+# Anwendungsfall: Standard JSON Logging für Production
+# Provider: Alle
+---
+version: "1.0"
+provider: envoy
+
+global:
+  host: 0.0.0.0
+  port: 10000
+  admin_port: 9901
+
+  # Strukturiertes JSON Logging
+  logging:
+    enabled: true
+    format: json  # JSON Format für Log-Aggregatoren
+    level: info   # info Level für Production
+    access_log_path: /var/log/gateway/access.log
+    error_log_path: /var/log/gateway/error.log
+
+services:
+  - name: api_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+    routes:
+      - path_prefix: /api
+
+# Generierte Logs (Envoy):
+# {
+#   "request_id": "12345678-1234-1234-1234-123456789abc",
+#   "method": "GET",
+#   "path": "/api/users",
+#   "response_code": "200",
+#   "duration": "45"
+# }
+
+# ============================================================================
+# Beispiel 2: Prometheus Metrics
+# ============================================================================
+# Anwendungsfall: Prometheus Metriken-Export
+# Provider: Alle (Envoy, Kong, APISIX, Traefik mit Einschränkungen)
+---
+version: "1.0"
+provider: envoy
+
+global:
+  host: 0.0.0.0
+  port: 10000
+  admin_port: 9901
+
+  # Prometheus Metriken aktivieren
+  metrics:
+    enabled: true
+    exporter: prometheus
+    prometheus_port: 9090
+    prometheus_path: /metrics
+
+services:
+  - name: api_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+    routes:
+      - path_prefix: /api
+
+# Metriken abrufen:
+# curl http://localhost:9901/stats/prometheus (Envoy)
+# curl http://localhost:8001/metrics (Kong)
+# curl http://localhost:9091/apisix/prometheus/metrics (APISIX)
+
+# ============================================================================
+# Beispiel 3: OpenTelemetry Integration
+# ============================================================================
+# Anwendungsfall: OpenTelemetry Metriken-Export für Distributed Tracing
+# Provider: Envoy, Traefik
+---
+version: "1.0"
+provider: envoy
+
+global:
+  host: 0.0.0.0
+  port: 10000
+  admin_port: 9901
+
+  # OpenTelemetry Metriken
+  metrics:
+    enabled: true
+    exporter: opentelemetry
+    opentelemetry_endpoint: http://otel-collector:4317  # gRPC Endpoint
+
+services:
+  - name: api_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+    routes:
+      - path_prefix: /api
+
+# OpenTelemetry Collector muss erreichbar sein
+# docker run -d -p 4317:4317 otel/opentelemetry-collector
+
+# ============================================================================
+# Beispiel 4: Log Sampling (High Traffic)
+# ============================================================================
+# Anwendungsfall: Reduzierung des Log-Volumens bei High Traffic
+# Provider: Envoy
+---
+version: "1.0"
+provider: envoy
+
+global:
+  host: 0.0.0.0
+  port: 10000
+  admin_port: 9901
+
+  # Log Sampling für High Traffic
+  logging:
+    enabled: true
+    format: json
+    level: warning        # Nur Warnings/Errors
+    access_log_path: /var/log/gateway/access.log
+    sample_rate: 0.1      # Nur 10% der Requests loggen
+    exclude_paths:
+      - /health
+      - /metrics
+      - /ping
+
+services:
+  - name: high_traffic_api
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+    routes:
+      - path_prefix: /api
+
+# Faustregel für sample_rate:
+# < 1k req/s:   1.0 (100%)
+# 1k-5k req/s:  0.5 (50%)
+# 5k-10k req/s: 0.2 (20%)
+# > 10k req/s:  0.1 (10%)
+
+# ============================================================================
+# Beispiel 5: Custom Fields
+# ============================================================================
+# Anwendungsfall: Zusätzliche Metadaten in Logs
+# Provider: Alle
+---
+version: "1.0"
+provider: envoy
+
+global:
+  host: 0.0.0.0
+  port: 10000
+  admin_port: 9901
+
+  # Custom Fields für Kontext
+  logging:
+    enabled: true
+    format: json
+    level: info
+    access_log_path: /var/log/gateway/access.log
+    custom_fields:
+      environment: production
+      cluster: eu-west-1
+      region: europe
+      version: v1.2.0
+      datacenter: aws-eu-west-1
+      team: platform
+
+services:
+  - name: api_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+    routes:
+      - path_prefix: /api
+
+# Generierte Logs enthalten Custom Fields:
+# {
+#   "request_id": "...",
+#   "method": "GET",
+#   "environment": "production",
+#   "cluster": "eu-west-1",
+#   "version": "v1.2.0"
+# }
+
+# ============================================================================
+# Beispiel 6: Include Specific Headers
+# ============================================================================
+# Anwendungsfall: Distributed Tracing Headers in Logs
+# Provider: Envoy, Traefik
+---
+version: "1.0"
+provider: envoy
+
+global:
+  host: 0.0.0.0
+  port: 10000
+  admin_port: 9901
+
+  # Tracing Headers einbeziehen
+  logging:
+    enabled: true
+    format: json
+    level: info
+    access_log_path: /var/log/gateway/access.log
+    include_headers:
+      - X-Request-ID
+      - X-Correlation-ID
+      - X-B3-TraceId          # Zipkin/Jaeger
+      - X-B3-SpanId
+      - Traceparent           # W3C Trace Context
+      - User-Agent
+      - X-Forwarded-For
+
+services:
+  - name: api_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+    routes:
+      - path_prefix: /api
+
+# Headers werden in Logs verfügbar sein:
+# {
+#   "x_request_id": "123...",
+#   "x_b3_traceid": "abc...",
+#   "traceparent": "00-..."
+# }
+
+# ============================================================================
+# Beispiel 7: Production API (Complete Setup)
+# ============================================================================
+# Anwendungsfall: Production-Ready Setup mit Logging + Metrics
+# Provider: Envoy
+---
+version: "1.0"
+provider: envoy
+
+global:
+  host: 0.0.0.0
+  port: 10000
+  admin_port: 9901
+
+  # Vollständiges Logging Setup
+  logging:
+    enabled: true
+    format: json
+    level: info
+    access_log_path: /var/log/gateway/access.log
+    error_log_path: /var/log/gateway/error.log
+    include_headers:
+      - X-Request-ID
+      - X-Correlation-ID
+      - User-Agent
+      - X-Forwarded-For
+    exclude_paths:
+      - /health
+      - /metrics
+      - /ping
+    custom_fields:
+      environment: production
+      cluster: eu-west-1
+      service: api-gateway
+      version: v1.2.0
+
+  # Prometheus + OpenTelemetry
+  metrics:
+    enabled: true
+    exporter: both
+    prometheus_port: 9090
+    opentelemetry_endpoint: http://otel-collector:4317
+    custom_labels:
+      environment: production
+      cluster: eu-west-1
+
+services:
+  - name: api_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: api-1.internal
+          port: 8080
+        - host: api-2.internal
+          port: 8080
+      load_balancer:
+        algorithm: least_conn
+      health_check:
+        active:
+          enabled: true
+          http_path: /health
+          interval: 10s
+    routes:
+      - path_prefix: /api
+        rate_limit:
+          enabled: true
+          requests_per_second: 100
+        authentication:
+          enabled: true
+          type: jwt
+          jwt:
+            issuer: https://auth.example.com
+
+# Vollständiger Observability Stack:
+# - JSON Logs mit Custom Fields
+# - Prometheus Metriken
+# - OpenTelemetry Export
+# - Health Checks
+# - Rate Limiting
+# - JWT Authentication
+
+# ============================================================================
+# Beispiel 8: Development Environment (Debug Logging)
+# ============================================================================
+# Anwendungsfall: Lokale Entwicklung mit maximalem Logging
+# Provider: Nginx
+---
+version: "1.0"
+provider: nginx
+
+global:
+  host: 0.0.0.0
+  port: 80
+
+  # Debug Logging für Entwicklung
+  logging:
+    enabled: true
+    format: json
+    level: debug              # Alle Debug-Informationen
+    access_log_path: /var/log/nginx/access.log
+    error_log_path: /var/log/nginx/error.log
+    include_request_body: true   # Request Body loggen
+    include_response_body: true  # Response Body loggen
+    custom_fields:
+      environment: development
+      debug: "true"
+
+services:
+  - name: dev_api
+    type: rest
+    protocol: http
+    upstream:
+      host: localhost
+      port: 3000
+    routes:
+      - path_prefix: /api
+
+# Maximales Logging für Debugging:
+# - Debug Level
+# - Request/Response Bodies
+# - Alle Header
+
+# ============================================================================
+# Beispiel 9: Security Audit Logging
+# ============================================================================
+# Anwendungsfall: Compliance und Security Auditing
+# Provider: Envoy
+---
+version: "1.0"
+provider: envoy
+
+global:
+  host: 0.0.0.0
+  port: 10000
+  admin_port: 9901
+
+  # Audit Logging für Compliance
+  logging:
+    enabled: true
+    format: json
+    level: info
+    access_log_path: /var/log/gateway/audit.log
+    sample_rate: 1.0          # ALLE Requests loggen (keine Sampling)
+    include_headers:
+      - Authorization
+      - X-API-Key
+      - X-Client-ID
+      - X-Forwarded-For
+      - User-Agent
+      - X-Real-IP
+    custom_fields:
+      audit: "true"
+      compliance: pci-dss
+      retention_days: "365"
+      security_level: high
+
+  metrics:
+    enabled: true
+    exporter: prometheus
+    prometheus_port: 9090
+
+services:
+  - name: payment_api
+    type: rest
+    protocol: http
+    upstream:
+      host: payment.internal
+      port: 8080
+    routes:
+      - path_prefix: /payment
+        authentication:
+          enabled: true
+          type: jwt
+          jwt:
+            issuer: https://auth.example.com
+        rate_limit:
+          enabled: true
+          requests_per_second: 10
+
+# Vollständiger Audit Trail:
+# - 100% Logging (kein Sampling)
+# - Authorization Headers
+# - Retention Metadata
+# - Compliance Tags
+
+# ============================================================================
+# Beispiel 10: Multi-Tenant SaaS
+# ============================================================================
+# Anwendungsfall: Multi-Tenant Logging mit Tenant-ID
+# Provider: Kong
+---
+version: "1.0"
+provider: kong
+
+global:
+  host: 0.0.0.0
+  port: 8000
+
+  # Multi-Tenant Logging
+  logging:
+    enabled: true
+    format: json
+    level: info
+    access_log_path: /var/log/kong/access.log
+    include_headers:
+      - X-Tenant-ID
+      - X-Organization-ID
+      - X-User-ID
+      - X-Subscription-Tier
+    custom_fields:
+      environment: production
+      service_type: multi-tenant-saas
+
+  metrics:
+    enabled: true
+    exporter: prometheus
+
+services:
+  - name: saas_api
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+    routes:
+      - path_prefix: /api
+
+# Logs enthalten Tenant-Informationen:
+# {
+#   "x_tenant_id": "tenant-123",
+#   "x_organization_id": "org-456",
+#   "x_subscription_tier": "premium"
+# }
+
+# ============================================================================
+# Beispiel 11: Microservices mit Correlation IDs
+# ============================================================================
+# Anwendungsfall: Distributed Tracing über Microservices
+# Provider: Envoy
+---
+version: "1.0"
+provider: envoy
+
+global:
+  host: 0.0.0.0
+  port: 10000
+  admin_port: 9901
+
+  # Correlation IDs für Distributed Tracing
+  logging:
+    enabled: true
+    format: json
+    level: info
+    access_log_path: /var/log/gateway/access.log
+    include_headers:
+      - X-Request-ID
+      - X-Correlation-ID
+      - X-B3-TraceId
+      - X-B3-SpanId
+    custom_fields:
+      service: gateway
+      span_kind: server
+
+  metrics:
+    enabled: true
+    exporter: opentelemetry
+    opentelemetry_endpoint: http://otel-collector:4317
+
+services:
+  - name: user_service
+    type: rest
+    protocol: http
+    upstream:
+      host: users.internal
+      port: 8080
+    routes:
+      - path_prefix: /users
+
+  - name: order_service
+    type: rest
+    protocol: http
+    upstream:
+      host: orders.internal
+      port: 8080
+    routes:
+      - path_prefix: /orders
+
+# Vollständiger Trace Context in Logs
+
+# ============================================================================
+# Beispiel 12: Exclude Health Check Endpoints
+# ============================================================================
+# Anwendungsfall: Noise Reduction durch Ausschluss von Health Checks
+# Provider: Alle
+---
+version: "1.0"
+provider: envoy
+
+global:
+  host: 0.0.0.0
+  port: 10000
+  admin_port: 9901
+
+  # Health Checks ausschließen
+  logging:
+    enabled: true
+    format: json
+    level: info
+    access_log_path: /var/log/gateway/access.log
+    exclude_paths:
+      - /health
+      - /metrics
+      - /ping
+      - /readiness
+      - /liveness
+      - /_status
+      - /healthz
+      - /favicon.ico
+
+services:
+  - name: api_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+    routes:
+      - path_prefix: /api
+      - path_prefix: /health
+
+# Health Check Requests werden NICHT geloggt
+# → Reduziert Log-Volumen erheblich
+
+# ============================================================================
+# Beispiel 13: HAProxy with Syslog
+# ============================================================================
+# Anwendungsfall: HAProxy mit Syslog Logging
+# Provider: HAProxy
+---
+version: "1.0"
+provider: haproxy
+
+global:
+  host: 0.0.0.0
+  port: 80
+
+  # Syslog Logging
+  logging:
+    enabled: true
+    format: text  # HAProxy verwendet syslog
+    level: info
+    access_log_path: /var/log/haproxy/access.log
+
+  metrics:
+    enabled: true
+    exporter: prometheus
+    prometheus_port: 9090
+
+services:
+  - name: api_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+    routes:
+      - path_prefix: /api
+
+# HAProxy verwendet Syslog für Logging
+# Externe prometheus-exporter erforderlich für Metriken
+
+# ============================================================================
+# Beispiel 14: Nginx with JSON Format
+# ============================================================================
+# Anwendungsfall: Nginx mit JSON Logging
+# Provider: Nginx
+---
+version: "1.0"
+provider: nginx
+
+global:
+  host: 0.0.0.0
+  port: 80
+
+  # JSON Logging mit Nginx
+  logging:
+    enabled: true
+    format: json
+    level: info
+    access_log_path: /var/log/nginx/access.log
+    error_log_path: /var/log/nginx/error.log
+    custom_fields:
+      app: gateway
+      environment: production
+
+services:
+  - name: api_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+    routes:
+      - path_prefix: /api
+
+# Nginx log_format mit JSON Support
+# Externe nginx-prometheus-exporter für Metriken
+
+# ============================================================================
+# Beispiel 15: APISIX with File Logger
+# ============================================================================
+# Anwendungsfall: APISIX mit file-logger Plugin
+# Provider: APISIX
+---
+version: "1.0"
+provider: apisix
+
+global:
+  host: 0.0.0.0
+  port: 9080
+
+  # File Logger Plugin
+  logging:
+    enabled: true
+    format: json
+    level: info
+    access_log_path: /var/log/apisix/access.log
+    include_request_body: true
+    include_response_body: false
+
+  # Prometheus Plugin
+  metrics:
+    enabled: true
+    exporter: prometheus
+
+services:
+  - name: api_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api.internal
+      port: 8080
+    routes:
+      - path_prefix: /api
+
+# APISIX file-logger Plugin mit req/resp body
+# Metriken: http://localhost:9091/apisix/prometheus/metrics
