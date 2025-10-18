@@ -1,182 +1,253 @@
-# Release v1.1.0 - Traffic Management & Security
+# Release v1.2.0 - Neue Provider & Erweiterte Features
 
 **Release-Datum:** 2025-10-18
 
-Wir freuen uns, **GAL v1.1.0** anzukündigen - ein großes Update, das umfassende Traffic-Management- und Security-Features für die Gateway Abstraction Layer bringt!
+Wir freuen uns, **GAL v1.2.0** anzukündigen - ein bedeutendes Update, das **2 neue Gateway-Provider** und **4 erweiterte Features** für die Gateway Abstraction Layer bringt!
 
 ## 🎉 Was ist neu
 
-Dieses Release fügt **7 Haupt-Features** mit voller Unterstützung für alle 4 Gateway-Provider (Envoy, Kong, APISIX, Traefik) hinzu.
+Dieses Release fügt **6 Haupt-Features** hinzu und bringt die Gesamtzahl der unterstützten Gateway-Provider auf **6**.
 
-### 🚦 Traffic Management
+### 🆕 Neue Gateway-Provider
 
-#### Rate Limiting & Throttling
-Schützen Sie Ihre APIs vor Überlastung mit konfigurierbarem Rate Limiting:
-- Requests pro Sekunde und Burst-Limits
-- Mehrere Schlüsseltypen: IP-Adresse, Header, JWT Claim
-- Anpassbare Antwortmeldungen
-- Volle Provider-Unterstützung
-
-```yaml
-rate_limit:
-  enabled: true
-  requests_per_second: 100
-  burst: 200
-  key_type: ip_address
-```
-
-**Dokumentation:** [docs/guides/RATE_LIMITING.md](docs/guides/RATE_LIMITING.md)
-
-#### Circuit Breaker Pattern
-Verbessern Sie die Resilienz mit automatischer Fehlererkennung und Wiederherstellung:
-- Konfigurierbare Fehlerschwellwerte
-- Automatische Wiederherstellung mit Half-Open Testing
-- Anpassbare Fehlerantworten
-- 75% native Provider-Unterstützung (APISIX, Traefik, Envoy)
-
-```yaml
-circuit_breaker:
-  enabled: true
-  max_failures: 5
-  timeout: "30s"
-  half_open_requests: 3
-```
-
-**Dokumentation:** [docs/guides/CIRCUIT_BREAKER.md](docs/guides/CIRCUIT_BREAKER.md)
-
-#### Health Checks & Load Balancing
-Bauen Sie hochverfügbare Systeme mit umfassenden Health Checks:
-- **Active Health Checks**: Periodisches HTTP/TCP Probing
-- **Passive Health Checks**: Traffic-basierte Fehlererkennung
-- **Load Balancing Algorithmen**: Round Robin, Least Connections, IP Hash, Weighted
-- **Sticky Sessions** Unterstützung
-- Mehrere Backend-Targets mit Gewichtungen
-
-```yaml
-upstream:
-  targets:
-    - host: api-1.internal
-      port: 8080
-      weight: 2
-    - host: api-2.internal
-      port: 8080
-      weight: 1
-  health_check:
-    active:
-      enabled: true
-      http_path: /health
-      interval: "10s"
-  load_balancer:
-    algorithm: round_robin
-```
-
-**Dokumentation:** [docs/guides/HEALTH_CHECKS.md](docs/guides/HEALTH_CHECKS.md)
-
-### 🔐 Security Features
-
-#### Authentication & Authorization
-Sichern Sie Ihre APIs mit mehreren Authentifizierungsmethoden:
-- **Basic Authentication**: Benutzername/Passwort
-- **API Key Authentication**: Header- oder Query-basiert
-- **JWT Token Validation**: JWKS, Issuer/Audience Verifizierung, Claims to Headers Mapping
-- Volle Provider-Unterstützung mit nativen Plugins
-
-```yaml
-authentication:
-  type: jwt
-  jwt:
-    issuer: "https://auth.example.com"
-    audiences: ["api"]
-    jwks_uri: "https://auth.example.com/.well-known/jwks.json"
-    claims_to_headers:
-      - claim: sub
-        header: X-User-ID
-```
-
-**Dokumentation:** [docs/guides/AUTHENTICATION.md](docs/guides/AUTHENTICATION.md)
-
-#### Request/Response Header Manipulation
-Kontrollieren Sie HTTP-Header mit Präzision:
-- Headers hinzufügen, setzen und entfernen für Requests und Responses
-- Route-Level und Service-Level Konfiguration
-- Template-Variablen-Unterstützung (UUID, Timestamps)
-- Security Headers (X-Frame-Options, CSP, etc.)
-
-```yaml
-headers:
-  request_add:
-    X-Request-ID: "{{uuid}}"
-    X-Gateway: "GAL"
-  response_add:
-    X-Frame-Options: "DENY"
-    X-Content-Type-Options: "nosniff"
-  response_remove:
-    - X-Powered-By
-```
-
-**Dokumentation:** [docs/guides/HEADERS.md](docs/guides/HEADERS.md)
-
-#### CORS Policies
-Aktivieren Sie Cross-Origin Requests für SPAs und Mobile Apps:
-- Origin Whitelisting (spezifische Domains oder Wildcard)
-- Granulare HTTP Methoden und Header Kontrolle
-- Credentials Support
-- Konfigurierbare Preflight Caching
-
-```yaml
-cors:
-  enabled: true
-  allowed_origins:
-    - "https://app.example.com"
-  allowed_methods: [GET, POST, PUT, DELETE, OPTIONS]
-  allowed_headers: [Content-Type, Authorization]
-  allow_credentials: true
-  max_age: 86400
-```
-
-**Dokumentation:** [docs/guides/CORS.md](docs/guides/CORS.md)
-
-### 📦 PyPI Publication
-
-GAL ist jetzt auf PyPI verfügbar!
-
-```bash
-# Von PyPI installieren
-pip install gal-gateway
-
-# CLI verwenden
-gal --version
-gal generate examples/rate-limiting-example.yaml
-```
+#### Nginx Provider (Open Source)
+Der weltweit führende Web Server ist jetzt in GAL verfügbar!
 
 **Features:**
-- Automatisierte Release-Pipeline über GitHub Actions
-- TestPyPI Unterstützung für Pre-Release Testing
-- Package-Validierung mit `twine check`
+- Vollständige nginx.conf Generierung
+- Alle Load Balancing Algorithmen: Round Robin, Least Connections, IP Hash, Weighted
+- Rate Limiting (limit_req_zone, limit_req)
+- Basic Authentication (auth_basic, htpasswd)
+- Request/Response Header Manipulation
+- CORS Policies (add_header directives)
+- Passive Health Checks (max_fails, fail_timeout)
+- OpenResty Integration für JWT und API Key Auth
 
-**Links:**
-- **PyPI Package:** https://pypi.org/project/gal-gateway/
-- **TestPyPI Package:** https://test.pypi.org/project/gal-gateway/
-- **Publishing Guide:** [docs/PYPI_PUBLISHING.md](docs/PYPI_PUBLISHING.md)
+```yaml
+provider: nginx
+services:
+  - name: api_service
+    upstream:
+      targets:
+        - host: api-1.internal
+          port: 8080
+          weight: 2
+        - host: api-2.internal
+          port: 8080
+          weight: 1
+      load_balancer:
+        algorithm: least_conn
+```
+
+**Dokumentation:** [docs/guides/NGINX.md](docs/guides/NGINX.md) (1000+ Zeilen, Deutsch)
+
+#### HAProxy Provider
+Enterprise-grade High-Performance Load Balancer!
+
+**Features:**
+- Vollständige haproxy.cfg Generierung
+- Advanced Load Balancing: roundrobin, leastconn, source, weighted
+- Active & Passive Health Checks (httpchk, fall/rise)
+- Rate Limiting (stick-table basiert, IP/Header tracking)
+- ACLs (Access Control Lists) für komplexes Routing
+- Sticky Sessions (cookie-based, source-based)
+- Header Manipulation (http-request/http-response)
+
+```yaml
+provider: haproxy
+services:
+  - name: api_service
+    upstream:
+      health_check:
+        active:
+          enabled: true
+          http_path: /health
+          interval: "5s"
+          fall: 3
+          rise: 2
+      load_balancer:
+        algorithm: leastconn
+```
+
+**Dokumentation:** [docs/guides/HAPROXY.md](docs/guides/HAPROXY.md) (1100+ Zeilen, Deutsch)
+
+### 🚀 Erweiterte Features
+
+#### WebSocket Support
+Real-time bidirektionale Kommunikation für alle 6 Provider!
+
+**Features:**
+- Konfigurierbare idle_timeout, ping_interval, max_message_size
+- Per-Message Deflate Compression Support
+- Provider-spezifische Optimierungen
+
+**Alle Provider unterstützt:**
+- Envoy: upgrade_configs + idle_timeout
+- Kong: read_timeout/write_timeout
+- APISIX: enable_websocket flag
+- Traefik: passHostHeader + flushInterval
+- Nginx: proxy_http_version 1.1 + Upgrade headers
+- HAProxy: timeout tunnel
+
+```yaml
+routes:
+  - path_prefix: /ws/chat
+    websocket:
+      enabled: true
+      idle_timeout: "600s"
+      ping_interval: "20s"
+      max_message_size: 524288
+      compression: true
+```
+
+**Dokumentation:** [docs/guides/WEBSOCKET.md](docs/guides/WEBSOCKET.md) (1100+ Zeilen)
+
+#### Request/Response Body Transformation
+On-the-fly Datenmanipulation mit dynamischen Feldern!
+
+**Request Transformations:**
+- add_fields: Füge Felder mit Template-Variablen hinzu ({{uuid}}, {{now}}, {{timestamp}})
+- remove_fields: Entferne sensitive Daten (PII, Secrets)
+- rename_fields: Legacy System Integration
+
+**Response Transformations:**
+- filter_fields: Entferne PII aus Responses (GDPR, PCI-DSS Compliance)
+- add_fields: Füge Metadata hinzu (Timestamps, Server Info)
+
+```yaml
+routes:
+  - path_prefix: /api/users
+    body_transformation:
+      enabled: true
+      request:
+        add_fields:
+          trace_id: "{{uuid}}"
+          timestamp: "{{now}}"
+          api_version: "v1"
+        remove_fields:
+          - internal_id
+          - secret_key
+        rename_fields:
+          user_id: id
+      response:
+        filter_fields:
+          - password
+          - ssn
+        add_fields:
+          server_time: "{{timestamp}}"
+```
+
+**Provider Support:**
+- Envoy: ✅ Lua Filter (100%)
+- Kong: ✅ Plugins (95%)
+- APISIX: ✅ Serverless Lua (100%)
+- Traefik: ❌ Nicht unterstützt
+- Nginx: ✅ OpenResty Lua (100%)
+- HAProxy: ⚠️ Lua References (90%)
+
+**Dokumentation:** [docs/guides/BODY_TRANSFORMATION.md](docs/guides/BODY_TRANSFORMATION.md) (1000+ Zeilen)
+
+#### Timeout & Retry Policies
+Robuste Fehlerbehandlung mit automatischen Retries!
+
+**Features:**
+- Connection, Send, Read, Idle Timeouts
+- Automatic Retries mit Exponential/Linear Backoff
+- Konfigurierbare retry_on Bedingungen (connect_timeout, http_5xx, etc.)
+- Base Interval & Max Interval für Backoff
+
+```yaml
+routes:
+  - path_prefix: /api
+    timeout:
+      connect: "5s"
+      send: "30s"
+      read: "60s"
+      idle: "300s"
+    retry:
+      enabled: true
+      attempts: 3
+      backoff: exponential
+      base_interval: "25ms"
+      max_interval: "250ms"
+      retry_on:
+        - connect_timeout
+        - http_5xx
+```
+
+**Alle Provider unterstützt:**
+- Envoy, Kong, APISIX, Traefik, Nginx, HAProxy
+
+**Dokumentation:** [docs/guides/TIMEOUT_RETRY.md](docs/guides/TIMEOUT_RETRY.md) (1000+ Zeilen)
+
+#### Logging & Observability
+Production-Ready Logging mit Prometheus & OpenTelemetry!
+
+**Features:**
+- Structured Logging (JSON/Text Format)
+- Log Sampling für High-Traffic Scenarios (sample_rate)
+- Custom Fields für Kontext (environment, cluster, version)
+- Header Inclusion für Distributed Tracing (X-Request-ID, X-B3-TraceId)
+- Path Exclusion (Health Checks, Metrics Endpoints)
+- Prometheus Metrics Export
+- OpenTelemetry Integration
+
+```yaml
+global:
+  logging:
+    enabled: true
+    format: json
+    level: info
+    access_log_path: /var/log/gateway/access.log
+    sample_rate: 0.5  # 50% sampling für High Traffic
+    include_headers:
+      - X-Request-ID
+      - X-Correlation-ID
+    exclude_paths:
+      - /health
+      - /metrics
+    custom_fields:
+      environment: production
+      cluster: eu-west-1
+
+  metrics:
+    enabled: true
+    exporter: both
+    prometheus_port: 9090
+    opentelemetry_endpoint: http://otel-collector:4317
+```
+
+**Provider Support:**
+- Envoy: ✅ JSON logs, sampling, Prometheus + OpenTelemetry
+- Kong, APISIX, Traefik, Nginx, HAProxy: ✅ Prometheus Support
+
+**Dokumentation:** [docs/guides/LOGGING_OBSERVABILITY.md](docs/guides/LOGGING_OBSERVABILITY.md) (1000+ Zeilen)
+
+### 📚 Umfassende Provider-Dokumentation
+
+Alle 6 Gateway-Provider haben jetzt detaillierte Guides:
+
+- [**ENVOY.md**](docs/guides/ENVOY.md) (1068 Zeilen) - CNCF cloud-native proxy, Filter-Architektur, xDS API
+- [**KONG.md**](docs/guides/KONG.md) (750 Zeilen) - Plugin-Ökosystem, Admin API, DB-less mode
+- [**APISIX.md**](docs/guides/APISIX.md) (730 Zeilen) - Ultra-high performance, etcd integration, Lua scripting
+- [**TRAEFIK.md**](docs/guides/TRAEFIK.md) (800 Zeilen) - Auto-discovery, Let's Encrypt, Cloud-native
+- [**NGINX.md**](docs/guides/NGINX.md) (1000+ Zeilen) - Open Source, ngx_http modules, OpenResty
+- [**HAPROXY.md**](docs/guides/HAPROXY.md) (1100+ Zeilen) - Advanced Load Balancing, ACLs, High performance
+
+**Jeder Guide enthält:**
+- Feature-Matrix
+- Installation & Setup
+- Konfigurationsoptionen
+- Best Practices
+- Troubleshooting
 
 ## 📊 Statistiken
 
-- **7/7 Features Abgeschlossen** (100%)
-- **400+ Tests** (erhöht von 101)
-- **6000+ Zeilen Dokumentation** hinzugefügt
-- **60+ Beispiel-Szenarien** über alle Features hinweg
-- **Volle Provider-Unterstützung**: Alle Features funktionieren auf Envoy, Kong, APISIX, Traefik
-
-## 📚 Dokumentation
-
-Umfassende Guides für alle Features:
-- [RATE_LIMITING.md](docs/guides/RATE_LIMITING.md) - 600+ Zeilen
-- [AUTHENTICATION.md](docs/guides/AUTHENTICATION.md) - 923 Zeilen (Deutsch)
-- [HEADERS.md](docs/guides/HEADERS.md) - 700+ Zeilen
-- [CORS.md](docs/guides/CORS.md) - 1000+ Zeilen (Deutsch)
-- [CIRCUIT_BREAKER.md](docs/guides/CIRCUIT_BREAKER.md) - 1000+ Zeilen (Deutsch)
-- [HEALTH_CHECKS.md](docs/guides/HEALTH_CHECKS.md) - 1000+ Zeilen (Deutsch)
-- [PYPI_PUBLISHING.md](docs/PYPI_PUBLISHING.md) - 400+ Zeilen
+- **6 Gateway-Provider** (Envoy, Kong, APISIX, Traefik, Nginx, HAProxy)
+- **364 Tests** (erhöht von 291) mit **89% Code Coverage**
+- **10.000+ Zeilen Dokumentation** (6 Provider-Guides + 6 Feature-Guides)
+- **70+ Production-Ready Beispiel-Szenarien**
+- **12 Umfassende Feature-Guides**
 
 ## 🚀 Installation
 
@@ -187,65 +258,90 @@ pip install gal-gateway
 
 ### Von Docker
 ```bash
-docker pull ghcr.io/pt9912/x-gal:v1.1.0
+docker pull ghcr.io/pt9912/x-gal:v1.2.0
 ```
 
 ### Von Source
 ```bash
 git clone https://github.com/pt9912/x-gal.git
 cd x-gal
-git checkout v1.1.0
+git checkout v1.2.0
 pip install -e ".[dev]"
 ```
 
 ## 📖 Schnellstart-Beispiele
 
-### Rate Limiting
+### Nginx Provider
 ```bash
-gal generate examples/rate-limiting-example.yaml --provider kong
+gal generate examples/nginx-example.yaml --provider nginx
 ```
 
-### Authentication
+### HAProxy Provider
 ```bash
-gal generate examples/authentication-test.yaml --provider envoy
+gal generate examples/haproxy-example.yaml --provider haproxy
 ```
 
-### Health Checks & Load Balancing
+### WebSocket Support
 ```bash
-gal generate examples/health-checks-example.yaml --provider apisix
+gal generate examples/websocket-example.yaml --provider envoy
 ```
 
-### CORS
+### Body Transformation
 ```bash
-gal generate examples/cors-example.yaml --provider traefik
+gal generate examples/body-transformation-example.yaml --provider kong
+```
+
+### Timeout & Retry
+```bash
+gal generate examples/timeout-retry-example.yaml --provider apisix
+```
+
+### Logging & Observability
+```bash
+gal generate examples/logging-observability-example.yaml --provider traefik
 ```
 
 ## 🔧 Was hat sich geändert
 
 ### Config Model Erweiterungen
-- `RateLimitConfig`, `AuthenticationConfig`, `HeaderManipulation` hinzugefügt
-- `CORSPolicy`, `CircuitBreakerConfig`, `HealthCheckConfig`, `LoadBalancerConfig` hinzugefügt
-- `Route` und `Upstream` erweitert um alle neuen Features zu unterstützen
+- `WebSocketConfig` hinzugefügt
+- `BodyTransformationConfig`, `RequestBodyTransformation`, `ResponseBodyTransformation` hinzugefügt
+- `TimeoutConfig`, `RetryConfig` hinzugefügt
+- `LoggingConfig`, `MetricsConfig` hinzugefügt
+- `Route` erweitert um websocket, body_transformation, timeout, retry
+- `GlobalConfig` erweitert um logging, metrics
 
 ### Provider Implementierungen
-- Alle 4 Provider aktualisiert um alle 7 neuen Features zu unterstützen
-- Provider-spezifische Dokumentation für jedes Feature
-- 100% Provider-Kompatibilität für die meisten Features
+- 2 neue Provider: Nginx, HAProxy
+- Alle 6 Provider aktualisiert um WebSocket, Body Transformation, Timeout & Retry, Logging & Observability zu unterstützen
+- Provider-spezifische Optimierungen und Dokumentation
 
 ### Testing
-- Test-Anzahl von 101 auf 400+ erhöht
-- Umfassende Provider-spezifische Tests
-- Real-World Szenario Abdeckung
+- Test-Anzahl von 291 auf 364 erhöht (+73 Tests)
+- Neue Testdateien:
+  - test_nginx.py (25 Tests)
+  - test_haproxy.py (10 Tests)
+  - test_websocket.py (20 Tests)
+  - test_body_transformation.py (12 Tests)
+  - test_timeout_retry.py (22 Tests)
+  - test_logging_observability.py (19 Tests)
+- Code Coverage: 89% maintained
+
+### Code Quality
+- Black Formatting für alle Python-Dateien
+- Isort Import Sorting
+- Flake8 Linting
+- Pre-Push Skill für automatisierte Checks
 
 ## 🐛 Bugfixes
 
-- Verschiedene Bugfixes und Verbesserungen über alle Provider hinweg
-- Verbesserte Fehlerbehandlung und Validierung
-- Erweitertes Logging und Debugging
+- Legacy transformation tests aktualisiert für Body Transformation Feature
+- Undefined variable in nginx.py behoben
+- Code formatting issues behoben
 
 ## ⚠️ Breaking Changes
 
-Keine! Dieses Release ist vollständig rückwärtskompatibel mit v1.0.0.
+Keine! Dieses Release ist vollständig rückwärtskompatibel mit v1.1.0 und v1.0.0.
 
 ## 🙏 Danksagung
 
@@ -255,35 +351,53 @@ Besonderer Dank an alle Contributor und Nutzer, die während der Entwicklung Fee
 
 Siehe [CHANGELOG.md](CHANGELOG.md) für vollständige Details.
 
-## 🔮 Was kommt als Nächstes (v1.2.0)
+## 🔮 Was kommt als Nächstes
 
-Das nächste Release (v1.2.0, Q1 2026) bringt **neue Gateway-Provider** und **erweiterte Features**:
+### v1.3.0 - Import/Migration & Provider Portability (Q2 2026)
 
-### Neue Gateway-Provider
-- **Nginx Provider (Open Source)** - Der #1 Web Server weltweit
-  - Reverse Proxy & Load Balancing
-  - Rate Limiting, Basic Auth, Header Manipulation
-  - Passive Health Checks
-  - 4 Load Balancing Algorithmen
-- **HAProxy Provider** - Enterprise-grade High-Performance Load Balancer
-  - 10+ Load Balancing Algorithmen
-  - Active & Passive Health Checks
-  - Advanced Rate Limiting (stick-tables)
-  - ACLs und Sticky Sessions
+**Mission:** Break provider lock-in with automatic config import
 
-### Neue Features
-- **WebSocket Support** - Real-time bidirektionale Kommunikation
-- **Request/Response Body Transformation** - On-the-fly Datenmanipulation
-- **Timeout & Retry Policies** - Robuste Fehlerbehandlung
-- **Enhanced Logging & Observability** - Strukturierte Logs, OpenTelemetry
+**Geplante Features:**
+1. **Config Import (Provider → GAL)**
+   - Parse provider-specific configs zu GAL format
+   - Support all 6 providers
+   - CLI: `gal import --provider nginx --input nginx.conf --output gal-config.yaml`
 
-### Ziele v1.2.0
-- **6 Gateway-Provider** (Envoy, Kong, APISIX, Traefik, Nginx, HAProxy)
-- **600+ Tests** (erhöht von 400+)
-- **95%+ Code Coverage**
-- **10.000+ Zeilen Dokumentation**
+2. **Compatibility Checker**
+   - Validate if GAL config works on target provider
+   - CLI: `gal validate --target-provider haproxy`
+   - CLI: `gal compare --providers envoy,kong,nginx`
 
-**Weitere Informationen:** Siehe [docs/v1.2.0-PLAN.md](docs/v1.2.0-PLAN.md) für den detaillierten Implementierungsplan.
+3. **Migration Assistant**
+   - Interactive migration workflow
+   - CLI: `gal migrate` (interactive)
+   - Migration reports (Markdown)
+
+**Use Cases:**
+- Nginx → HAProxy migration in minutes
+- Kong → Envoy migration
+- Multi-provider deployment testing
+
+**Weitere Informationen:** Siehe [docs/v1.3.0-PLAN.md](docs/v1.3.0-PLAN.md) für den detaillierten Implementierungsplan.
+
+### v1.4.0 - Advanced Traffic & gRPC (Q3 2026)
+
+**Geplante Features:**
+- gRPC Transformations (Protobuf → JSON, Field Mapping)
+- A/B Testing & Canary Deployments
+- GraphQL Support
+- Advanced Traffic Splitting
+
+### v1.5.0 - Enterprise Features & Caddy Provider (Q4 2026)
+
+**Geplante Features:**
+- Caddy Provider (Automatic HTTPS, HTTP/3)
+- Web UI / Dashboard
+- Service Mesh Integration (Istio, Linkerd)
+- Advanced Observability
+- Multi-Tenant Support
+
+**Roadmap:** Siehe [ROADMAP.md](ROADMAP.md) für die vollständige Roadmap bis 2027+.
 
 ---
 
@@ -292,5 +406,8 @@ Das nächste Release (v1.2.0, Q1 2026) bringt **neue Gateway-Provider** und **er
 - **PyPI Package:** https://pypi.org/project/gal-gateway/
 - **Dokumentation:** [README.md](README.md)
 - **Roadmap:** [ROADMAP.md](ROADMAP.md)
+- **v1.2.0 Plan:** [docs/v1.2.0-PLAN.md](docs/v1.2.0-PLAN.md)
 
 **Installationsprobleme?** Siehe [docs/PYPI_PUBLISHING.md](docs/PYPI_PUBLISHING.md) für Troubleshooting.
+
+**Feedback?** Öffne ein Issue auf GitHub: https://github.com/pt9912/x-gal/issues

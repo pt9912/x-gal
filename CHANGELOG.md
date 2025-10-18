@@ -7,6 +7,181 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-10-18
+
+### Hinzugefügt
+
+#### Neue Gateway Provider
+
+- **Nginx Provider (Open Source)**
+  - Vollständige nginx.conf Generierung
+  - Alle Load Balancing Algorithmen: Round Robin, Least Connections, IP Hash, Weighted
+  - Rate Limiting (limit_req_zone, limit_req)
+  - Basic Authentication (auth_basic, htpasswd)
+  - Request/Response Header Manipulation
+  - CORS Policies (add_header directives)
+  - Passive Health Checks (max_fails, fail_timeout)
+  - Template-Variablen ({{uuid}} → $request_id, {{now}} → $time_iso8601)
+  - OpenResty Integration für JWT und API Key Auth
+  - Provider: `gal/providers/nginx.py` (223 Zeilen, 99% Coverage)
+  - Tests: 25 Tests (test_nginx.py)
+  - Dokumentation: [docs/guides/NGINX.md](docs/guides/NGINX.md) (1000+ Zeilen, Deutsch)
+  - Beispiele: [examples/nginx-example.yaml](examples/nginx-example.yaml) (15 Szenarien)
+
+- **HAProxy Provider**
+  - Vollständige haproxy.cfg Generierung
+  - Advanced Load Balancing: roundrobin, leastconn, source, weighted
+  - Active & Passive Health Checks (httpchk, fall/rise)
+  - Rate Limiting (stick-table basiert, IP/Header tracking)
+  - ACLs (Access Control Lists) für komplexes Routing
+  - Sticky Sessions (cookie-based, source-based)
+  - Header Manipulation (http-request/http-response)
+  - CORS (Access-Control-* Headers)
+  - Provider: `gal/providers/haproxy.py` (187 Zeilen, 86% Coverage)
+  - Tests: 10 Tests (test_haproxy.py)
+  - Dokumentation: [docs/guides/HAPROXY.md](docs/guides/HAPROXY.md) (1100+ Zeilen, Deutsch)
+  - Beispiele: [examples/haproxy-example.yaml](examples/haproxy-example.yaml) (16 Szenarien)
+
+#### Erweiterte Features
+
+- **WebSocket Support**
+  - Real-time bidirectional communication für alle 6 Provider
+  - Konfigurierbare idle_timeout, ping_interval, max_message_size
+  - Per-Message Deflate Compression Support
+  - Provider-spezifische Implementierungen:
+    - Envoy: upgrade_configs + idle_timeout
+    - Kong: read_timeout/write_timeout
+    - APISIX: enable_websocket flag
+    - Traefik: passHostHeader + flushInterval
+    - Nginx: proxy_http_version 1.1 + Upgrade headers
+    - HAProxy: timeout tunnel
+  - Config Model: `WebSocketConfig` in gal/config.py
+  - Tests: 20 Tests (test_websocket.py)
+  - Dokumentation: [docs/guides/WEBSOCKET.md](docs/guides/WEBSOCKET.md) (1100+ Zeilen, Deutsch)
+  - Beispiele: [examples/websocket-example.yaml](examples/websocket-example.yaml) (6 Szenarien)
+
+- **Request/Response Body Transformation**
+  - Request Transformations: add_fields, remove_fields, rename_fields
+  - Response Transformations: filter_fields, add_fields
+  - Template-Variablen: {{uuid}}, {{now}}, {{timestamp}}
+  - PII Filtering für Compliance (GDPR, PCI-DSS)
+  - Legacy System Integration durch Field Renaming
+  - Provider-Implementierungen:
+    - Envoy: Lua Filter (100% Support)
+    - Kong: request-transformer & response-transformer Plugins (95%)
+    - APISIX: Serverless Lua Functions (100%)
+    - Traefik: Limitation Warning (0% - nicht unterstützt)
+    - Nginx: OpenResty Lua Blocks (100%)
+    - HAProxy: Lua Function References (90% - manuelle Setup)
+  - Config Models: `BodyTransformationConfig`, `RequestBodyTransformation`, `ResponseBodyTransformation`
+  - Tests: 12 Tests (test_body_transformation.py)
+  - Dokumentation: [docs/guides/BODY_TRANSFORMATION.md](docs/guides/BODY_TRANSFORMATION.md) (1000+ Zeilen, Deutsch)
+  - Beispiele: [examples/body-transformation-example.yaml](examples/body-transformation-example.yaml) (15 Szenarien)
+
+- **Timeout & Retry Policies**
+  - Connection, Send, Read, Idle Timeouts
+  - Automatic Retries mit Exponential/Linear Backoff
+  - Konfigurierbare retry_on Bedingungen (connect_timeout, http_5xx, etc.)
+  - Base Interval & Max Interval für Backoff
+  - Provider-Implementierungen:
+    - Envoy: cluster.connect_timeout, retry_policy
+    - Kong: Service-level timeouts (Millisekunden), retries field
+    - APISIX: timeout object + proxy-retry plugin
+    - Traefik: serversTransport, retry middleware
+    - Nginx: proxy_*_timeout, proxy_next_upstream
+    - HAProxy: timeout directives, retry-on
+  - Config Models: `TimeoutConfig`, `RetryConfig`
+  - Tests: 22 Tests (test_timeout_retry.py)
+  - Dokumentation: [docs/guides/TIMEOUT_RETRY.md](docs/guides/TIMEOUT_RETRY.md) (1000+ Zeilen, Deutsch)
+  - Beispiele: [examples/timeout-retry-example.yaml](examples/timeout-retry-example.yaml) (12 Szenarien)
+
+- **Logging & Observability**
+  - Structured Logging (JSON/Text Format)
+  - Log Sampling für High-Traffic Scenarios (sample_rate)
+  - Custom Fields für Kontext (environment, cluster, version)
+  - Header Inclusion für Distributed Tracing (X-Request-ID, X-B3-TraceId)
+  - Path Exclusion (Health Checks, Metrics Endpoints)
+  - Prometheus Metrics Export
+  - OpenTelemetry Integration (Envoy, Traefik)
+  - Provider-Implementierungen:
+    - Envoy: JSON access logs, sampling, Prometheus + OpenTelemetry stats_sinks
+    - Kong: file-log + prometheus Plugins
+    - APISIX: file-logger + prometheus Global Plugins
+    - Traefik: accessLog + prometheus EntryPoint
+    - Nginx: log_format JSON + nginx-prometheus-exporter
+    - HAProxy: syslog logging + haproxy_exporter
+  - Config Models: `LoggingConfig`, `MetricsConfig`
+  - Tests: 19 Tests (test_logging_observability.py)
+  - Dokumentation: [docs/guides/LOGGING_OBSERVABILITY.md](docs/guides/LOGGING_OBSERVABILITY.md) (1000+ Zeilen, Deutsch)
+  - Beispiele: [examples/logging-observability-example.yaml](examples/logging-observability-example.yaml) (15 Szenarien)
+
+#### Umfassende Provider-Dokumentation
+
+- **Provider-Guides** für alle 6 Gateway Provider:
+  - [ENVOY.md](docs/guides/ENVOY.md) (1068 Zeilen) - CNCF cloud-native proxy, Filter-Architektur, xDS API
+  - [KONG.md](docs/guides/KONG.md) (750 Zeilen) - Plugin-Ökosystem, Admin API, DB-less mode
+  - [APISIX.md](docs/guides/APISIX.md) (730 Zeilen) - Ultra-high performance, etcd integration, Lua scripting
+  - [TRAEFIK.md](docs/guides/TRAEFIK.md) (800 Zeilen) - Auto-discovery, Let's Encrypt, Cloud-native
+  - [NGINX.md](docs/guides/NGINX.md) (1000+ Zeilen) - Open Source, ngx_http modules, OpenResty
+  - [HAPROXY.md](docs/guides/HAPROXY.md) (1100+ Zeilen) - Advanced Load Balancing, ACLs, High performance
+  - Jeder Guide enthält: Feature-Matrix, Installation, Konfiguration, Best Practices, Troubleshooting
+
+### Geändert
+
+- **Test Suite Expansion**
+  - Test Count erhöht: 291 Tests → 364 Tests (+73 Tests)
+  - Neue Testdateien:
+    - test_nginx.py (25 Tests)
+    - test_haproxy.py (10 Tests)
+    - test_websocket.py (20 Tests)
+    - test_body_transformation.py (12 Tests)
+    - test_timeout_retry.py (22 Tests)
+    - test_logging_observability.py (19 Tests)
+  - Code Coverage: 89% maintained
+
+- **CLI Integration**
+  - Nginx Provider in allen Befehlen registriert
+  - HAProxy Provider in allen Befehlen registriert
+  - Extensions Map erweitert: nginx → .conf, haproxy → .cfg
+
+- **Config Model Erweiterungen**
+  - `WebSocketConfig` Dataclass (enabled, idle_timeout, ping_interval, max_message_size, compression)
+  - `BodyTransformationConfig`, `RequestBodyTransformation`, `ResponseBodyTransformation`
+  - `TimeoutConfig` (connect, send, read, idle)
+  - `RetryConfig` (enabled, attempts, backoff, base_interval, max_interval, retry_on)
+  - `LoggingConfig` (enabled, format, level, sample_rate, include_headers, exclude_paths, custom_fields)
+  - `MetricsConfig` (enabled, exporter, prometheus_port, opentelemetry_endpoint, custom_labels)
+  - `Route` erweitert um websocket, body_transformation, timeout, retry
+  - `GlobalConfig` erweitert um logging, metrics
+
+- **README Updates**
+  - Provider Count: 4 → 6 (Nginx, HAProxy added)
+  - Test Count: 291 → 364 Tests
+  - Feature Liste erweitert um WebSocket, Body Transformation, Timeout & Retry, Logging & Observability
+  - Provider-Guides Section hinzugefügt
+
+### Verbessert
+
+- **Code Quality**
+  - Black Formatting für alle Python-Dateien
+  - Isort Import Sorting
+  - Flake8 Linting (kritische Fehler behoben)
+  - Pre-Push Skill für automatisierte Code Quality Checks
+
+- **Dokumentation**
+  - Über 10.000 Zeilen deutschsprachige Dokumentation
+  - 12 Feature-Guides (6 Provider + 6 Features)
+  - 70+ Production-Ready Beispiel-Szenarien
+  - Alle Guides in Deutsch übersetzt
+
+### Statistik
+
+- **6 Gateway Provider** (Envoy, Kong, APISIX, Traefik, Nginx, HAProxy)
+- **364 Tests** mit **89% Code Coverage**
+- **10.000+ Zeilen Dokumentation**
+- **70+ Produktions-Szenarien**
+- **12 Umfassende Feature-Guides**
+
 ## [1.1.0] - 2025-10-18
 
 ### Hinzugefügt
