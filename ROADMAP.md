@@ -284,7 +284,7 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 
 **Focus:** Neue Gateway-Provider & Erweiterte Features
 **Status:** 🚧 In Development (siehe [docs/v1.2.0-PLAN.md](docs/v1.2.0-PLAN.md))
-**Progress:** 16.7% (1 von 6 Features komplett)
+**Progress:** 33.3% (2 von 6 Features komplett)
 **Estimated Effort:** 11.5 Wochen
 
 ### High Priority Features
@@ -312,16 +312,27 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 - ⚠️ JWT Auth requires OpenResty/Lua
 - ⚠️ Circuit Breaker requires Lua
 
-#### 2. HAProxy Provider
-**Status:** 🔄 Pending
+#### 2. HAProxy Provider ✅
+**Status:** ✅ **IMPLEMENTED** (Commit: f758eb8, 2961850, d964b82)
 **Effort:** 2.5 Wochen
-- **Advanced Load Balancing** (10+ Algorithmen)
-- **Active & Passive Health Checks**
-- **Rate Limiting** (stick-tables)
-- **Header Manipulation** (req.hdr, res.hdr)
-- **ACLs** (Access Control Lists)
-- **Sticky Sessions** (multiple methods)
-- **Circuit Breaker** (via server checks)
+- ✅ **Advanced Load Balancing** (roundrobin, leastconn, source, weighted)
+- ✅ **Active & Passive Health Checks** (httpchk, fall/rise thresholds)
+- ✅ **Rate Limiting** (stick-table based, IP and header tracking)
+- ✅ **Header Manipulation** (http-request/http-response directives)
+- ✅ **ACLs** (path_beg, method, header matching)
+- ✅ **Sticky Sessions** (cookie-based and source-based)
+- ✅ **CORS** (via Access-Control-* headers)
+
+**Implementierung:**
+- Provider: `gal/providers/haproxy.py` (187 lines, 86% coverage)
+- Tests: `tests/test_haproxy.py` (10 tests, all passing)
+- Dokumentation: `docs/guides/HAPROXY.md` (1100+ lines, German)
+- Beispiele: `examples/haproxy-example.yaml` (16 production scenarios)
+- CLI Integration: ✅ Complete
+
+**Limitations:**
+- ⚠️ JWT Auth requires Lua scripting
+- ⚠️ Circuit Breaker requires Lua (basic via fall/rise)
 
 **Provider Comparison (Updated):**
 | Feature | Envoy | Kong | APISIX | Traefik | **Nginx** | **HAProxy** |
