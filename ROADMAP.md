@@ -280,24 +280,32 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 
 ---
 
-## 🚀 v1.2.0 (Q1 2026 - In Planning)
+## 🚀 v1.2.0 (Q1 2026 - In Development)
 
 **Focus:** Neue Gateway-Provider & Erweiterte Features
-**Status:** 📋 In Planning (siehe [docs/v1.2.0-PLAN.md](docs/v1.2.0-PLAN.md))
+**Status:** 🚧 In Development (siehe [docs/v1.2.0-PLAN.md](docs/v1.2.0-PLAN.md))
+**Progress:** 16.7% (1 von 6 Features komplett)
 **Estimated Effort:** 11.5 Wochen
 
 ### High Priority Features
 
-#### 1. Nginx Provider (Open Source)
-**Status:** 🔄 Pending
+#### 1. Nginx Provider (Open Source) ✅
+**Status:** ✅ **IMPLEMENTED** (Commit: 3fbd1e0, 5982ee5)
 **Effort:** 3 Wochen
-- **Reverse Proxy & Load Balancing**
-- **Rate Limiting** (ngx_http_limit_req_module)
-- **Basic Authentication** (ngx_http_auth_basic_module)
-- **Header Manipulation** (add_header, proxy_set_header)
-- **CORS** (via add_header directives)
-- **Passive Health Checks** (max_fails, fail_timeout)
-- **Load Balancing Algorithms:** Round Robin, Least Conn, IP Hash, Weighted
+- ✅ **Reverse Proxy & Load Balancing**
+- ✅ **Rate Limiting** (ngx_http_limit_req_module)
+- ✅ **Basic Authentication** (ngx_http_auth_basic_module)
+- ✅ **Header Manipulation** (add_header, proxy_set_header)
+- ✅ **CORS** (via add_header directives)
+- ✅ **Passive Health Checks** (max_fails, fail_timeout)
+- ✅ **Load Balancing Algorithms:** Round Robin, Least Conn, IP Hash, Weighted
+
+**Implementierung:**
+- Provider: `gal/providers/nginx.py` (223 lines, 99% coverage)
+- Tests: `tests/test_nginx.py` (25 tests, all passing)
+- Dokumentation: `docs/guides/NGINX.md` (1000+ lines, German)
+- Beispiele: `examples/nginx-example.yaml` (15 scenarios)
+- CLI Integration: ✅ Complete
 
 **Limitations:**
 - ❌ No Active Health Checks (Nginx Plus only)
