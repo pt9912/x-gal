@@ -28,7 +28,7 @@ setup(
     },
     packages=find_packages(exclude=["tests", "tests.*", "examples", "docs"]),
     classifiers=[
-        "Development Status :: 4 - Beta",
+        "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Developers",
         "Intended Audience :: System Administrators",
         "Topic :: Software Development :: Code Generators",
