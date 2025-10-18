@@ -158,6 +158,15 @@ class EnvoyProvider(Provider):
                 output.append("                route:")
                 output.append(f"                  cluster: {service.name}_cluster")
 
+                # Add WebSocket support if configured
+                if route.websocket and route.websocket.enabled:
+                    ws = route.websocket
+                    output.append("                  upgrade_configs:")
+                    output.append("                  - upgrade_type: websocket")
+                    # Set idle timeout for WebSocket connections
+                    output.append(f"                  idle_timeout: {ws.idle_timeout}")
+                    # Note: max_message_size and ping_interval are handled at cluster level
+
                 # Add route-level header manipulation
                 if route.headers:
                     headers = route.headers
@@ -257,6 +266,16 @@ class EnvoyProvider(Provider):
                         output.append("                  expose_headers: '{}'".format(", ".join(cors.expose_headers)))
                     output.append("                  allow_credentials: {}".format(str(cors.allow_credentials).lower()))
                     output.append("                  max_age: '{}'".format(cors.max_age))
+
+        # Add WebSocket upgrade support if any route has WebSocket enabled
+        has_websocket = any(
+            route.websocket and route.websocket.enabled
+            for service in config.services
+            for route in service.routes
+        )
+        if has_websocket:
+            output.append("          upgrade_configs:")
+            output.append("          - upgrade_type: websocket")
 
         # HTTP filters
         output.append("          http_filters:")

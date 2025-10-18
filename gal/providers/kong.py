@@ -148,6 +148,16 @@ class KongProvider(Provider):
                 output.append(f"  host: {service.upstream.host}")
                 output.append(f"  port: {service.upstream.port}")
 
+            # Add WebSocket timeout configuration if any route has WebSocket enabled
+            for route in service.routes:
+                if route.websocket and route.websocket.enabled:
+                    ws = route.websocket
+                    # Kong uses milliseconds for timeouts
+                    timeout_ms = self._parse_kong_duration(ws.idle_timeout)
+                    output.append(f"  read_timeout: {timeout_ms}")
+                    output.append(f"  write_timeout: {timeout_ms}")
+                    break  # Only need to set once per service
+
             output.append("  routes:")
             
             for route in service.routes:

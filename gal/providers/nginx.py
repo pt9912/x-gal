@@ -376,13 +376,26 @@ class NginxProvider(Provider):
 
         # Proxy headers (default)
         output.append("            proxy_http_version 1.1;")
-        output.append("            proxy_set_header Connection \"\";")
 
-        # Timeouts
-        timeout = config.global_config.timeout if hasattr(self, 'config') else "30s"
-        output.append(f"            proxy_connect_timeout 5s;")
-        output.append(f"            proxy_send_timeout 60s;")
-        output.append(f"            proxy_read_timeout 60s;")
+        # WebSocket support
+        if route.websocket and route.websocket.enabled:
+            ws = route.websocket
+            output.append("            proxy_set_header Upgrade $http_upgrade;")
+            output.append("            proxy_set_header Connection \"upgrade\";")
+
+            # WebSocket timeouts
+            output.append(f"            proxy_connect_timeout 5s;")
+            output.append(f"            proxy_send_timeout 60s;")
+            # Use idle_timeout for WebSocket connections
+            output.append(f"            proxy_read_timeout {ws.idle_timeout};")
+        else:
+            output.append("            proxy_set_header Connection \"\";")
+
+            # Regular HTTP timeouts
+            timeout = config.global_config.timeout if hasattr(self, 'config') else "30s"
+            output.append(f"            proxy_connect_timeout 5s;")
+            output.append(f"            proxy_send_timeout 60s;")
+            output.append(f"            proxy_read_timeout 60s;")
 
         output.append("        }")
         output.append("")
