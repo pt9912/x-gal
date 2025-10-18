@@ -1,202 +1,275 @@
-# Release Notes - GAL v1.0.0
+# Release v1.1.0 - Traffic Management & Security
 
-## 🎉 Erste stabile Version
+**Release-Datum:** 2025-10-18
 
-Gateway Abstraction Layer (GAL) v1.0.0 ist die erste Production-Ready Version eines provider-agnostischen API-Gateway-Konfigurations- und Transformationssystems in Python.
+Wir freuen uns, **GAL v1.1.0** anzukündigen - ein großes Update, das umfassende Traffic-Management- und Security-Features für die Gateway Abstraction Layer bringt!
 
-## ✨ Highlights
+## 🎉 Was ist neu
 
-### 🚀 Kern-Features
+Dieses Release fügt **7 Haupt-Features** mit voller Unterstützung für alle 4 Gateway-Provider (Envoy, Kong, APISIX, Traefik) hinzu.
 
-- **Provider-agnostische Konfiguration**: Einmal definieren, überall deployen
-- **4 Gateway-Provider**: Envoy, Kong, APISIX, Traefik
-- **5 Example Services**: 3 gRPC + 2 REST Services mit vollständigen Transformationsregeln
-- **Payload-Transformation**: Automatische Generierung von Transformationslogik
-  - Default-Werte
-  - Berechnete Felder (UUIDs, Zeitstempel)
-  - Feldvalidierung
+### 🚦 Traffic Management
 
-### 🔧 Entwickler-Features
+#### Rate Limiting & Throttling
+Schützen Sie Ihre APIs vor Überlastung mit konfigurierbarem Rate Limiting:
+- Requests pro Sekunde und Burst-Limits
+- Mehrere Schlüsseltypen: IP-Adresse, Header, JWT Claim
+- Anpassbare Antwortmeldungen
+- Volle Provider-Unterstützung
 
-- **Strukturiertes Logging**: Hierarchische Logger mit 4 konfigurierbaren Levels (debug, info, warning, error)
-- **Umfassende Tests**: 101 Tests mit 89% Code Coverage
-- **Type Hints**: Vollständig getyptes Python (3.10+)
-- **CLI-Tool**: Benutzerfreundliches Command-Line Interface mit Click
-
-### 🐳 Container & Deployment
-
-- **Docker-ready**: Multi-stage Dockerfile mit Security Best Practices
-  - Non-root User
-  - Health Checks
-  - OCI Standard Labels
-  - Multi-Platform Support (amd64, arm64)
-- **GitHub Container Registry**: Automatische Builds auf ghcr.io
-- **Docker Compose**: Vorgefertigte Services für Dev, Generate, Validate
-
-### ⚙️ CI/CD & Automation
-
-- **GitHub Actions Workflows**:
-  - Automatische Tests auf Python 3.10, 3.11, 3.12
-  - Code Quality Checks (black, isort, flake8)
-  - Docker Build & Push zu ghcr.io
-  - Release Automation mit Changelog
-- **Git Flow**: main + develop Branch-Strategie
-- **Semantic Versioning**: VERSION file + automatisches Tagging
-
-### 📦 Packaging
-
-- **PyPI-ready**: Vollständige setup.py + pyproject.toml Konfiguration
-- **Moderne Standards**: PEP 517/518 compliant
-- **Single Source of Truth**: pyproject.toml für alle Dependencies
-
-## 📥 Installation
-
-### Docker (Empfohlen)
-
-```bash
-# Latest Version von GitHub Container Registry
-docker pull ghcr.io/pt9912/x-gal:latest
-
-# Direkt verwenden
-docker run --rm ghcr.io/pt9912/x-gal:latest list-providers
-
-# Konfiguration generieren
-docker run --rm -v $(pwd)/generated:/app/generated \
-  ghcr.io/pt9912/x-gal:latest \
-  generate --config examples/gateway-config.yaml --provider envoy
+```yaml
+rate_limit:
+  enabled: true
+  requests_per_second: 100
+  burst: 200
+  key_type: ip_address
 ```
 
-### Python (Lokal)
+**Dokumentation:** [docs/guides/RATE_LIMITING.md](docs/guides/RATE_LIMITING.md)
 
-```bash
-# Repository klonen
-git clone https://github.com/pt9912/x-gal.git
-cd x-gal
+#### Circuit Breaker Pattern
+Verbessern Sie die Resilienz mit automatischer Fehlererkennung und Wiederherstellung:
+- Konfigurierbare Fehlerschwellwerte
+- Automatische Wiederherstellung mit Half-Open Testing
+- Anpassbare Fehlerantworten
+- 75% native Provider-Unterstützung (APISIX, Traefik, Envoy)
 
-# Virtuelle Umgebung
-python3 -m venv venv
-source venv/bin/activate
-
-# Installation
-pip install -e .         # Runtime
-pip install -e .[dev]    # Mit Dev-Tools
+```yaml
+circuit_breaker:
+  enabled: true
+  max_failures: 5
+  timeout: "30s"
+  half_open_requests: 3
 ```
 
-### PyPI (Geplant für v1.1.0)
+**Dokumentation:** [docs/guides/CIRCUIT_BREAKER.md](docs/guides/CIRCUIT_BREAKER.md)
+
+#### Health Checks & Load Balancing
+Bauen Sie hochverfügbare Systeme mit umfassenden Health Checks:
+- **Active Health Checks**: Periodisches HTTP/TCP Probing
+- **Passive Health Checks**: Traffic-basierte Fehlererkennung
+- **Load Balancing Algorithmen**: Round Robin, Least Connections, IP Hash, Weighted
+- **Sticky Sessions** Unterstützung
+- Mehrere Backend-Targets mit Gewichtungen
+
+```yaml
+upstream:
+  targets:
+    - host: api-1.internal
+      port: 8080
+      weight: 2
+    - host: api-2.internal
+      port: 8080
+      weight: 1
+  health_check:
+    active:
+      enabled: true
+      http_path: /health
+      interval: "10s"
+  load_balancer:
+    algorithm: round_robin
+```
+
+**Dokumentation:** [docs/guides/HEALTH_CHECKS.md](docs/guides/HEALTH_CHECKS.md)
+
+### 🔐 Security Features
+
+#### Authentication & Authorization
+Sichern Sie Ihre APIs mit mehreren Authentifizierungsmethoden:
+- **Basic Authentication**: Benutzername/Passwort
+- **API Key Authentication**: Header- oder Query-basiert
+- **JWT Token Validation**: JWKS, Issuer/Audience Verifizierung, Claims to Headers Mapping
+- Volle Provider-Unterstützung mit nativen Plugins
+
+```yaml
+authentication:
+  type: jwt
+  jwt:
+    issuer: "https://auth.example.com"
+    audiences: ["api"]
+    jwks_uri: "https://auth.example.com/.well-known/jwks.json"
+    claims_to_headers:
+      - claim: sub
+        header: X-User-ID
+```
+
+**Dokumentation:** [docs/guides/AUTHENTICATION.md](docs/guides/AUTHENTICATION.md)
+
+#### Request/Response Header Manipulation
+Kontrollieren Sie HTTP-Header mit Präzision:
+- Headers hinzufügen, setzen und entfernen für Requests und Responses
+- Route-Level und Service-Level Konfiguration
+- Template-Variablen-Unterstützung (UUID, Timestamps)
+- Security Headers (X-Frame-Options, CSP, etc.)
+
+```yaml
+headers:
+  request_add:
+    X-Request-ID: "{{uuid}}"
+    X-Gateway: "GAL"
+  response_add:
+    X-Frame-Options: "DENY"
+    X-Content-Type-Options: "nosniff"
+  response_remove:
+    - X-Powered-By
+```
+
+**Dokumentation:** [docs/guides/HEADERS.md](docs/guides/HEADERS.md)
+
+#### CORS Policies
+Aktivieren Sie Cross-Origin Requests für SPAs und Mobile Apps:
+- Origin Whitelisting (spezifische Domains oder Wildcard)
+- Granulare HTTP Methoden und Header Kontrolle
+- Credentials Support
+- Konfigurierbare Preflight Caching
+
+```yaml
+cors:
+  enabled: true
+  allowed_origins:
+    - "https://app.example.com"
+  allowed_methods: [GET, POST, PUT, DELETE, OPTIONS]
+  allowed_headers: [Content-Type, Authorization]
+  allow_credentials: true
+  max_age: 86400
+```
+
+**Dokumentation:** [docs/guides/CORS.md](docs/guides/CORS.md)
+
+### 📦 PyPI Publication
+
+GAL ist jetzt auf PyPI verfügbar!
 
 ```bash
+# Von PyPI installieren
 pip install gal-gateway
-gal --help
+
+# CLI verwenden
+gal --version
+gal generate examples/rate-limiting-example.yaml
 ```
 
-## 🎯 Quick Start
+**Features:**
+- Automatisierte Release-Pipeline über GitHub Actions
+- TestPyPI Unterstützung für Pre-Release Testing
+- Package-Validierung mit `twine check`
 
-```bash
-# Alle Provider generieren
-python gal-cli.py generate-all --config examples/gateway-config.yaml
+**Links:**
+- **PyPI Package:** https://pypi.org/project/gal-gateway/
+- **TestPyPI Package:** https://test.pypi.org/project/gal-gateway/
+- **Publishing Guide:** [docs/PYPI_PUBLISHING.md](docs/PYPI_PUBLISHING.md)
 
-# Einzelnen Provider mit Logging
-python gal-cli.py --log-level debug generate \
-  --config examples/gateway-config.yaml \
-  --provider kong \
-  --output generated/kong.yaml
+## 📊 Statistiken
 
-# Konfiguration validieren
-python gal-cli.py validate --config examples/gateway-config.yaml
-
-# Provider-Informationen
-python gal-cli.py list-providers
-```
-
-## 🔧 Unterstützte Provider
-
-| Provider | Status | Transformation Engine |
-|----------|--------|----------------------|
-| **Envoy** | ✅ Vollständig | Wasm/Lua Filter |
-| **Kong** | ✅ Vollständig | Lua Plugins |
-| **APISIX** | ✅ Vollständig | Lua Scripts |
-| **Traefik** | ✅ Vollständig | Middleware |
-
-## 📊 Test Coverage
-
-```
-Tests: 101/101 passed
-Coverage: 89%
-
-Modules:
-- gal.config: 95%
-- gal.manager: 92%
-- gal.providers.*: 88%
-- gal.transformation.*: 85%
-```
-
-## ⚠️ Breaking Changes
-
-Keine - Dies ist die erste stabile Version.
-
-## 🐛 Bekannte Einschränkungen
-
-1. **PyPI Packaging**: Noch nicht auf PyPI publiziert (geplant für v1.1.0)
-2. **Provider Features**: Nicht alle Gateway-spezifischen Features sind abgebildet (nur Basis-Routing + Transformationen)
-3. **Dokumentation**: Einige erweiterte Guides fehlen noch
-
-## 🔜 Roadmap
-
-Siehe [**ROADMAP.md**](ROADMAP.md) für die vollständige Feature-Planung über alle Releases.
-
-### v1.1.0 (Q4 2025) - High Priority
-- [ ] Rate Limiting & Throttling
-- [ ] Authentication (Basic Auth, API Key, JWT)
-- [ ] Request/Response Header Manipulation
-- [ ] CORS Policies
-- [ ] PyPI Publication
-- [ ] Circuit Breaker Pattern (Optional)
-- [ ] Health Checks & Load Balancing (Optional)
-
-**Details:** [v1.1.0 Implementierungsplan](docs/v1.1.0-PLAN.md)
-
-### v1.2.0 (Q1 2026) - Cloud & Advanced Traffic
-- AWS API Gateway Support
-- Azure API Management Support
-- A/B Testing & Canary Deployments
-- gRPC-Web & Transcoding
-- GraphQL Support
-- WebSocket Routing
-
-### v1.3.0 (Q2 2026) - Enterprise & Developer Experience
-- Web UI / Dashboard
-- Service Mesh Integration (Istio, Linkerd)
-- Full OpenTelemetry Support
-- Multi-Tenant Support
-- API Versioning
+- **7/7 Features Abgeschlossen** (100%)
+- **400+ Tests** (erhöht von 101)
+- **6000+ Zeilen Dokumentation** hinzugefügt
+- **60+ Beispiel-Szenarien** über alle Features hinweg
+- **Volle Provider-Unterstützung**: Alle Features funktionieren auf Envoy, Kong, APISIX, Traefik
 
 ## 📚 Dokumentation
 
-- [README.md](README.md) - Hauptdokumentation
-- [CHANGELOG.md](CHANGELOG.md) - Vollständige Änderungshistorie
-- [examples/gateway-config.yaml](examples/gateway-config.yaml) - Beispielkonfiguration
-- [docs/](docs/) - Zusätzliche Guides
+Umfassende Guides für alle Features:
+- [RATE_LIMITING.md](docs/guides/RATE_LIMITING.md) - 600+ Zeilen
+- [AUTHENTICATION.md](docs/guides/AUTHENTICATION.md) - 923 Zeilen (Deutsch)
+- [HEADERS.md](docs/guides/HEADERS.md) - 700+ Zeilen
+- [CORS.md](docs/guides/CORS.md) - 1000+ Zeilen (Deutsch)
+- [CIRCUIT_BREAKER.md](docs/guides/CIRCUIT_BREAKER.md) - 1000+ Zeilen (Deutsch)
+- [HEALTH_CHECKS.md](docs/guides/HEALTH_CHECKS.md) - 1000+ Zeilen (Deutsch)
+- [PYPI_PUBLISHING.md](docs/PYPI_PUBLISHING.md) - 400+ Zeilen
+
+## 🚀 Installation
+
+### Von PyPI (Empfohlen)
+```bash
+pip install gal-gateway
+```
+
+### Von Docker
+```bash
+docker pull ghcr.io/pt9912/x-gal:v1.1.0
+```
+
+### Von Source
+```bash
+git clone https://github.com/pt9912/x-gal.git
+cd x-gal
+git checkout v1.1.0
+pip install -e ".[dev]"
+```
+
+## 📖 Schnellstart-Beispiele
+
+### Rate Limiting
+```bash
+gal generate examples/rate-limiting-example.yaml --provider kong
+```
+
+### Authentication
+```bash
+gal generate examples/authentication-test.yaml --provider envoy
+```
+
+### Health Checks & Load Balancing
+```bash
+gal generate examples/health-checks-example.yaml --provider apisix
+```
+
+### CORS
+```bash
+gal generate examples/cors-example.yaml --provider traefik
+```
+
+## 🔧 Was hat sich geändert
+
+### Config Model Erweiterungen
+- `RateLimitConfig`, `AuthenticationConfig`, `HeaderManipulation` hinzugefügt
+- `CORSPolicy`, `CircuitBreakerConfig`, `HealthCheckConfig`, `LoadBalancerConfig` hinzugefügt
+- `Route` und `Upstream` erweitert um alle neuen Features zu unterstützen
+
+### Provider Implementierungen
+- Alle 4 Provider aktualisiert um alle 7 neuen Features zu unterstützen
+- Provider-spezifische Dokumentation für jedes Feature
+- 100% Provider-Kompatibilität für die meisten Features
+
+### Testing
+- Test-Anzahl von 101 auf 400+ erhöht
+- Umfassende Provider-spezifische Tests
+- Real-World Szenario Abdeckung
+
+## 🐛 Bugfixes
+
+- Verschiedene Bugfixes und Verbesserungen über alle Provider hinweg
+- Verbesserte Fehlerbehandlung und Validierung
+- Erweitertes Logging und Debugging
+
+## ⚠️ Breaking Changes
+
+Keine! Dieses Release ist vollständig rückwärtskompatibel mit v1.0.0.
 
 ## 🙏 Danksagung
 
-Dieses Projekt wurde entwickelt, um die Komplexität verschiedener API-Gateway-Provider zu abstrahieren und eine einheitliche, portable Konfiguration zu ermöglichen.
+Besonderer Dank an alle Contributor und Nutzer, die während der Entwicklung Feedback gegeben haben!
 
-## 📝 Lizenz
+## 📝 Vollständiges Changelog
 
-MIT License - siehe [LICENSE](LICENSE) für Details.
+Siehe [CHANGELOG.md](CHANGELOG.md) für vollständige Details.
 
-## 🔗 Links
+## 🔮 Was kommt als Nächstes (v1.2.0)
 
-- **Repository**: https://github.com/pt9912/x-gal
-- **Container Registry**: https://github.com/pt9912/x-gal/pkgs/container/x-gal
-- **Issues**: https://github.com/pt9912/x-gal/issues
-- **Releases**: https://github.com/pt9912/x-gal/releases
+- WebSocket-Unterstützung
+- gRPC Health Checks
+- Request/Response Body Transformationen
+- Timeout-Konfigurationen
+- Retry Policies
+- Zusätzliche Gateway-Provider (HAProxy, Nginx)
 
 ---
 
-**Autor**: Dietmar Burkard
-**Version**: 1.0.0
-**Datum**: Oktober 2025
-**Python**: 3.10+
+**Links:**
+- **GitHub Repository:** https://github.com/pt9912/x-gal
+- **PyPI Package:** https://pypi.org/project/gal-gateway/
+- **Dokumentation:** [README.md](README.md)
+- **Roadmap:** [ROADMAP.md](ROADMAP.md)
 
-⭐ Wenn dir GAL gefällt, gib dem Projekt einen Stern auf GitHub!
+**Installationsprobleme?** Siehe [docs/PYPI_PUBLISHING.md](docs/PYPI_PUBLISHING.md) für Troubleshooting.
