@@ -32,23 +32,179 @@ class GlobalConfig:
 
 
 @dataclass
-class Upstream:
-    """Upstream backend service configuration.
+class UpstreamTarget:
+    """Individual backend server target configuration.
 
-    Defines the target host and port for a backend service that the
-    gateway will proxy requests to.
+    Defines a single backend server in an upstream pool for load balancing.
 
     Attributes:
-        host: Backend service hostname or IP address
-        port: Backend service port number
+        host: Backend server hostname or IP address
+        port: Backend server port number
+        weight: Load balancing weight (default: 1)
+                Higher weight = more traffic
 
     Example:
-        >>> upstream = Upstream(host="api.example.com", port=8080)
-        >>> f"{upstream.host}:{upstream.port}"
-        'api.example.com:8080'
+        >>> target = UpstreamTarget(host="api-1.internal", port=8080, weight=2)
+        >>> f"{target.host}:{target.port} (weight: {target.weight})"
+        'api-1.internal:8080 (weight: 2)'
     """
     host: str
     port: int
+    weight: int = 1
+
+
+@dataclass
+class ActiveHealthCheck:
+    """Active health check configuration.
+
+    Defines periodic probing of backend servers to determine health status.
+
+    Attributes:
+        enabled: Whether active health checks are enabled (default: True)
+        http_path: HTTP path to probe (default: "/health")
+        interval: Check interval duration (default: "10s")
+        timeout: Individual check timeout (default: "5s")
+        healthy_threshold: Consecutive successes to mark healthy (default: 2)
+        unhealthy_threshold: Consecutive failures to mark unhealthy (default: 3)
+        healthy_status_codes: HTTP status codes considered healthy (default: [200, 201, 204])
+
+    Example:
+        >>> check = ActiveHealthCheck(
+        ...     http_path="/api/health",
+        ...     interval="5s",
+        ...     healthy_threshold=2
+        ... )
+        >>> check.http_path
+        '/api/health'
+    """
+    enabled: bool = True
+    http_path: str = "/health"
+    interval: str = "10s"
+    timeout: str = "5s"
+    healthy_threshold: int = 2
+    unhealthy_threshold: int = 3
+    healthy_status_codes: List[int] = field(
+        default_factory=lambda: [200, 201, 204]
+    )
+
+
+@dataclass
+class PassiveHealthCheck:
+    """Passive health check configuration.
+
+    Monitors ongoing traffic to determine health status (circuit breaker).
+
+    Attributes:
+        enabled: Whether passive health checks are enabled (default: True)
+        max_failures: Consecutive failures before marking unhealthy (default: 5)
+        unhealthy_status_codes: HTTP status codes considered unhealthy
+                                (default: [500, 502, 503, 504])
+
+    Example:
+        >>> check = PassiveHealthCheck(
+        ...     max_failures=3,
+        ...     unhealthy_status_codes=[500, 503]
+        ... )
+        >>> check.max_failures
+        3
+    """
+    enabled: bool = True
+    max_failures: int = 5
+    unhealthy_status_codes: List[int] = field(
+        default_factory=lambda: [500, 502, 503, 504]
+    )
+
+
+@dataclass
+class HealthCheckConfig:
+    """Combined health check configuration.
+
+    Configures both active and passive health checking for an upstream.
+
+    Attributes:
+        active: Optional active health check configuration
+        passive: Optional passive health check configuration
+
+    Example:
+        >>> health = HealthCheckConfig(
+        ...     active=ActiveHealthCheck(http_path="/health"),
+        ...     passive=PassiveHealthCheck(max_failures=3)
+        ... )
+        >>> health.active.http_path
+        '/health'
+    """
+    active: Optional[ActiveHealthCheck] = None
+    passive: Optional[PassiveHealthCheck] = None
+
+
+@dataclass
+class LoadBalancerConfig:
+    """Load balancing configuration.
+
+    Defines load balancing strategy and behavior for an upstream.
+
+    Attributes:
+        algorithm: Load balancing algorithm (default: "round_robin")
+                   Options: "round_robin", "least_conn", "ip_hash", "weighted"
+        sticky_sessions: Enable sticky sessions (default: False)
+        cookie_name: Session cookie name if sticky_sessions enabled (default: "galSession")
+
+    Example:
+        >>> lb = LoadBalancerConfig(
+        ...     algorithm="least_conn",
+        ...     sticky_sessions=True
+        ... )
+        >>> lb.algorithm
+        'least_conn'
+    """
+    algorithm: str = "round_robin"  # round_robin, least_conn, ip_hash, weighted
+    sticky_sessions: bool = False
+    cookie_name: str = "galSession"
+
+
+@dataclass
+class Upstream:
+    """Upstream backend service configuration.
+
+    Defines the target host(s) and port(s) for a backend service that the
+    gateway will proxy requests to, with optional health checks and load balancing.
+
+    Supports two modes:
+    1. Single host mode: Use 'host' and 'port' attributes
+    2. Multiple targets mode: Use 'targets' list for load balancing
+
+    Attributes:
+        host: Single backend service hostname or IP address (simple mode)
+        port: Single backend service port number (simple mode)
+        targets: List of backend servers for load balancing (advanced mode)
+                 If provided, 'host' and 'port' are ignored
+        health_check: Optional health check configuration
+        load_balancer: Optional load balancing configuration
+
+    Example (simple mode):
+        >>> upstream = Upstream(host="api.example.com", port=8080)
+        >>> f"{upstream.host}:{upstream.port}"
+        'api.example.com:8080'
+
+    Example (load balancing mode):
+        >>> upstream = Upstream(
+        ...     targets=[
+        ...         UpstreamTarget(host="api-1.internal", port=8080, weight=2),
+        ...         UpstreamTarget(host="api-2.internal", port=8080, weight=1)
+        ...     ],
+        ...     health_check=HealthCheckConfig(
+        ...         active=ActiveHealthCheck(http_path="/health")
+        ...     ),
+        ...     load_balancer=LoadBalancerConfig(algorithm="weighted")
+        ... )
+        >>> len(upstream.targets)
+        2
+    """
+    host: str = ""
+    port: int = 0
+    targets: List[UpstreamTarget] = field(default_factory=list)
+    health_check: Optional[HealthCheckConfig] = None
+    load_balancer: Optional[LoadBalancerConfig] = None
 
 
 @dataclass

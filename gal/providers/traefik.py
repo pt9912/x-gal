@@ -158,10 +158,7 @@ class TraefikProvider(Provider):
         
         output.append("  services:")
         for service in config.services:
-            output.append(f"    {service.name}_service:")
-            output.append("      loadBalancer:")
-            output.append("        servers:")
-            output.append(f"        - url: 'http://{service.upstream.host}:{service.upstream.port}'")
+            self._generate_traefik_service(service, output)
             output.append("")
         
         # Middlewares for authentication, transformations, rate limiting, headers, and CORS
@@ -372,6 +369,51 @@ class TraefikProvider(Provider):
         result = "\n".join(output)
         logger.info(f"Traefik configuration generated: {len(result)} bytes, {len(config.services)} services")
         return result
+
+    def _generate_traefik_service(self, service, output: list):
+        """Generate Traefik service configuration with health checks and load balancing.
+
+        Creates Traefik service LoadBalancer configuration supporting:
+        - Multiple servers with weights
+        - Health checks (HTTP/HTTPS probing)
+        - Sticky sessions
+        - Load balancing (implicit round-robin or weighted)
+
+        Args:
+            service: Service object with upstream configuration
+            output: Output list to append YAML lines to
+        """
+        output.append(f"    {service.name}_service:")
+        output.append("      loadBalancer:")
+
+        # Configure servers
+        output.append("        servers:")
+        if service.upstream.targets:
+            # Multiple targets mode
+            for target in service.upstream.targets:
+                output.append(f"        - url: 'http://{target.host}:{target.port}'")
+                if service.upstream.load_balancer and service.upstream.load_balancer.algorithm == "weighted":
+                    output.append(f"          weight: {target.weight}")
+        else:
+            # Simple mode (single host/port)
+            output.append(f"        - url: 'http://{service.upstream.host}:{service.upstream.port}'")
+
+        # Configure sticky sessions
+        if service.upstream.load_balancer and service.upstream.load_balancer.sticky_sessions:
+            output.append("        sticky:")
+            output.append("          cookie:")
+            cookie_name = service.upstream.load_balancer.cookie_name or "galSession"
+            output.append(f"            name: {cookie_name}")
+            output.append("            httpOnly: true")
+
+        # Configure health checks
+        if service.upstream.health_check and service.upstream.health_check.active:
+            active = service.upstream.health_check.active
+            if active.enabled:
+                output.append("        healthCheck:")
+                output.append(f"          path: {active.http_path}")
+                output.append(f"          interval: {active.interval}")
+                output.append(f"          timeout: {active.timeout}")
 
     def deploy(self, config: Config, output_file: Optional[str] = None,
                api_url: Optional[str] = None) -> bool:

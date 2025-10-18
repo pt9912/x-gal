@@ -121,14 +121,8 @@ class APISIXProvider(Provider):
         }
         
         for service in config.services:
-            # Create upstream
-            upstream = {
-                "id": f"{service.name}_upstream",
-                "type": "roundrobin",
-                "nodes": {
-                    f"{service.upstream.host}:{service.upstream.port}": 1
-                }
-            }
+            # Create upstream with health checks and load balancing
+            upstream = self._generate_upstream(service)
             apisix_config["upstreams"].append(upstream)
             
             # Create service with plugins
@@ -299,7 +293,133 @@ class APISIXProvider(Provider):
         result = json.dumps(apisix_config, indent=2)
         logger.info(f"APISIX configuration generated: {len(result)} bytes, {len(config.services)} services")
         return result
-    
+
+    def _generate_upstream(self, service) -> dict:
+        """Generate upstream configuration with health checks and load balancing.
+
+        Creates APISIX upstream configuration supporting:
+        - Multiple nodes (targets) with weights
+        - Active health checks (HTTP/HTTPS/TCP probing)
+        - Passive health checks (traffic monitoring)
+        - Load balancing algorithms
+
+        Args:
+            service: Service object with upstream configuration
+
+        Returns:
+            dict: APISIX upstream configuration
+
+        Example:
+            >>> upstream = provider._generate_upstream(service)
+            >>> upstream["type"]
+            'roundrobin'
+            >>> "checks" in upstream
+            True
+        """
+        upstream = {
+            "id": f"{service.name}_upstream",
+            "type": "roundrobin",  # Default algorithm
+            "nodes": {}
+        }
+
+        # Determine if using targets mode or simple host/port mode
+        if service.upstream.targets:
+            # Multiple targets mode (load balancing)
+            for target in service.upstream.targets:
+                node_key = f"{target.host}:{target.port}"
+                upstream["nodes"][node_key] = target.weight
+        else:
+            # Simple mode (single host/port)
+            node_key = f"{service.upstream.host}:{service.upstream.port}"
+            upstream["nodes"][node_key] = 1
+
+        # Configure load balancing algorithm
+        if service.upstream.load_balancer:
+            lb_algo_map = {
+                "round_robin": "roundrobin",
+                "least_conn": "least_conn",
+                "ip_hash": "chash",
+                "weighted": "roundrobin"  # Weighted uses roundrobin with node weights
+            }
+            algorithm = service.upstream.load_balancer.algorithm
+            upstream["type"] = lb_algo_map.get(algorithm, "roundrobin")
+
+            # For IP hash, configure key
+            if algorithm == "ip_hash":
+                upstream["hash_on"] = "vars"
+                upstream["key"] = "remote_addr"
+
+        # Configure health checks
+        if service.upstream.health_check:
+            checks_config = {}
+            hc = service.upstream.health_check
+
+            # Active health checks
+            if hc.active and hc.active.enabled:
+                active = hc.active
+                checks_config["active"] = {
+                    "type": "http",  # APISIX supports http, https, tcp
+                    "http_path": active.http_path,
+                    "timeout": self._parse_duration(active.timeout),
+                    "healthy": {
+                        "interval": self._parse_duration(active.interval),
+                        "successes": active.healthy_threshold,
+                        "http_statuses": active.healthy_status_codes
+                    },
+                    "unhealthy": {
+                        "interval": self._parse_duration(active.interval),
+                        "http_failures": active.unhealthy_threshold
+                    }
+                }
+
+            # Passive health checks
+            if hc.passive and hc.passive.enabled:
+                passive = hc.passive
+                checks_config["passive"] = {
+                    "type": "http",
+                    "healthy": {
+                        "successes": 1,
+                        "http_statuses": [200, 201, 202, 204, 301, 302, 303, 304, 307, 308]
+                    },
+                    "unhealthy": {
+                        "http_failures": passive.max_failures,
+                        "http_statuses": passive.unhealthy_status_codes
+                    }
+                }
+
+            if checks_config:
+                upstream["checks"] = checks_config
+
+        return upstream
+
+    def _parse_duration(self, duration: str) -> int:
+        """Parse duration string to seconds.
+
+        Converts duration strings like "10s", "1m", "1h" to integer seconds.
+
+        Args:
+            duration: Duration string (e.g., "10s", "1m")
+
+        Returns:
+            int: Duration in seconds
+
+        Example:
+            >>> provider._parse_duration("10s")
+            10
+            >>> provider._parse_duration("1m")
+            60
+        """
+        duration = duration.strip()
+        if duration.endswith('s'):
+            return int(duration[:-1])
+        elif duration.endswith('m'):
+            return int(duration[:-1]) * 60
+        elif duration.endswith('h'):
+            return int(duration[:-1]) * 3600
+        else:
+            # Assume seconds if no unit
+            return int(duration)
+
     def _generate_lua_transformation(self, service) -> str:
         """Generate Lua transformation script for APISIX serverless plugin.
 
