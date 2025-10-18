@@ -9,12 +9,14 @@ Tests all CORS functionality across all providers:
 """
 
 import json
+
 import pytest
-from gal.config import Config, Service, Route, Upstream, GlobalConfig, CORSPolicy
-from gal.providers.kong import KongProvider
+
+from gal.config import Config, CORSPolicy, GlobalConfig, Route, Service, Upstream
 from gal.providers.apisix import APISIXProvider
-from gal.providers.traefik import TraefikProvider
 from gal.providers.envoy import EnvoyProvider
+from gal.providers.kong import KongProvider
+from gal.providers.traefik import TraefikProvider
 
 
 class TestCORSPolicy:
@@ -36,11 +38,11 @@ class TestCORSPolicy:
                         Route(
                             path_prefix="/api/v1",
                             methods=["GET", "POST", "OPTIONS"],
-                            cors=cors_policy
+                            cors=cors_policy,
                         )
-                    ]
+                    ],
                 )
-            ]
+            ],
         )
 
     # Kong Tests
@@ -51,7 +53,7 @@ class TestCORSPolicy:
             enabled=True,
             allowed_origins=["https://example.com"],
             allowed_methods=["GET", "POST"],
-            allowed_headers=["Content-Type", "Authorization"]
+            allowed_headers=["Content-Type", "Authorization"],
         )
         config = self._create_config_with_cors("kong", cors)
         result = provider.generate(config)
@@ -67,11 +69,7 @@ class TestCORSPolicy:
     def test_kong_cors_wildcard_origin(self):
         """Test Kong CORS with wildcard origin"""
         provider = KongProvider()
-        cors = CORSPolicy(
-            enabled=True,
-            allowed_origins=["*"],
-            allowed_methods=["GET", "POST"]
-        )
+        cors = CORSPolicy(enabled=True, allowed_origins=["*"], allowed_methods=["GET", "POST"])
         config = self._create_config_with_cors("kong", cors)
         result = provider.generate(config)
 
@@ -82,9 +80,7 @@ class TestCORSPolicy:
         """Test Kong CORS with credentials enabled"""
         provider = KongProvider()
         cors = CORSPolicy(
-            enabled=True,
-            allowed_origins=["https://app.example.com"],
-            allow_credentials=True
+            enabled=True, allowed_origins=["https://app.example.com"], allow_credentials=True
         )
         config = self._create_config_with_cors("kong", cors)
         result = provider.generate(config)
@@ -98,7 +94,7 @@ class TestCORSPolicy:
         cors = CORSPolicy(
             enabled=True,
             allowed_origins=["https://example.com"],
-            expose_headers=["X-Custom-Header", "X-Request-ID"]
+            expose_headers=["X-Custom-Header", "X-Request-ID"],
         )
         config = self._create_config_with_cors("kong", cors)
         result = provider.generate(config)
@@ -109,11 +105,7 @@ class TestCORSPolicy:
     def test_kong_cors_max_age(self):
         """Test Kong CORS with custom max_age"""
         provider = KongProvider()
-        cors = CORSPolicy(
-            enabled=True,
-            allowed_origins=["https://example.com"],
-            max_age=7200
-        )
+        cors = CORSPolicy(enabled=True, allowed_origins=["https://example.com"], max_age=7200)
         config = self._create_config_with_cors("kong", cors)
         result = provider.generate(config)
 
@@ -128,7 +120,7 @@ class TestCORSPolicy:
             enabled=True,
             allowed_origins=["https://example.com"],
             allowed_methods=["GET", "POST"],
-            allowed_headers=["Content-Type"]
+            allowed_headers=["Content-Type"],
         )
         config = self._create_config_with_cors("apisix", cors)
         result = provider.generate(config)
@@ -144,8 +136,7 @@ class TestCORSPolicy:
         """Test APISIX CORS with multiple origins"""
         provider = APISIXProvider()
         cors = CORSPolicy(
-            enabled=True,
-            allowed_origins=["https://example.com", "https://app.example.com"]
+            enabled=True, allowed_origins=["https://example.com", "https://app.example.com"]
         )
         config = self._create_config_with_cors("apisix", cors)
         result = provider.generate(config)
@@ -160,9 +151,7 @@ class TestCORSPolicy:
         """Test APISIX CORS with credentials"""
         provider = APISIXProvider()
         cors = CORSPolicy(
-            enabled=True,
-            allowed_origins=["https://example.com"],
-            allow_credentials=True
+            enabled=True, allowed_origins=["https://example.com"], allow_credentials=True
         )
         config = self._create_config_with_cors("apisix", cors)
         result = provider.generate(config)
@@ -177,7 +166,7 @@ class TestCORSPolicy:
         cors = CORSPolicy(
             enabled=True,
             allowed_origins=["https://example.com"],
-            expose_headers=["X-Request-ID", "X-Response-Time"]
+            expose_headers=["X-Request-ID", "X-Response-Time"],
         )
         config = self._create_config_with_cors("apisix", cors)
         result = provider.generate(config)
@@ -192,9 +181,7 @@ class TestCORSPolicy:
         """Test Traefik CORS headers middleware"""
         provider = TraefikProvider()
         cors = CORSPolicy(
-            enabled=True,
-            allowed_origins=["https://example.com"],
-            allowed_methods=["GET", "POST"]
+            enabled=True, allowed_origins=["https://example.com"], allowed_methods=["GET", "POST"]
         )
         config = self._create_config_with_cors("traefik", cors)
         result = provider.generate(config)
@@ -212,7 +199,7 @@ class TestCORSPolicy:
         cors = CORSPolicy(
             enabled=True,
             allowed_origins=["*"],
-            allowed_headers=["Content-Type", "Authorization", "X-API-Key"]
+            allowed_headers=["Content-Type", "Authorization", "X-API-Key"],
         )
         config = self._create_config_with_cors("traefik", cors)
         result = provider.generate(config)
@@ -226,9 +213,7 @@ class TestCORSPolicy:
         """Test Traefik CORS with credentials"""
         provider = TraefikProvider()
         cors = CORSPolicy(
-            enabled=True,
-            allowed_origins=["https://example.com"],
-            allow_credentials=True
+            enabled=True, allowed_origins=["https://example.com"], allow_credentials=True
         )
         config = self._create_config_with_cors("traefik", cors)
         result = provider.generate(config)
@@ -238,11 +223,7 @@ class TestCORSPolicy:
     def test_traefik_cors_max_age(self):
         """Test Traefik CORS with max age"""
         provider = TraefikProvider()
-        cors = CORSPolicy(
-            enabled=True,
-            allowed_origins=["https://example.com"],
-            max_age=3600
-        )
+        cors = CORSPolicy(enabled=True, allowed_origins=["https://example.com"], max_age=3600)
         config = self._create_config_with_cors("traefik", cors)
         result = provider.generate(config)
 
@@ -254,7 +235,7 @@ class TestCORSPolicy:
         cors = CORSPolicy(
             enabled=True,
             allowed_origins=["https://example.com"],
-            expose_headers=["X-Custom-Header"]
+            expose_headers=["X-Custom-Header"],
         )
         config = self._create_config_with_cors("traefik", cors)
         result = provider.generate(config)
@@ -267,9 +248,7 @@ class TestCORSPolicy:
         """Test Envoy native CORS policy"""
         provider = EnvoyProvider()
         cors = CORSPolicy(
-            enabled=True,
-            allowed_origins=["https://example.com"],
-            allowed_methods=["GET", "POST"]
+            enabled=True, allowed_origins=["https://example.com"], allowed_methods=["GET", "POST"]
         )
         config = self._create_config_with_cors("envoy", cors)
         result = provider.generate(config)
@@ -283,10 +262,7 @@ class TestCORSPolicy:
     def test_envoy_cors_wildcard(self):
         """Test Envoy CORS with wildcard origin"""
         provider = EnvoyProvider()
-        cors = CORSPolicy(
-            enabled=True,
-            allowed_origins=["*"]
-        )
+        cors = CORSPolicy(enabled=True, allowed_origins=["*"])
         config = self._create_config_with_cors("envoy", cors)
         result = provider.generate(config)
 
@@ -298,9 +274,7 @@ class TestCORSPolicy:
         """Test Envoy CORS with credentials"""
         provider = EnvoyProvider()
         cors = CORSPolicy(
-            enabled=True,
-            allowed_origins=["https://example.com"],
-            allow_credentials=True
+            enabled=True, allowed_origins=["https://example.com"], allow_credentials=True
         )
         config = self._create_config_with_cors("envoy", cors)
         result = provider.generate(config)
@@ -313,7 +287,7 @@ class TestCORSPolicy:
         cors = CORSPolicy(
             enabled=True,
             allowed_origins=["https://example.com"],
-            expose_headers=["X-Request-ID", "X-Response-Time"]
+            expose_headers=["X-Request-ID", "X-Response-Time"],
         )
         config = self._create_config_with_cors("envoy", cors)
         result = provider.generate(config)
@@ -325,11 +299,7 @@ class TestCORSPolicy:
     def test_envoy_cors_max_age(self):
         """Test Envoy CORS with max age"""
         provider = EnvoyProvider()
-        cors = CORSPolicy(
-            enabled=True,
-            allowed_origins=["https://example.com"],
-            max_age=7200
-        )
+        cors = CORSPolicy(enabled=True, allowed_origins=["https://example.com"], max_age=7200)
         config = self._create_config_with_cors("envoy", cors)
         result = provider.generate(config)
 

@@ -4,6 +4,7 @@ Manager for orchestrating GAL operations
 
 import logging
 from typing import Dict, List
+
 from .config import Config
 from .provider import Provider
 
@@ -73,7 +74,9 @@ class Manager:
         logger.info(f"Loading configuration from: {filepath}")
         try:
             config = Config.from_yaml(filepath)
-            logger.info(f"Configuration loaded successfully: provider={config.provider}, services={len(config.services)}")
+            logger.info(
+                f"Configuration loaded successfully: provider={config.provider}, services={len(config.services)}"
+            )
             return config
         except Exception as e:
             logger.error(f"Failed to load configuration from {filepath}: {e}")
@@ -149,7 +152,9 @@ class Manager:
                 raise ValueError(f"Configuration validation failed for {config.provider}")
 
             result = provider.generate(config)
-            logger.info(f"Configuration generated successfully for {config.provider} ({len(result)} bytes)")
+            logger.info(
+                f"Configuration generated successfully for {config.provider} ({len(result)} bytes)"
+            )
             return result
         except Exception as e:
             logger.error(f"Generation error for {config.provider}: {e}")

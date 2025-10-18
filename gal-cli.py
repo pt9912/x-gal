@@ -3,19 +3,20 @@
 GAL CLI Tool
 """
 
-import click
-import sys
 import logging
+import sys
 from pathlib import Path
+
+import click
 
 from gal.manager import Manager
 from gal.providers import (
-    EnvoyProvider,
-    KongProvider,
     APISIXProvider,
-    TraefikProvider,
+    EnvoyProvider,
+    HAProxyProvider,
+    KongProvider,
     NginxProvider,
-    HAProxyProvider
+    TraefikProvider,
 )
 
 # Configure logging
@@ -27,28 +28,31 @@ def setup_logging(log_level):
     level = getattr(logging, log_level.upper(), logging.INFO)
     logging.basicConfig(
         level=level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
 
 @click.group()
-@click.option('--log-level', '-l',
-              type=click.Choice(['debug', 'info', 'warning', 'error'], case_sensitive=False),
-              default='warning',
-              help='Set logging level (default: warning)')
+@click.option(
+    "--log-level",
+    "-l",
+    type=click.Choice(["debug", "info", "warning", "error"], case_sensitive=False),
+    default="warning",
+    help="Set logging level (default: warning)",
+)
 @click.pass_context
 def cli(ctx, log_level):
     """Gateway Abstraction Layer (GAL) CLI"""
     ctx.ensure_object(dict)
-    ctx.obj['LOG_LEVEL'] = log_level
+    ctx.obj["LOG_LEVEL"] = log_level
     setup_logging(log_level)
 
 
 @cli.command()
-@click.option('--config', '-c', required=True, help='Configuration file path')
-@click.option('--provider', '-p', help='Provider name (overrides config)')
-@click.option('--output', '-o', help='Output file (default: stdout)')
+@click.option("--config", "-c", required=True, help="Configuration file path")
+@click.option("--provider", "-p", help="Provider name (overrides config)")
+@click.option("--output", "-o", help="Output file (default: stdout)")
 def generate(config, provider, output):
     """Generate gateway configuration"""
     try:
@@ -61,30 +65,32 @@ def generate(config, provider, output):
         manager.register_provider(HAProxyProvider())
 
         cfg = manager.load_config(config)
-        
+
         if provider:
             cfg.provider = provider
-        
+
         click.echo(f"Generating configuration for: {cfg.provider}")
-        click.echo(f"Services: {len(cfg.services)} ({len(cfg.get_grpc_services())} gRPC, {len(cfg.get_rest_services())} REST)")
-        
+        click.echo(
+            f"Services: {len(cfg.services)} ({len(cfg.get_grpc_services())} gRPC, {len(cfg.get_rest_services())} REST)"
+        )
+
         result = manager.generate(cfg)
-        
+
         if output:
             Path(output).parent.mkdir(parents=True, exist_ok=True)
-            with open(output, 'w') as f:
+            with open(output, "w") as f:
                 f.write(result)
             click.echo(f"✓ Configuration written to: {output}")
         else:
             click.echo("\n" + result)
-    
+
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
 
 @cli.command()
-@click.option('--config', '-c', required=True, help='Configuration file path')
+@click.option("--config", "-c", required=True, help="Configuration file path")
 def validate(config):
     """Validate configuration"""
     try:
@@ -111,20 +117,20 @@ def validate(config):
 
 
 @cli.command()
-@click.option('--config', '-c', required=True, help='Configuration file path')
-@click.option('--output-dir', '-o', default='generated', help='Output directory')
+@click.option("--config", "-c", required=True, help="Configuration file path")
+@click.option("--output-dir", "-o", default="generated", help="Output directory")
 def generate_all(config, output_dir):
     """Generate configurations for all providers"""
-    providers = ['envoy', 'kong', 'apisix', 'traefik', 'nginx', 'haproxy']
+    providers = ["envoy", "kong", "apisix", "traefik", "nginx", "haproxy"]
     extensions = {
-        'envoy': 'yaml',
-        'kong': 'yaml',
-        'apisix': 'json',
-        'traefik': 'yaml',
-        'nginx': 'conf',
-        'haproxy': 'cfg'
+        "envoy": "yaml",
+        "kong": "yaml",
+        "apisix": "json",
+        "traefik": "yaml",
+        "nginx": "conf",
+        "haproxy": "cfg",
     }
-    
+
     try:
         manager = Manager()
         manager.register_provider(EnvoyProvider())
@@ -136,42 +142,42 @@ def generate_all(config, output_dir):
 
         cfg = manager.load_config(config)
         original_provider = cfg.provider
-        
+
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
-        
+
         click.echo(f"Generating configurations for all providers...")
         click.echo(f"Output directory: {output_path.absolute()}")
         click.echo("")
-        
+
         for provider in providers:
             cfg.provider = provider
             result = manager.generate(cfg)
-            
-            ext = extensions.get(provider, 'txt')
+
+            ext = extensions.get(provider, "txt")
             output_file = output_path / f"{provider}.{ext}"
-            
-            with open(output_file, 'w') as f:
+
+            with open(output_file, "w") as f:
                 f.write(result)
-            
+
             click.echo(f"  ✓ {provider}: {output_file}")
-        
+
         cfg.provider = original_provider
         click.echo(f"\n✓ All configurations generated successfully")
-    
+
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
 
 @cli.command()
-@click.option('--config', '-c', required=True, help='Configuration file path')
+@click.option("--config", "-c", required=True, help="Configuration file path")
 def info(config):
     """Show configuration information"""
     try:
         manager = Manager()
         cfg = manager.load_config(config)
-        
+
         click.echo("=" * 60)
         click.echo("GAL Configuration Information")
         click.echo("=" * 60)
@@ -186,29 +192,31 @@ def info(config):
         click.echo("")
         click.echo(f"Services ({len(cfg.services)} total):")
         click.echo("")
-        
+
         for service in cfg.services:
             click.echo(f"  • {service.name}")
             click.echo(f"    Type: {service.type}")
             click.echo(f"    Upstream: {service.upstream.host}:{service.upstream.port}")
             click.echo(f"    Routes: {len(service.routes)}")
-            
+
             if service.transformation and service.transformation.enabled:
                 click.echo(f"    Transformations: ✓ Enabled")
                 click.echo(f"      Defaults: {len(service.transformation.defaults)} fields")
                 click.echo(f"      Computed: {len(service.transformation.computed_fields)} fields")
                 if service.transformation.validation:
-                    click.echo(f"      Required: {', '.join(service.transformation.validation.required_fields)}")
+                    click.echo(
+                        f"      Required: {', '.join(service.transformation.validation.required_fields)}"
+                    )
             else:
                 click.echo(f"    Transformations: ✗ Disabled")
             click.echo("")
-        
+
         if cfg.plugins:
             click.echo(f"Plugins ({len(cfg.plugins)}):")
             for plugin in cfg.plugins:
                 status = "✓" if plugin.enabled else "✗"
                 click.echo(f"  {status} {plugin.name}")
-    
+
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
@@ -226,5 +234,5 @@ def list_providers():
     click.echo("  • haproxy - HAProxy Load Balancer")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli()

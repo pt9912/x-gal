@@ -6,7 +6,8 @@ This ensures a consistent interface across different gateway implementations.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Any, Dict
+
 from .config import Config
 
 

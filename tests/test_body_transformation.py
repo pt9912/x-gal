@@ -4,19 +4,28 @@ Tests for Body Transformation feature (v1.2.0 Feature 4).
 Tests request and response body transformation across all providers.
 """
 
-import pytest
 import json
+
+import pytest
 import yaml
+
 from gal.config import (
-    Config, GlobalConfig, Service, Upstream, UpstreamTarget, Route,
-    BodyTransformationConfig, RequestBodyTransformation, ResponseBodyTransformation
+    BodyTransformationConfig,
+    Config,
+    GlobalConfig,
+    RequestBodyTransformation,
+    ResponseBodyTransformation,
+    Route,
+    Service,
+    Upstream,
+    UpstreamTarget,
 )
-from gal.providers.envoy import EnvoyProvider
-from gal.providers.kong import KongProvider
 from gal.providers.apisix import APISIXProvider
-from gal.providers.traefik import TraefikProvider
-from gal.providers.nginx import NginxProvider
+from gal.providers.envoy import EnvoyProvider
 from gal.providers.haproxy import HAProxyProvider
+from gal.providers.kong import KongProvider
+from gal.providers.nginx import NginxProvider
+from gal.providers.traefik import TraefikProvider
 
 
 class TestBodyTransformation:
@@ -28,21 +37,16 @@ class TestBodyTransformation:
         request = RequestBodyTransformation(
             add_fields={"trace_id": "{{uuid}}", "timestamp": "{{now}}"},
             remove_fields=["internal_id", "secret"],
-            rename_fields={"old_field": "new_field"}
+            rename_fields={"old_field": "new_field"},
         )
 
         # Response transformation
         response = ResponseBodyTransformation(
-            filter_fields=["password", "api_key"],
-            add_fields={"server_time": "{{now}}"}
+            filter_fields=["password", "api_key"], add_fields={"server_time": "{{now}}"}
         )
 
         # Combined transformation
-        bt = BodyTransformationConfig(
-            enabled=True,
-            request=request,
-            response=response
-        )
+        bt = BodyTransformationConfig(enabled=True, request=request, response=response)
 
         assert bt.enabled is True
         assert bt.request.add_fields["trace_id"] == "{{uuid}}"
@@ -60,11 +64,9 @@ class TestBodyTransformation:
             services=[
                 Service(
                     name="api_service",
-                    type="rest", protocol="http",
-                    upstream=Upstream(
-                        host="api.internal",
-                        port=8080
-                    ),
+                    type="rest",
+                    protocol="http",
+                    upstream=Upstream(host="api.internal", port=8080),
                     routes=[
                         Route(
                             path_prefix="/api/users",
@@ -73,13 +75,13 @@ class TestBodyTransformation:
                                 request=RequestBodyTransformation(
                                     add_fields={"request_id": "{{uuid}}", "created_at": "{{now}}"},
                                     remove_fields=["internal_secret"],
-                                    rename_fields={"user_id": "id"}
-                                )
-                            )
+                                    rename_fields={"user_id": "id"},
+                                ),
+                            ),
                         )
-                    ]
+                    ],
                 )
-            ]
+            ],
         )
 
         provider = EnvoyProvider()
@@ -111,11 +113,9 @@ class TestBodyTransformation:
             services=[
                 Service(
                     name="api_service",
-                    type="rest", protocol="http",
-                    upstream=Upstream(
-                        host="api.internal",
-                        port=8080
-                    ),
+                    type="rest",
+                    protocol="http",
+                    upstream=Upstream(host="api.internal", port=8080),
                     routes=[
                         Route(
                             path_prefix="/api/users",
@@ -123,13 +123,13 @@ class TestBodyTransformation:
                                 enabled=True,
                                 response=ResponseBodyTransformation(
                                     filter_fields=["password", "ssn"],
-                                    add_fields={"server_time": "{{timestamp}}"}
-                                )
-                            )
+                                    add_fields={"server_time": "{{timestamp}}"},
+                                ),
+                            ),
                         )
-                    ]
+                    ],
                 )
-            ]
+            ],
         )
 
         provider = EnvoyProvider()
@@ -150,25 +150,22 @@ class TestBodyTransformation:
             services=[
                 Service(
                     name="api_service",
-                    type="rest", protocol="http",
-                    upstream=Upstream(
-                        host="api.internal",
-                        port=8080
-                    ),
+                    type="rest",
+                    protocol="http",
+                    upstream=Upstream(host="api.internal", port=8080),
                     routes=[
                         Route(
                             path_prefix="/api/users",
                             body_transformation=BodyTransformationConfig(
                                 enabled=True,
                                 request=RequestBodyTransformation(
-                                    add_fields={"trace_id": "{{uuid}}"},
-                                    remove_fields=["secret"]
-                                )
-                            )
+                                    add_fields={"trace_id": "{{uuid}}"}, remove_fields=["secret"]
+                                ),
+                            ),
                         )
-                    ]
+                    ],
                 )
-            ]
+            ],
         )
 
         provider = KongProvider()
@@ -191,25 +188,22 @@ class TestBodyTransformation:
             services=[
                 Service(
                     name="api_service",
-                    type="rest", protocol="http",
-                    upstream=Upstream(
-                        host="api.internal",
-                        port=8080
-                    ),
+                    type="rest",
+                    protocol="http",
+                    upstream=Upstream(host="api.internal", port=8080),
                     routes=[
                         Route(
                             path_prefix="/api/users",
                             body_transformation=BodyTransformationConfig(
                                 enabled=True,
                                 response=ResponseBodyTransformation(
-                                    filter_fields=["password"],
-                                    add_fields={"version": "v1"}
-                                )
-                            )
+                                    filter_fields=["password"], add_fields={"version": "v1"}
+                                ),
+                            ),
                         )
-                    ]
+                    ],
                 )
-            ]
+            ],
         )
 
         provider = KongProvider()
@@ -231,11 +225,9 @@ class TestBodyTransformation:
             services=[
                 Service(
                     name="api_service",
-                    type="rest", protocol="http",
-                    upstream=Upstream(
-                        host="api.internal",
-                        port=8080
-                    ),
+                    type="rest",
+                    protocol="http",
+                    upstream=Upstream(host="api.internal", port=8080),
                     routes=[
                         Route(
                             path_prefix="/api/users",
@@ -244,13 +236,13 @@ class TestBodyTransformation:
                                 request=RequestBodyTransformation(
                                     add_fields={"request_id": "{{uuid}}"},
                                     remove_fields=["internal"],
-                                    rename_fields={"old": "new"}
-                                )
-                            )
+                                    rename_fields={"old": "new"},
+                                ),
+                            ),
                         )
-                    ]
+                    ],
                 )
-            ]
+            ],
         )
 
         provider = APISIXProvider()
@@ -282,25 +274,22 @@ class TestBodyTransformation:
             services=[
                 Service(
                     name="api_service",
-                    type="rest", protocol="http",
-                    upstream=Upstream(
-                        host="api.internal",
-                        port=8080
-                    ),
+                    type="rest",
+                    protocol="http",
+                    upstream=Upstream(host="api.internal", port=8080),
                     routes=[
                         Route(
                             path_prefix="/api/users",
                             body_transformation=BodyTransformationConfig(
                                 enabled=True,
                                 response=ResponseBodyTransformation(
-                                    filter_fields=["password"],
-                                    add_fields={"api_version": "1.0"}
-                                )
-                            )
+                                    filter_fields=["password"], add_fields={"api_version": "1.0"}
+                                ),
+                            ),
                         )
-                    ]
+                    ],
                 )
-            ]
+            ],
         )
 
         provider = APISIXProvider()
@@ -329,11 +318,9 @@ class TestBodyTransformation:
             services=[
                 Service(
                     name="api_service",
-                    type="rest", protocol="http",
-                    upstream=Upstream(
-                        host="api.internal",
-                        port=8080
-                    ),
+                    type="rest",
+                    protocol="http",
+                    upstream=Upstream(host="api.internal", port=8080),
                     routes=[
                         Route(
                             path_prefix="/api/users",
@@ -341,12 +328,12 @@ class TestBodyTransformation:
                                 enabled=True,
                                 request=RequestBodyTransformation(
                                     add_fields={"trace_id": "{{uuid}}"}
-                                )
-                            )
+                                ),
+                            ),
                         )
-                    ]
+                    ],
                 )
-            ]
+            ],
         )
 
         provider = TraefikProvider()
@@ -371,11 +358,10 @@ class TestBodyTransformation:
             services=[
                 Service(
                     name="api_service",
-                    type="rest", protocol="http",
+                    type="rest",
+                    protocol="http",
                     upstream=Upstream(
-                        targets=[
-                            UpstreamTarget(host="api-1.internal", port=8080, weight=1)
-                        ]
+                        targets=[UpstreamTarget(host="api-1.internal", port=8080, weight=1)]
                     ),
                     routes=[
                         Route(
@@ -385,13 +371,13 @@ class TestBodyTransformation:
                                 request=RequestBodyTransformation(
                                     add_fields={"request_id": "{{uuid}}"},
                                     remove_fields=["secret"],
-                                    rename_fields={"user_id": "id"}
-                                )
-                            )
+                                    rename_fields={"user_id": "id"},
+                                ),
+                            ),
                         )
-                    ]
+                    ],
                 )
-            ]
+            ],
         )
 
         provider = NginxProvider()
@@ -414,11 +400,10 @@ class TestBodyTransformation:
             services=[
                 Service(
                     name="api_service",
-                    type="rest", protocol="http",
+                    type="rest",
+                    protocol="http",
                     upstream=Upstream(
-                        targets=[
-                            UpstreamTarget(host="api-1.internal", port=8080, weight=1)
-                        ]
+                        targets=[UpstreamTarget(host="api-1.internal", port=8080, weight=1)]
                     ),
                     routes=[
                         Route(
@@ -426,14 +411,13 @@ class TestBodyTransformation:
                             body_transformation=BodyTransformationConfig(
                                 enabled=True,
                                 response=ResponseBodyTransformation(
-                                    filter_fields=["password"],
-                                    add_fields={"server": "nginx"}
-                                )
-                            )
+                                    filter_fields=["password"], add_fields={"server": "nginx"}
+                                ),
+                            ),
                         )
-                    ]
+                    ],
                 )
-            ]
+            ],
         )
 
         provider = NginxProvider()
@@ -453,11 +437,10 @@ class TestBodyTransformation:
             services=[
                 Service(
                     name="api_service",
-                    type="rest", protocol="http",
+                    type="rest",
+                    protocol="http",
                     upstream=Upstream(
-                        targets=[
-                            UpstreamTarget(host="api-1.internal", port=8080, weight=1)
-                        ]
+                        targets=[UpstreamTarget(host="api-1.internal", port=8080, weight=1)]
                     ),
                     routes=[
                         Route(
@@ -467,14 +450,12 @@ class TestBodyTransformation:
                                 request=RequestBodyTransformation(
                                     add_fields={"trace_id": "{{uuid}}"}
                                 ),
-                                response=ResponseBodyTransformation(
-                                    filter_fields=["password"]
-                                )
-                            )
+                                response=ResponseBodyTransformation(filter_fields=["password"]),
+                            ),
                         )
-                    ]
+                    ],
                 )
-            ]
+            ],
         )
 
         provider = HAProxyProvider()
@@ -497,11 +478,9 @@ class TestBodyTransformation:
             services=[
                 Service(
                     name="api_service",
-                    type="rest", protocol="http",
-                    upstream=Upstream(
-                        host="api.internal",
-                        port=8080
-                    ),
+                    type="rest",
+                    protocol="http",
+                    upstream=Upstream(host="api.internal", port=8080),
                     routes=[
                         Route(
                             path_prefix="/api/users",
@@ -512,27 +491,27 @@ class TestBodyTransformation:
                                         "trace_id": "{{uuid}}",
                                         "timestamp": "{{now}}",
                                         "api_version": "v1",
-                                        "priority": 1
+                                        "priority": 1,
                                     },
                                     remove_fields=["internal_id", "secret_key", "password"],
                                     rename_fields={
                                         "user_id": "id",
                                         "user_name": "name",
-                                        "user_email": "email"
-                                    }
+                                        "user_email": "email",
+                                    },
                                 ),
                                 response=ResponseBodyTransformation(
                                     filter_fields=["password", "ssn", "credit_card"],
                                     add_fields={
                                         "server_time": "{{timestamp}}",
-                                        "server_id": "envoy-1"
-                                    }
-                                )
-                            )
+                                        "server_id": "envoy-1",
+                                    },
+                                ),
+                            ),
                         )
-                    ]
+                    ],
                 )
-            ]
+            ],
         )
 
         provider = EnvoyProvider()

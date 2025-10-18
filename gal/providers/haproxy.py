@@ -5,10 +5,10 @@ Generates haproxy.cfg configuration for HAProxy Open Source.
 Supports advanced load balancing, health checks, rate limiting, headers, ACLs.
 """
 
-from typing import List, Dict, Any
 import logging
+from typing import Any, Dict, List
 
-from gal.config import Config, Service, Route, UpstreamTarget
+from gal.config import Config, Route, Service, UpstreamTarget
 from gal.provider import Provider
 
 logger = logging.getLogger(__name__)
@@ -110,7 +110,7 @@ class HAProxyProvider(Provider):
             "",
             "    # Stats socket for runtime API",
             "    stats socket /var/lib/haproxy/stats level admin",
-            "    stats timeout 30s"
+            "    stats timeout 30s",
         ]
 
         return output
@@ -139,7 +139,7 @@ class HAProxyProvider(Provider):
             f"    timeout server          {timeout}",
             "    timeout http-keep-alive 10s",
             "    timeout check           5s",
-            "    maxconn                 3000"
+            "    maxconn                 3000",
         ]
 
         return output
@@ -150,7 +150,7 @@ class HAProxyProvider(Provider):
             "#---------------------------------------------------------------------",
             "# Frontend - Main HTTP Router",
             "#---------------------------------------------------------------------",
-            "frontend http_frontend"
+            "frontend http_frontend",
         ]
 
         # Bind address
@@ -199,8 +199,14 @@ class HAProxyProvider(Provider):
 
                     # Deny if rate exceeded
                     rps = route.rate_limit.requests_per_second
-                    status = route.rate_limit.response_status if route.rate_limit.response_status else 429
-                    output.append(f"    http-request deny deny_status {status} if {acl_name} {{ sc_http_req_rate(0) gt {rps} }}")
+                    status = (
+                        route.rate_limit.response_status
+                        if route.rate_limit.response_status
+                        else 429
+                    )
+                    output.append(
+                        f"    http-request deny deny_status {status} if {acl_name} {{ sc_http_req_rate(0) gt {rps} }}"
+                    )
 
                 # Headers manipulation
                 if route.headers:
@@ -211,13 +217,17 @@ class HAProxyProvider(Provider):
                         for header, value in route.headers.request_add.items():
                             # Convert template variables
                             value = self._convert_template_vars(value)
-                            output.append(f'    http-request set-header {header} "{value}" if {acl_name}')
+                            output.append(
+                                f'    http-request set-header {header} "{value}" if {acl_name}'
+                            )
 
                     # Request headers (set)
                     if route.headers.request_set:
                         for header, value in route.headers.request_set.items():
                             value = self._convert_template_vars(value)
-                            output.append(f'    http-request set-header {header} "{value}" if {acl_name}')
+                            output.append(
+                                f'    http-request set-header {header} "{value}" if {acl_name}'
+                            )
 
                     # Request headers (remove)
                     if route.headers.request_remove:
@@ -231,31 +241,49 @@ class HAProxyProvider(Provider):
                     if route.cors.allowed_origins:
                         origins = " ".join(route.cors.allowed_origins)
                         # For simplicity, use first origin or * for multiple
-                        origin = route.cors.allowed_origins[0] if len(route.cors.allowed_origins) == 1 else "*"
-                        output.append(f'    http-response set-header Access-Control-Allow-Origin "{origin}" if {acl_name}')
+                        origin = (
+                            route.cors.allowed_origins[0]
+                            if len(route.cors.allowed_origins) == 1
+                            else "*"
+                        )
+                        output.append(
+                            f'    http-response set-header Access-Control-Allow-Origin "{origin}" if {acl_name}'
+                        )
 
                     if route.cors.allowed_methods:
                         methods = ", ".join(route.cors.allowed_methods)
-                        output.append(f'    http-response set-header Access-Control-Allow-Methods "{methods}" if {acl_name}')
+                        output.append(
+                            f'    http-response set-header Access-Control-Allow-Methods "{methods}" if {acl_name}'
+                        )
 
                     if route.cors.allowed_headers:
                         headers = ", ".join(route.cors.allowed_headers)
-                        output.append(f'    http-response set-header Access-Control-Allow-Headers "{headers}" if {acl_name}')
+                        output.append(
+                            f'    http-response set-header Access-Control-Allow-Headers "{headers}" if {acl_name}'
+                        )
 
                     if route.cors.allow_credentials:
-                        output.append(f'    http-response set-header Access-Control-Allow-Credentials "true" if {acl_name}')
+                        output.append(
+                            f'    http-response set-header Access-Control-Allow-Credentials "true" if {acl_name}'
+                        )
 
                     if route.cors.max_age:
-                        output.append(f'    http-response set-header Access-Control-Max-Age "{route.cors.max_age}" if {acl_name}')
+                        output.append(
+                            f'    http-response set-header Access-Control-Max-Age "{route.cors.max_age}" if {acl_name}'
+                        )
 
                 # Response headers
                 if route.headers and route.headers.response_add:
                     for header, value in route.headers.response_add.items():
-                        output.append(f'    http-response set-header {header} "{value}" if {acl_name}')
+                        output.append(
+                            f'    http-response set-header {header} "{value}" if {acl_name}'
+                        )
 
                 if route.headers and route.headers.response_set:
                     for header, value in route.headers.response_set.items():
-                        output.append(f'    http-response set-header {header} "{value}" if {acl_name}')
+                        output.append(
+                            f'    http-response set-header {header} "{value}" if {acl_name}'
+                        )
 
                 if route.headers and route.headers.response_remove:
                     for header in route.headers.response_remove:
@@ -263,7 +291,9 @@ class HAProxyProvider(Provider):
 
                 # Body transformation (requires Lua scripting)
                 if route.body_transformation and route.body_transformation.enabled:
-                    output.append(f"    # Body transformation for {route.path_prefix} (requires Lua)")
+                    output.append(
+                        f"    # Body transformation for {route.path_prefix} (requires Lua)"
+                    )
                     bt = route.body_transformation
 
                     # Request body transformation
@@ -319,7 +349,7 @@ class HAProxyProvider(Provider):
             "#---------------------------------------------------------------------",
             f"# Backend - {service.name}",
             "#---------------------------------------------------------------------",
-            f"backend {backend_name}"
+            f"backend {backend_name}",
         ]
 
         # Load balancing algorithm
@@ -345,10 +375,7 @@ class HAProxyProvider(Provider):
                 output.append(f"    cookie {cookie_name} insert indirect nocache")
 
         # WebSocket support
-        has_websocket = any(
-            route.websocket and route.websocket.enabled
-            for route in service.routes
-        )
+        has_websocket = any(route.websocket and route.websocket.enabled for route in service.routes)
         if has_websocket:
             # Get idle_timeout from first WebSocket route
             for route in service.routes:
@@ -389,13 +416,13 @@ class HAProxyProvider(Provider):
             for idx, target in enumerate(service.upstream.targets):
                 # Handle both dict and UpstreamTarget object
                 if isinstance(target, dict):
-                    target_host = target.get('host')
-                    target_port = target.get('port')
-                    target_weight = target.get('weight', 1)
+                    target_host = target.get("host")
+                    target_port = target.get("port")
+                    target_weight = target.get("weight", 1)
                 else:
                     target_host = target.host
                     target_port = target.port
-                    target_weight = target.weight if hasattr(target, 'weight') else 1
+                    target_weight = target.weight if hasattr(target, "weight") else 1
 
                 server_name = f"server{idx + 1}"
                 server_line = f"    server {server_name} {target_host}:{target_port}"
@@ -421,12 +448,15 @@ class HAProxyProvider(Provider):
                     server_line += f" weight {target_weight}"
 
                 # Cookie for sticky sessions
-                if service.upstream.load_balancer and service.upstream.load_balancer.sticky_sessions:
+                if (
+                    service.upstream.load_balancer
+                    and service.upstream.load_balancer.sticky_sessions
+                ):
                     server_line += f" cookie {server_name}"
 
                 output.append(server_line)
 
-        elif hasattr(service, 'host') and hasattr(service, 'port'):
+        elif hasattr(service, "host") and hasattr(service, "port"):
             # Single backend server
             server_line = f"    server server1 {service.host}:{service.port}"
 

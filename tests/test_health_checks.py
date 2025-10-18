@@ -9,22 +9,33 @@ Tests health checks and load balancing functionality across all providers:
 """
 
 import json
+
 import pytest
+
 from gal.config import (
-    Config, Service, Route, Upstream, GlobalConfig,
-    UpstreamTarget, ActiveHealthCheck, PassiveHealthCheck,
-    HealthCheckConfig, LoadBalancerConfig
+    ActiveHealthCheck,
+    Config,
+    GlobalConfig,
+    HealthCheckConfig,
+    LoadBalancerConfig,
+    PassiveHealthCheck,
+    Route,
+    Service,
+    Upstream,
+    UpstreamTarget,
 )
-from gal.providers.kong import KongProvider
 from gal.providers.apisix import APISIXProvider
-from gal.providers.traefik import TraefikProvider
 from gal.providers.envoy import EnvoyProvider
+from gal.providers.kong import KongProvider
+from gal.providers.traefik import TraefikProvider
 
 
 class TestHealthChecks:
     """Test Health Checks for all providers"""
 
-    def _create_config_with_health_checks(self, provider_name: str, health_check: HealthCheckConfig):
+    def _create_config_with_health_checks(
+        self, provider_name: str, health_check: HealthCheckConfig
+    ):
         """Helper to create test config with health checks"""
         return Config(
             version="1.0",
@@ -35,22 +46,15 @@ class TestHealthChecks:
                     name="api_service",
                     type="rest",
                     protocol="http",
-                    upstream=Upstream(
-                        host="api.local",
-                        port=8080,
-                        health_check=health_check
-                    ),
-                    routes=[
-                        Route(
-                            path_prefix="/api/v1",
-                            methods=["GET", "POST"]
-                        )
-                    ]
+                    upstream=Upstream(host="api.local", port=8080, health_check=health_check),
+                    routes=[Route(path_prefix="/api/v1", methods=["GET", "POST"])],
                 )
-            ]
+            ],
         )
 
-    def _create_config_with_load_balancing(self, provider_name: str, targets: list, lb_config: LoadBalancerConfig):
+    def _create_config_with_load_balancing(
+        self, provider_name: str, targets: list, lb_config: LoadBalancerConfig
+    ):
         """Helper to create test config with load balancing"""
         return Config(
             version="1.0",
@@ -61,18 +65,10 @@ class TestHealthChecks:
                     name="api_service",
                     type="rest",
                     protocol="http",
-                    upstream=Upstream(
-                        targets=targets,
-                        load_balancer=lb_config
-                    ),
-                    routes=[
-                        Route(
-                            path_prefix="/api/v1",
-                            methods=["GET", "POST"]
-                        )
-                    ]
+                    upstream=Upstream(targets=targets, load_balancer=lb_config),
+                    routes=[Route(path_prefix="/api/v1", methods=["GET", "POST"])],
                 )
-            ]
+            ],
         )
 
     # APISIX Tests
@@ -86,7 +82,7 @@ class TestHealthChecks:
                 interval="10s",
                 timeout="5s",
                 healthy_threshold=2,
-                unhealthy_threshold=3
+                unhealthy_threshold=3,
             )
         )
         config = self._create_config_with_health_checks("apisix", hc)
@@ -107,9 +103,7 @@ class TestHealthChecks:
         provider = APISIXProvider()
         hc = HealthCheckConfig(
             passive=PassiveHealthCheck(
-                enabled=True,
-                max_failures=5,
-                unhealthy_status_codes=[500, 502, 503, 504]
+                enabled=True, max_failures=5, unhealthy_status_codes=[500, 502, 503, 504]
             )
         )
         config = self._create_config_with_health_checks("apisix", hc)
@@ -127,7 +121,7 @@ class TestHealthChecks:
         provider = APISIXProvider()
         hc = HealthCheckConfig(
             active=ActiveHealthCheck(enabled=True, http_path="/health"),
-            passive=PassiveHealthCheck(enabled=True, max_failures=3)
+            passive=PassiveHealthCheck(enabled=True, max_failures=3),
         )
         config = self._create_config_with_health_checks("apisix", hc)
         result = provider.generate(config)
@@ -143,7 +137,7 @@ class TestHealthChecks:
         provider = APISIXProvider()
         targets = [
             UpstreamTarget(host="api-1.local", port=8080, weight=1),
-            UpstreamTarget(host="api-2.local", port=8080, weight=1)
+            UpstreamTarget(host="api-2.local", port=8080, weight=1),
         ]
         lb_config = LoadBalancerConfig(algorithm="round_robin")
         config = self._create_config_with_load_balancing("apisix", targets, lb_config)
@@ -160,7 +154,7 @@ class TestHealthChecks:
         provider = APISIXProvider()
         targets = [
             UpstreamTarget(host="api-1.local", port=8080, weight=2),
-            UpstreamTarget(host="api-2.local", port=8080, weight=1)
+            UpstreamTarget(host="api-2.local", port=8080, weight=1),
         ]
         lb_config = LoadBalancerConfig(algorithm="weighted")
         config = self._create_config_with_load_balancing("apisix", targets, lb_config)
@@ -176,7 +170,7 @@ class TestHealthChecks:
         provider = APISIXProvider()
         targets = [
             UpstreamTarget(host="api-1.local", port=8080, weight=1),
-            UpstreamTarget(host="api-2.local", port=8080, weight=1)
+            UpstreamTarget(host="api-2.local", port=8080, weight=1),
         ]
         lb_config = LoadBalancerConfig(algorithm="least_conn")
         config = self._create_config_with_load_balancing("apisix", targets, lb_config)
@@ -191,7 +185,7 @@ class TestHealthChecks:
         provider = APISIXProvider()
         targets = [
             UpstreamTarget(host="api-1.local", port=8080, weight=1),
-            UpstreamTarget(host="api-2.local", port=8080, weight=1)
+            UpstreamTarget(host="api-2.local", port=8080, weight=1),
         ]
         lb_config = LoadBalancerConfig(algorithm="ip_hash")
         config = self._create_config_with_load_balancing("apisix", targets, lb_config)
@@ -214,7 +208,7 @@ class TestHealthChecks:
                 interval="10s",
                 timeout="5s",
                 healthy_threshold=2,
-                unhealthy_threshold=3
+                unhealthy_threshold=3,
             )
         )
         config = self._create_config_with_health_checks("kong", hc)
@@ -234,9 +228,7 @@ class TestHealthChecks:
         provider = KongProvider()
         hc = HealthCheckConfig(
             passive=PassiveHealthCheck(
-                enabled=True,
-                max_failures=5,
-                unhealthy_status_codes=[500, 502, 503, 504]
+                enabled=True, max_failures=5, unhealthy_status_codes=[500, 502, 503, 504]
             )
         )
         config = self._create_config_with_health_checks("kong", hc)
@@ -251,7 +243,7 @@ class TestHealthChecks:
         provider = KongProvider()
         targets = [
             UpstreamTarget(host="api-1.local", port=8080, weight=2),
-            UpstreamTarget(host="api-2.local", port=8080, weight=1)
+            UpstreamTarget(host="api-2.local", port=8080, weight=1),
         ]
         lb_config = LoadBalancerConfig(algorithm="round_robin")
         config = self._create_config_with_load_balancing("kong", targets, lb_config)
@@ -268,7 +260,7 @@ class TestHealthChecks:
         provider = KongProvider()
         targets = [
             UpstreamTarget(host="api-1.local", port=8080, weight=1),
-            UpstreamTarget(host="api-2.local", port=8080, weight=1)
+            UpstreamTarget(host="api-2.local", port=8080, weight=1),
         ]
         lb_config = LoadBalancerConfig(algorithm="least_conn")
         config = self._create_config_with_load_balancing("kong", targets, lb_config)
@@ -281,7 +273,7 @@ class TestHealthChecks:
         provider = KongProvider()
         targets = [
             UpstreamTarget(host="api-1.local", port=8080, weight=1),
-            UpstreamTarget(host="api-2.local", port=8080, weight=1)
+            UpstreamTarget(host="api-2.local", port=8080, weight=1),
         ]
         lb_config = LoadBalancerConfig(algorithm="ip_hash")
         config = self._create_config_with_load_balancing("kong", targets, lb_config)
@@ -297,10 +289,7 @@ class TestHealthChecks:
         provider = TraefikProvider()
         hc = HealthCheckConfig(
             active=ActiveHealthCheck(
-                enabled=True,
-                http_path="/health",
-                interval="10s",
-                timeout="5s"
+                enabled=True, http_path="/health", interval="10s", timeout="5s"
             )
         )
         config = self._create_config_with_health_checks("traefik", hc)
@@ -316,7 +305,7 @@ class TestHealthChecks:
         provider = TraefikProvider()
         targets = [
             UpstreamTarget(host="api-1.local", port=8080, weight=1),
-            UpstreamTarget(host="api-2.local", port=8080, weight=1)
+            UpstreamTarget(host="api-2.local", port=8080, weight=1),
         ]
         lb_config = LoadBalancerConfig(algorithm="round_robin")
         config = self._create_config_with_load_balancing("traefik", targets, lb_config)
@@ -331,7 +320,7 @@ class TestHealthChecks:
         provider = TraefikProvider()
         targets = [
             UpstreamTarget(host="api-1.local", port=8080, weight=2),
-            UpstreamTarget(host="api-2.local", port=8080, weight=1)
+            UpstreamTarget(host="api-2.local", port=8080, weight=1),
         ]
         lb_config = LoadBalancerConfig(algorithm="weighted")
         config = self._create_config_with_load_balancing("traefik", targets, lb_config)
@@ -345,12 +334,10 @@ class TestHealthChecks:
         provider = TraefikProvider()
         targets = [
             UpstreamTarget(host="api-1.local", port=8080, weight=1),
-            UpstreamTarget(host="api-2.local", port=8080, weight=1)
+            UpstreamTarget(host="api-2.local", port=8080, weight=1),
         ]
         lb_config = LoadBalancerConfig(
-            algorithm="round_robin",
-            sticky_sessions=True,
-            cookie_name="mySessionCookie"
+            algorithm="round_robin", sticky_sessions=True, cookie_name="mySessionCookie"
         )
         config = self._create_config_with_load_balancing("traefik", targets, lb_config)
         result = provider.generate(config)
@@ -372,7 +359,7 @@ class TestHealthChecks:
                 timeout="5s",
                 healthy_threshold=2,
                 unhealthy_threshold=3,
-                healthy_status_codes=[200, 201, 204]
+                healthy_status_codes=[200, 201, 204],
             )
         )
         config = self._create_config_with_health_checks("envoy", hc)
@@ -390,9 +377,7 @@ class TestHealthChecks:
         provider = EnvoyProvider()
         hc = HealthCheckConfig(
             passive=PassiveHealthCheck(
-                enabled=True,
-                max_failures=5,
-                unhealthy_status_codes=[500, 502, 503, 504]
+                enabled=True, max_failures=5, unhealthy_status_codes=[500, 502, 503, 504]
             )
         )
         config = self._create_config_with_health_checks("envoy", hc)
@@ -406,7 +391,7 @@ class TestHealthChecks:
         provider = EnvoyProvider()
         targets = [
             UpstreamTarget(host="api-1.local", port=8080, weight=1),
-            UpstreamTarget(host="api-2.local", port=8080, weight=1)
+            UpstreamTarget(host="api-2.local", port=8080, weight=1),
         ]
         lb_config = LoadBalancerConfig(algorithm="round_robin")
         config = self._create_config_with_load_balancing("envoy", targets, lb_config)
@@ -422,7 +407,7 @@ class TestHealthChecks:
         provider = EnvoyProvider()
         targets = [
             UpstreamTarget(host="api-1.local", port=8080, weight=1),
-            UpstreamTarget(host="api-2.local", port=8080, weight=1)
+            UpstreamTarget(host="api-2.local", port=8080, weight=1),
         ]
         lb_config = LoadBalancerConfig(algorithm="least_conn")
         config = self._create_config_with_load_balancing("envoy", targets, lb_config)
@@ -435,7 +420,7 @@ class TestHealthChecks:
         provider = EnvoyProvider()
         targets = [
             UpstreamTarget(host="api-1.local", port=8080, weight=1),
-            UpstreamTarget(host="api-2.local", port=8080, weight=1)
+            UpstreamTarget(host="api-2.local", port=8080, weight=1),
         ]
         lb_config = LoadBalancerConfig(algorithm="ip_hash")
         config = self._create_config_with_load_balancing("envoy", targets, lb_config)
@@ -450,7 +435,7 @@ class TestHealthChecks:
         provider = EnvoyProvider()
         targets = [
             UpstreamTarget(host="api-1.local", port=8080, weight=2),
-            UpstreamTarget(host="api-2.local", port=8080, weight=1)
+            UpstreamTarget(host="api-2.local", port=8080, weight=1),
         ]
         lb_config = LoadBalancerConfig(algorithm="weighted")
         config = self._create_config_with_load_balancing("envoy", targets, lb_config)
@@ -493,7 +478,7 @@ class TestConfigModels:
         """Test HealthCheckConfig with both active and passive"""
         hc = HealthCheckConfig(
             active=ActiveHealthCheck(http_path="/api/health"),
-            passive=PassiveHealthCheck(max_failures=3)
+            passive=PassiveHealthCheck(max_failures=3),
         )
         assert hc.active.http_path == "/api/health"
         assert hc.passive.max_failures == 3
@@ -508,9 +493,7 @@ class TestConfigModels:
     def test_load_balancer_config_sticky_sessions(self):
         """Test LoadBalancerConfig with sticky sessions"""
         lb = LoadBalancerConfig(
-            algorithm="round_robin",
-            sticky_sessions=True,
-            cookie_name="mySession"
+            algorithm="round_robin", sticky_sessions=True, cookie_name="mySession"
         )
         assert lb.sticky_sessions is True
         assert lb.cookie_name == "mySession"
@@ -527,7 +510,7 @@ class TestConfigModels:
         upstream = Upstream(
             targets=[
                 UpstreamTarget(host="api-1.local", port=8080, weight=2),
-                UpstreamTarget(host="api-2.local", port=8080, weight=1)
+                UpstreamTarget(host="api-2.local", port=8080, weight=1),
             ]
         )
         assert len(upstream.targets) == 2
@@ -539,16 +522,13 @@ class TestConfigModels:
         upstream = Upstream(
             targets=[
                 UpstreamTarget(host="api-1.local", port=8080, weight=1),
-                UpstreamTarget(host="api-2.local", port=8080, weight=1)
+                UpstreamTarget(host="api-2.local", port=8080, weight=1),
             ],
             health_check=HealthCheckConfig(
                 active=ActiveHealthCheck(http_path="/health"),
-                passive=PassiveHealthCheck(max_failures=3)
+                passive=PassiveHealthCheck(max_failures=3),
             ),
-            load_balancer=LoadBalancerConfig(
-                algorithm="least_conn",
-                sticky_sessions=True
-            )
+            load_balancer=LoadBalancerConfig(algorithm="least_conn", sticky_sessions=True),
         )
         assert len(upstream.targets) == 2
         assert upstream.health_check.active.http_path == "/health"

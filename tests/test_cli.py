@@ -2,20 +2,25 @@
 Tests for CLI commands
 """
 
-import pytest
 import os
-import tempfile
 import shutil
-from pathlib import Path
-from click.testing import CliRunner
 
 # Import CLI directly
 import sys
+import tempfile
+from pathlib import Path
+
+import pytest
+from click.testing import CliRunner
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import from gal-cli.py (hyphen in filename)
 import importlib.util
-spec = importlib.util.spec_from_file_location("gal_cli", Path(__file__).parent.parent / "gal-cli.py")
+
+spec = importlib.util.spec_from_file_location(
+    "gal_cli", Path(__file__).parent.parent / "gal-cli.py"
+)
 gal_cli = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gal_cli)
 cli = gal_cli.cli
@@ -33,7 +38,8 @@ class TestCLIGenerate:
     def config_file(self, tmp_path):
         """Create temporary config file"""
         config = tmp_path / "test-config.yaml"
-        config.write_text("""
+        config.write_text(
+            """
 version: "1.0"
 provider: envoy
 
@@ -53,12 +59,13 @@ services:
     routes:
       - path_prefix: /api
         methods: [GET, POST]
-""")
+"""
+        )
         return str(config)
 
     def test_generate_to_stdout(self, runner, config_file):
         """Test generating config to stdout"""
-        result = runner.invoke(cli, ['generate', '-c', config_file])
+        result = runner.invoke(cli, ["generate", "-c", config_file])
 
         assert result.exit_code == 0
         assert "Generating configuration for: envoy" in result.output
@@ -69,11 +76,7 @@ services:
         """Test generating config to file"""
         output_file = tmp_path / "output" / "envoy.yaml"
 
-        result = runner.invoke(cli, [
-            'generate',
-            '-c', config_file,
-            '-o', str(output_file)
-        ])
+        result = runner.invoke(cli, ["generate", "-c", config_file, "-o", str(output_file)])
 
         assert result.exit_code == 0
         assert "Configuration written to:" in result.output
@@ -88,12 +91,9 @@ services:
         """Test overriding provider"""
         output_file = tmp_path / "kong.yaml"
 
-        result = runner.invoke(cli, [
-            'generate',
-            '-c', config_file,
-            '-p', 'kong',
-            '-o', str(output_file)
-        ])
+        result = runner.invoke(
+            cli, ["generate", "-c", config_file, "-p", "kong", "-o", str(output_file)]
+        )
 
         assert result.exit_code == 0
         assert "Generating configuration for: kong" in result.output
@@ -104,7 +104,7 @@ services:
 
     def test_generate_missing_config(self, runner):
         """Test error with missing config file"""
-        result = runner.invoke(cli, ['generate', '-c', 'nonexistent.yaml'])
+        result = runner.invoke(cli, ["generate", "-c", "nonexistent.yaml"])
 
         assert result.exit_code != 0
         assert "Error:" in result.output
@@ -113,11 +113,7 @@ services:
         """Test that output directory is created"""
         output_file = tmp_path / "deep" / "nested" / "dir" / "config.yaml"
 
-        result = runner.invoke(cli, [
-            'generate',
-            '-c', config_file,
-            '-o', str(output_file)
-        ])
+        result = runner.invoke(cli, ["generate", "-c", config_file, "-o", str(output_file)])
 
         assert result.exit_code == 0
         assert output_file.exists()
@@ -135,7 +131,8 @@ class TestCLIValidate:
     def valid_config_file(self, tmp_path):
         """Create valid config file"""
         config = tmp_path / "valid-config.yaml"
-        config.write_text("""
+        config.write_text(
+            """
 version: "1.0"
 provider: kong
 
@@ -152,14 +149,16 @@ services:
       port: 3000
     routes:
       - path_prefix: /api/v1
-""")
+"""
+        )
         return str(config)
 
     @pytest.fixture
     def invalid_config_file(self, tmp_path):
         """Create invalid config file"""
         config = tmp_path / "invalid-config.yaml"
-        config.write_text("""
+        config.write_text(
+            """
 version: "1.0"
 provider: envoy
 
@@ -168,12 +167,13 @@ global:
   port: 0
 
 services: []
-""")
+"""
+        )
         return str(config)
 
     def test_validate_success(self, runner, valid_config_file):
         """Test validating valid configuration"""
-        result = runner.invoke(cli, ['validate', '-c', valid_config_file])
+        result = runner.invoke(cli, ["validate", "-c", valid_config_file])
 
         assert result.exit_code == 0
         assert "Configuration is valid" in result.output
@@ -182,16 +182,18 @@ services: []
 
     def test_validate_failure(self, runner, invalid_config_file):
         """Test validating invalid configuration (port 0)"""
-        result = runner.invoke(cli, ['validate', '-c', invalid_config_file])
+        result = runner.invoke(cli, ["validate", "-c", invalid_config_file])
 
         # Note: Port 0 validation only fails for Envoy provider
         # This test verifies Envoy-specific validation
         assert result.exit_code != 0
-        assert "Configuration is invalid" in result.output or "Port must be specified" in result.output
+        assert (
+            "Configuration is invalid" in result.output or "Port must be specified" in result.output
+        )
 
     def test_validate_missing_file(self, runner):
         """Test error with missing config file"""
-        result = runner.invoke(cli, ['validate', '-c', 'missing.yaml'])
+        result = runner.invoke(cli, ["validate", "-c", "missing.yaml"])
 
         assert result.exit_code != 0
         assert "Configuration is invalid" in result.output
@@ -209,7 +211,8 @@ class TestCLIGenerateAll:
     def config_file(self, tmp_path):
         """Create config file"""
         config = tmp_path / "config.yaml"
-        config.write_text("""
+        config.write_text(
+            """
 version: "1.0"
 provider: envoy
 
@@ -222,14 +225,15 @@ services:
       port: 8080
     routes:
       - path_prefix: /api
-""")
+"""
+        )
         return str(config)
 
     def test_generate_all_default_dir(self, runner, config_file, tmp_path):
         """Test generating all configs to default directory"""
         # Change to tmp directory
         with runner.isolated_filesystem(temp_dir=tmp_path):
-            result = runner.invoke(cli, ['generate-all', '-c', config_file])
+            result = runner.invoke(cli, ["generate-all", "-c", config_file])
 
             assert result.exit_code == 0
             assert "Generating configurations for all providers" in result.output
@@ -252,11 +256,7 @@ services:
         """Test generating all configs to custom directory"""
         output_dir = tmp_path / "custom-output"
 
-        result = runner.invoke(cli, [
-            'generate-all',
-            '-c', config_file,
-            '-o', str(output_dir)
-        ])
+        result = runner.invoke(cli, ["generate-all", "-c", config_file, "-o", str(output_dir)])
 
         assert result.exit_code == 0
         assert "All configurations generated successfully" in result.output
@@ -273,11 +273,7 @@ services:
         """Test that generated configs have correct format"""
         output_dir = tmp_path / "output"
 
-        result = runner.invoke(cli, [
-            'generate-all',
-            '-c', config_file,
-            '-o', str(output_dir)
-        ])
+        result = runner.invoke(cli, ["generate-all", "-c", config_file, "-o", str(output_dir)])
 
         assert result.exit_code == 0
 
@@ -320,7 +316,8 @@ class TestCLIInfo:
     def detailed_config_file(self, tmp_path):
         """Create config with transformations"""
         config = tmp_path / "detailed-config.yaml"
-        config.write_text("""
+        config.write_text(
+            """
 version: "1.0"
 provider: apisix
 
@@ -357,12 +354,13 @@ plugins:
     enabled: true
     config:
       key: secret
-""")
+"""
+        )
         return str(config)
 
     def test_info_displays_configuration(self, runner, detailed_config_file):
         """Test that info displays all configuration details"""
-        result = runner.invoke(cli, ['info', '-c', detailed_config_file])
+        result = runner.invoke(cli, ["info", "-c", detailed_config_file])
 
         assert result.exit_code == 0
         assert "GAL Configuration Information" in result.output
@@ -375,7 +373,7 @@ plugins:
 
     def test_info_displays_services(self, runner, detailed_config_file):
         """Test that info displays service details"""
-        result = runner.invoke(cli, ['info', '-c', detailed_config_file])
+        result = runner.invoke(cli, ["info", "-c", detailed_config_file])
 
         assert result.exit_code == 0
         assert "user_service" in result.output
@@ -385,7 +383,7 @@ plugins:
 
     def test_info_displays_transformations(self, runner, detailed_config_file):
         """Test that info displays transformation details"""
-        result = runner.invoke(cli, ['info', '-c', detailed_config_file])
+        result = runner.invoke(cli, ["info", "-c", detailed_config_file])
 
         assert result.exit_code == 0
         assert "Transformations: ✓ Enabled" in result.output
@@ -395,7 +393,7 @@ plugins:
 
     def test_info_displays_plugins(self, runner, detailed_config_file):
         """Test that info displays plugin details"""
-        result = runner.invoke(cli, ['info', '-c', detailed_config_file])
+        result = runner.invoke(cli, ["info", "-c", detailed_config_file])
 
         assert result.exit_code == 0
         assert "Plugins (1):" in result.output
@@ -412,7 +410,7 @@ class TestCLIListProviders:
 
     def test_list_providers(self, runner):
         """Test listing all providers"""
-        result = runner.invoke(cli, ['list-providers'])
+        result = runner.invoke(cli, ["list-providers"])
 
         assert result.exit_code == 0
         assert "Available providers:" in result.output
@@ -423,7 +421,7 @@ class TestCLIListProviders:
 
     def test_list_providers_descriptions(self, runner):
         """Test that provider descriptions are shown"""
-        result = runner.invoke(cli, ['list-providers'])
+        result = runner.invoke(cli, ["list-providers"])
 
         assert result.exit_code == 0
         assert "Envoy Proxy" in result.output
@@ -442,7 +440,7 @@ class TestCLIHelp:
 
     def test_main_help(self, runner):
         """Test main help command"""
-        result = runner.invoke(cli, ['--help'])
+        result = runner.invoke(cli, ["--help"])
 
         assert result.exit_code == 0
         assert "Gateway Abstraction Layer (GAL) CLI" in result.output
@@ -454,7 +452,7 @@ class TestCLIHelp:
 
     def test_generate_help(self, runner):
         """Test generate command help"""
-        result = runner.invoke(cli, ['generate', '--help'])
+        result = runner.invoke(cli, ["generate", "--help"])
 
         assert result.exit_code == 0
         assert "Generate gateway configuration" in result.output

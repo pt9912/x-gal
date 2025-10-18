@@ -2,21 +2,23 @@
 Tests for header manipulation feature across all providers
 """
 
-import pytest
 import json
-from gal.providers.envoy import EnvoyProvider
-from gal.providers.kong import KongProvider
-from gal.providers.apisix import APISIXProvider
-from gal.providers.traefik import TraefikProvider
+
+import pytest
+
 from gal.config import (
     Config,
-    Service,
-    Upstream,
-    Route,
     GlobalConfig,
     HeaderManipulation,
-    Transformation
+    Route,
+    Service,
+    Transformation,
+    Upstream,
 )
+from gal.providers.apisix import APISIXProvider
+from gal.providers.envoy import EnvoyProvider
+from gal.providers.kong import KongProvider
+from gal.providers.traefik import TraefikProvider
 
 
 class TestHeaderManipulation:
@@ -35,9 +37,7 @@ class TestHeaderManipulation:
     def test_kong_request_headers_set(self):
         """Test Kong request header set/replace"""
         provider = KongProvider()
-        headers = HeaderManipulation(
-            request_set={"X-Forwarded-For": "10.0.0.1"}
-        )
+        headers = HeaderManipulation(request_set={"X-Forwarded-For": "10.0.0.1"})
         config = self._create_config_with_headers("kong", headers)
         result = provider.generate(config)
 
@@ -48,9 +48,7 @@ class TestHeaderManipulation:
     def test_kong_request_headers_remove(self):
         """Test Kong request header removal"""
         provider = KongProvider()
-        headers = HeaderManipulation(
-            request_remove=["X-Internal-Header", "X-Debug"]
-        )
+        headers = HeaderManipulation(request_remove=["X-Internal-Header", "X-Debug"])
         config = self._create_config_with_headers("kong", headers)
         result = provider.generate(config)
 
@@ -62,8 +60,7 @@ class TestHeaderManipulation:
         """Test Kong response header manipulation"""
         provider = KongProvider()
         headers = HeaderManipulation(
-            response_add={"X-Response-Time": "100ms"},
-            response_remove=["Server"]
+            response_add={"X-Response-Time": "100ms"}, response_remove=["Server"]
         )
         config = self._create_config_with_headers("kong", headers)
         result = provider.generate(config)
@@ -78,7 +75,7 @@ class TestHeaderManipulation:
         headers = HeaderManipulation(
             request_add={"X-API-Version": "v1"},
             request_set={"X-Request-ID": "12345"},
-            request_remove=["X-Old-Header"]
+            request_remove=["X-Old-Header"],
         )
         config = self._create_config_with_headers("apisix", headers)
         result = provider.generate(config)
@@ -97,8 +94,7 @@ class TestHeaderManipulation:
         """Test APISIX response header manipulation"""
         provider = APISIXProvider()
         headers = HeaderManipulation(
-            response_add={"X-Powered-By": "GAL"},
-            response_remove=["Server"]
+            response_add={"X-Powered-By": "GAL"}, response_remove=["Server"]
         )
         config = self._create_config_with_headers("apisix", headers)
         result = provider.generate(config)
@@ -113,10 +109,7 @@ class TestHeaderManipulation:
     def test_traefik_request_headers(self):
         """Test Traefik request header manipulation"""
         provider = TraefikProvider()
-        headers = HeaderManipulation(
-            request_add={"X-Traefik": "enabled"},
-            request_remove=["X-Old"]
-        )
+        headers = HeaderManipulation(request_add={"X-Traefik": "enabled"}, request_remove=["X-Old"])
         config = self._create_config_with_headers("traefik", headers)
         result = provider.generate(config)
 
@@ -129,8 +122,7 @@ class TestHeaderManipulation:
         """Test Traefik response header manipulation"""
         provider = TraefikProvider()
         headers = HeaderManipulation(
-            response_add={"X-Frame-Options": "DENY"},
-            response_remove=["Server"]
+            response_add={"X-Frame-Options": "DENY"}, response_remove=["Server"]
         )
         config = self._create_config_with_headers("traefik", headers)
         result = provider.generate(config)
@@ -145,7 +137,7 @@ class TestHeaderManipulation:
         headers = HeaderManipulation(
             request_add={"X-Envoy-Custom": "value"},
             request_set={"X-User-Agent": "GAL-Proxy"},
-            request_remove=["X-Debug"]
+            request_remove=["X-Debug"],
         )
         config = self._create_config_with_headers("envoy", headers)
         result = provider.generate(config)
@@ -159,8 +151,7 @@ class TestHeaderManipulation:
         """Test Envoy response header manipulation"""
         provider = EnvoyProvider()
         headers = HeaderManipulation(
-            response_add={"X-Response-ID": "12345"},
-            response_remove=["Server", "X-Powered-By"]
+            response_add={"X-Response-ID": "12345"}, response_remove=["Server", "X-Powered-By"]
         )
         config = self._create_config_with_headers("envoy", headers)
         result = provider.generate(config)
@@ -177,14 +168,10 @@ class TestHeaderManipulation:
         upstream = Upstream(host="test.local", port=8080)
 
         headers = HeaderManipulation(
-            request_add={"X-Service": "api"},
-            response_add={"X-API-Version": "1.0"}
+            request_add={"X-Service": "api"}, response_add={"X-API-Version": "1.0"}
         )
 
-        transformation = Transformation(
-            enabled=True,
-            headers=headers
-        )
+        transformation = Transformation(enabled=True, headers=headers)
 
         route = Route(path_prefix="/api")
         service = Service(
@@ -193,14 +180,11 @@ class TestHeaderManipulation:
             protocol="http",
             upstream=upstream,
             routes=[route],
-            transformation=transformation
+            transformation=transformation,
         )
 
         config = Config(
-            version="1.0",
-            provider="kong",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="kong", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -215,14 +199,9 @@ class TestHeaderManipulation:
         global_config = GlobalConfig()
         upstream = Upstream(host="test.local", port=8080)
 
-        headers = HeaderManipulation(
-            request_set={"X-Backend": "service1"}
-        )
+        headers = HeaderManipulation(request_set={"X-Backend": "service1"})
 
-        transformation = Transformation(
-            enabled=True,
-            headers=headers
-        )
+        transformation = Transformation(enabled=True, headers=headers)
 
         route = Route(path_prefix="/api")
         service = Service(
@@ -231,14 +210,11 @@ class TestHeaderManipulation:
             protocol="http",
             upstream=upstream,
             routes=[route],
-            transformation=transformation
+            transformation=transformation,
         )
 
         config = Config(
-            version="1.0",
-            provider="apisix",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="apisix", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -256,18 +232,11 @@ class TestHeaderManipulation:
         upstream = Upstream(host="test.local", port=8080)
 
         # Service-level headers
-        svc_headers = HeaderManipulation(
-            request_add={"X-Service-Level": "true"}
-        )
-        transformation = Transformation(
-            enabled=True,
-            headers=svc_headers
-        )
+        svc_headers = HeaderManipulation(request_add={"X-Service-Level": "true"})
+        transformation = Transformation(enabled=True, headers=svc_headers)
 
         # Route-level headers
-        route_headers = HeaderManipulation(
-            request_add={"X-Route-Level": "true"}
-        )
+        route_headers = HeaderManipulation(request_add={"X-Route-Level": "true"})
         route = Route(path_prefix="/api", headers=route_headers)
 
         service = Service(
@@ -276,14 +245,11 @@ class TestHeaderManipulation:
             protocol="http",
             upstream=upstream,
             routes=[route],
-            transformation=transformation
+            transformation=transformation,
         )
 
         config = Config(
-            version="1.0",
-            provider="kong",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="kong", global_config=global_config, services=[service]
         )
 
         result = provider.generate(config)
@@ -301,9 +267,9 @@ class TestHeaderManipulation:
                 "X-Content-Type-Options": "nosniff",
                 "X-XSS-Protection": "1; mode=block",
                 "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
-                "Content-Security-Policy": "default-src 'self'"
+                "Content-Security-Policy": "default-src 'self'",
             },
-            response_remove=["Server", "X-Powered-By"]
+            response_remove=["Server", "X-Powered-By"],
         )
         config = self._create_config_with_headers("traefik", headers)
         result = provider.generate(config)
@@ -320,7 +286,7 @@ class TestHeaderManipulation:
             response_add={
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
-                "Access-Control-Allow-Headers": "Content-Type, Authorization"
+                "Access-Control-Allow-Headers": "Content-Type, Authorization",
             }
         )
         config = self._create_config_with_headers("apisix", headers)
@@ -337,14 +303,14 @@ class TestHeaderManipulation:
         headers = HeaderManipulation(
             request_add={"X-Custom": "value"},
             request_remove=["X-Old"],
-            response_add={"X-Response": "ok"}
+            response_add={"X-Response": "ok"},
         )
 
         providers = [
             ("kong", KongProvider()),
             ("apisix", APISIXProvider()),
             ("traefik", TraefikProvider()),
-            ("envoy", EnvoyProvider())
+            ("envoy", EnvoyProvider()),
         ]
 
         for provider_name, provider in providers:
@@ -362,33 +328,20 @@ class TestHeaderManipulation:
         route = Route(path_prefix="/api", headers=headers)
 
         service = Service(
-            name="test_service",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         return Config(
-            version="1.0",
-            provider=provider_name,
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider=provider_name, global_config=global_config, services=[service]
         )
 
     def _create_config_with_request_headers(self, provider_name, operation):
         """Helper to create config with request header operations"""
         if operation == "add":
-            headers = HeaderManipulation(
-                request_add={"X-Custom-Header": "custom-value"}
-            )
+            headers = HeaderManipulation(request_add={"X-Custom-Header": "custom-value"})
         elif operation == "set":
-            headers = HeaderManipulation(
-                request_set={"X-User-Agent": "GAL-Proxy"}
-            )
+            headers = HeaderManipulation(request_set={"X-User-Agent": "GAL-Proxy"})
         else:  # remove
-            headers = HeaderManipulation(
-                request_remove=["X-Internal-Header"]
-            )
+            headers = HeaderManipulation(request_remove=["X-Internal-Header"])
 
         return self._create_config_with_headers(provider_name, headers)

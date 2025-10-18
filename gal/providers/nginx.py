@@ -5,11 +5,12 @@ Generates Nginx configuration (nginx.conf) with support for reverse proxy,
 load balancing, rate limiting, basic authentication, headers, and CORS.
 """
 
-import os
 import logging
+import os
 from typing import List, Optional
+
+from ..config import Config, Route, Service, Upstream
 from ..provider import Provider
-from ..config import Config, Service, Route, Upstream
 
 logger = logging.getLogger(__name__)
 
@@ -104,17 +105,23 @@ class NginxProvider(Provider):
         for service in config.services:
             for route in service.routes:
                 # Warn about Active Health Checks
-                if (service.upstream and service.upstream.health_check and
-                    service.upstream.health_check.active and
-                    service.upstream.health_check.active.enabled):
+                if (
+                    service.upstream
+                    and service.upstream.health_check
+                    and service.upstream.health_check.active
+                    and service.upstream.health_check.active.enabled
+                ):
                     logger.warning(
                         f"Service '{service.name}': Active health checks are not supported "
                         "in Nginx Open Source (Nginx Plus only). Using passive health checks."
                     )
 
                 # Warn about JWT Authentication
-                if (route.authentication and route.authentication.enabled and
-                    route.authentication.type == "jwt"):
+                if (
+                    route.authentication
+                    and route.authentication.enabled
+                    and route.authentication.type == "jwt"
+                ):
                     logger.warning(
                         f"Service '{service.name}', Route '{route.path_prefix}': "
                         "JWT authentication requires OpenResty/Lua. "
@@ -239,7 +246,9 @@ class NginxProvider(Provider):
 
                         # Zone: 10m = ~160k IP addresses
                         rate_per_sec = rl.requests_per_second or 100
-                        output.append(f"    limit_req_zone {key} zone={zone_name}:10m rate={rate_per_sec}r/s;")
+                        output.append(
+                            f"    limit_req_zone {key} zone={zone_name}:10m rate={rate_per_sec}r/s;"
+                        )
 
             output.append("")
 
@@ -268,13 +277,13 @@ class NginxProvider(Provider):
         for target in service.upstream.targets:
             # Handle both dict and UpstreamTarget object
             if isinstance(target, dict):
-                target_host = target.get('host')
-                target_port = target.get('port')
-                target_weight = target.get('weight', 1)
+                target_host = target.get("host")
+                target_port = target.get("port")
+                target_weight = target.get("weight", 1)
             else:
                 target_host = target.host
                 target_port = target.port
-                target_weight = target.weight if hasattr(target, 'weight') else 1
+                target_weight = target.weight if hasattr(target, "weight") else 1
 
             server_line = f"        server {target_host}:{target_port}"
 
@@ -327,11 +336,7 @@ class NginxProvider(Provider):
         output.append("")
 
     def _generate_location(
-        self,
-        service: Service,
-        route: Route,
-        route_index: int,
-        output: List[str]
+        self, service: Service, route: Route, route_index: int, output: List[str]
     ) -> None:
         """Generate location block for route.
 
@@ -385,7 +390,7 @@ class NginxProvider(Provider):
         if route.websocket and route.websocket.enabled:
             ws = route.websocket
             output.append("            proxy_set_header Upgrade $http_upgrade;")
-            output.append("            proxy_set_header Connection \"upgrade\";")
+            output.append('            proxy_set_header Connection "upgrade";')
 
             # WebSocket timeouts
             output.append(f"            proxy_connect_timeout 5s;")
@@ -393,10 +398,9 @@ class NginxProvider(Provider):
             # Use idle_timeout for WebSocket connections
             output.append(f"            proxy_read_timeout {ws.idle_timeout};")
         else:
-            output.append("            proxy_set_header Connection \"\";")
+            output.append('            proxy_set_header Connection "";')
 
             # Regular HTTP timeouts
-            timeout = config.global_config.timeout if hasattr(self, 'config') else "30s"
             output.append(f"            proxy_connect_timeout 5s;")
             output.append(f"            proxy_send_timeout 60s;")
             output.append(f"            proxy_read_timeout 60s;")
@@ -405,11 +409,7 @@ class NginxProvider(Provider):
         output.append("")
 
     def _generate_rate_limit_directives(
-        self,
-        service: Service,
-        route: Route,
-        route_index: int,
-        output: List[str]
+        self, service: Service, route: Route, route_index: int, output: List[str]
     ) -> None:
         """Generate rate limit directives for location.
 
@@ -442,7 +442,7 @@ class NginxProvider(Provider):
         if auth.basic_auth:
             realm = auth.basic_auth.realm or "Protected Area"
             output.append(f"            # Basic Authentication")
-            output.append(f"            auth_basic \"{realm}\";")
+            output.append(f'            auth_basic "{realm}";')
             output.append(f"            auth_basic_user_file /etc/nginx/.htpasswd;")
             output.append("")
 
@@ -460,30 +460,42 @@ class NginxProvider(Provider):
         if cors.allowed_origins:
             # For simplicity, use the first origin or wildcard
             origin = cors.allowed_origins[0] if cors.allowed_origins else "*"
-            output.append(f"            add_header 'Access-Control-Allow-Origin' '{origin}' always;")
+            output.append(
+                f"            add_header 'Access-Control-Allow-Origin' '{origin}' always;"
+            )
 
         # Allowed methods
         if cors.allowed_methods:
             methods = ", ".join(cors.allowed_methods)
-            output.append(f"            add_header 'Access-Control-Allow-Methods' '{methods}' always;")
+            output.append(
+                f"            add_header 'Access-Control-Allow-Methods' '{methods}' always;"
+            )
 
         # Allowed headers
         if cors.allowed_headers:
             headers = ", ".join(cors.allowed_headers)
-            output.append(f"            add_header 'Access-Control-Allow-Headers' '{headers}' always;")
+            output.append(
+                f"            add_header 'Access-Control-Allow-Headers' '{headers}' always;"
+            )
 
         # Exposed headers
         if cors.expose_headers:
             headers = ", ".join(cors.expose_headers)
-            output.append(f"            add_header 'Access-Control-Expose-Headers' '{headers}' always;")
+            output.append(
+                f"            add_header 'Access-Control-Expose-Headers' '{headers}' always;"
+            )
 
         # Credentials
         if cors.allow_credentials:
-            output.append(f"            add_header 'Access-Control-Allow-Credentials' 'true' always;")
+            output.append(
+                f"            add_header 'Access-Control-Allow-Credentials' 'true' always;"
+            )
 
         # Max age
         if cors.max_age:
-            output.append(f"            add_header 'Access-Control-Max-Age' '{cors.max_age}' always;")
+            output.append(
+                f"            add_header 'Access-Control-Max-Age' '{cors.max_age}' always;"
+            )
 
         # OPTIONS preflight handling
         output.append("")
@@ -550,19 +562,16 @@ class NginxProvider(Provider):
 
         # Remove headers (more_clear_headers module required, not in core)
         if headers.response_remove:
-            output.append("            # Note: Response header removal requires ngx_headers_more module")
+            output.append(
+                "            # Note: Response header removal requires ngx_headers_more module"
+            )
             for name in headers.response_remove:
                 output.append(f"            # more_clear_headers '{name}';")
 
         if headers.response_add or headers.response_set:
             output.append("")
 
-    def _generate_proxy_pass(
-        self,
-        service: Service,
-        route: Route,
-        output: List[str]
-    ) -> None:
+    def _generate_proxy_pass(self, service: Service, route: Route, output: List[str]) -> None:
         """Generate proxy_pass directive.
 
         Args:
@@ -575,7 +584,7 @@ class NginxProvider(Provider):
             # Use upstream block
             upstream_name = f"upstream_{service.name}"
             proxy_url = f"http://{upstream_name}"
-        elif hasattr(service, 'host') and hasattr(service, 'port'):
+        elif hasattr(service, "host") and hasattr(service, "port"):
             # Direct backend
             proxy_url = f"http://{service.host}:{service.port}"
         elif service.upstream:
@@ -606,7 +615,9 @@ class NginxProvider(Provider):
             output.append("                ngx.req.read_body()")
             output.append("                local body_data = ngx.req.get_body_data()")
             output.append("                if body_data then")
-            output.append("                    local success, body_json = pcall(cjson.decode, body_data)")
+            output.append(
+                "                    local success, body_json = pcall(cjson.decode, body_data)"
+            )
             output.append("                    if success then")
 
             # Add fields
@@ -614,7 +625,9 @@ class NginxProvider(Provider):
                 output.append("                        -- Add fields")
                 for key, value in bt.request.add_fields.items():
                     if value == "{{uuid}}":
-                        output.append(f"                        body_json.{key} = ngx.var.request_id")
+                        output.append(
+                            f"                        body_json.{key} = ngx.var.request_id"
+                        )
                     elif value == "{{now}}" or value == "{{timestamp}}":
                         output.append(f"                        body_json.{key} = ngx.utctime()")
                     elif isinstance(value, str):
@@ -633,7 +646,9 @@ class NginxProvider(Provider):
                 output.append("                        -- Rename fields")
                 for old_name, new_name in bt.request.rename_fields.items():
                     output.append(f"                        if body_json.{old_name} ~= nil then")
-                    output.append(f"                            body_json.{new_name} = body_json.{old_name}")
+                    output.append(
+                        f"                            body_json.{new_name} = body_json.{old_name}"
+                    )
                     output.append(f"                            body_json.{old_name} = nil")
                     output.append("                        end")
 
@@ -651,7 +666,9 @@ class NginxProvider(Provider):
             output.append("                local cjson = require('cjson')")
             output.append("                local chunk = ngx.arg[1]")
             output.append("                if chunk and chunk ~= '' then")
-            output.append("                    local success, body_json = pcall(cjson.decode, chunk)")
+            output.append(
+                "                    local success, body_json = pcall(cjson.decode, chunk)"
+            )
             output.append("                    if success then")
 
             # Filter sensitive fields
@@ -665,7 +682,9 @@ class NginxProvider(Provider):
                 output.append("                        -- Add metadata fields")
                 for key, value in bt.response.add_fields.items():
                     if value == "{{uuid}}":
-                        output.append(f"                        body_json.{key} = ngx.var.request_id")
+                        output.append(
+                            f"                        body_json.{key} = ngx.var.request_id"
+                        )
                     elif value == "{{now}}" or value == "{{timestamp}}":
                         output.append(f"                        body_json.{key} = ngx.utctime()")
                     elif isinstance(value, str):

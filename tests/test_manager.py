@@ -2,12 +2,14 @@
 Tests for GAL Manager
 """
 
-import pytest
 import tempfile
 from pathlib import Path
+
+import pytest
+
+from gal.config import Config, GlobalConfig, Route, Service, Upstream
 from gal.manager import Manager
 from gal.provider import Provider
-from gal.config import Config, Service, Upstream, Route, GlobalConfig
 
 
 class MockProvider(Provider):
@@ -106,7 +108,7 @@ services:
       - path_prefix: /api/test
 """
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             temp_file = f.name
 
@@ -131,18 +133,11 @@ services:
         upstream = Upstream(host="test.local", port=8080)
         route = Route(path_prefix="/api")
         service = Service(
-            name="test",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         config = Config(
-            version="1.0",
-            provider="test",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="test", global_config=global_config, services=[service]
         )
 
         result = manager.generate(config)
@@ -159,18 +154,11 @@ services:
         upstream = Upstream(host="test.local", port=8080)
         route = Route(path_prefix="/api")
         service = Service(
-            name="test",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         config = Config(
-            version="1.0",
-            provider="nonexistent",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="nonexistent", global_config=global_config, services=[service]
         )
 
         with pytest.raises(ValueError, match="Provider 'nonexistent' not registered"):
@@ -186,18 +174,11 @@ services:
         upstream = Upstream(host="test.local", port=8080)
         route = Route(path_prefix="/api")
         service = Service(
-            name="test",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         config = Config(
-            version="1.0",
-            provider="test",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="test", global_config=global_config, services=[service]
         )
 
         with pytest.raises(ValueError, match="Configuration validation failed"):
@@ -213,18 +194,11 @@ services:
         upstream = Upstream(host="test.local", port=8080)
         route = Route(path_prefix="/api")
         service = Service(
-            name="test",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         config = Config(
-            version="1.0",
-            provider="test",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="test", global_config=global_config, services=[service]
         )
 
         result = manager.deploy(config)
@@ -240,18 +214,11 @@ services:
         upstream = Upstream(host="test.local", port=8080)
         route = Route(path_prefix="/api")
         service = Service(
-            name="test",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         config = Config(
-            version="1.0",
-            provider="nonexistent",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="nonexistent", global_config=global_config, services=[service]
         )
 
         with pytest.raises(ValueError, match="Provider 'nonexistent' not registered"):

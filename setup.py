@@ -2,8 +2,9 @@
 Setup configuration for GAL (Gateway Abstraction Layer)
 """
 
-from setuptools import setup, find_packages
 from pathlib import Path
+
+from setuptools import find_packages, setup
 
 # Read version from VERSION file
 version = Path("VERSION").read_text().strip()

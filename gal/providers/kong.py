@@ -5,12 +5,14 @@ Generates Kong declarative configuration (DB-less mode) in YAML format
 with support for services, routes, and plugin-based transformations.
 """
 
-import os
 import logging
-import requests
+import os
 from typing import Optional
-from ..provider import Provider
+
+import requests
+
 from ..config import Config
+from ..provider import Provider
 
 logger = logging.getLogger(__name__)
 
@@ -121,9 +123,11 @@ class KongProvider(Provider):
         # Generate upstreams first (if needed for load balancing or health checks)
         upstreams_needed = []
         for service in config.services:
-            if (service.upstream.targets or
-                service.upstream.health_check or
-                service.upstream.load_balancer):
+            if (
+                service.upstream.targets
+                or service.upstream.health_check
+                or service.upstream.load_balancer
+            ):
                 upstreams_needed.append(service)
 
         if upstreams_needed:
@@ -159,7 +163,7 @@ class KongProvider(Provider):
                     break  # Only need to set once per service
 
             output.append("  routes:")
-            
+
             for route in service.routes:
                 output.append(f"  - name: {service.name}_route")
                 output.append("    paths:")
@@ -176,47 +180,49 @@ class KongProvider(Provider):
                 if route.authentication and route.authentication.enabled:
                     auth = route.authentication
                     if auth.type == "basic":
-                        route_plugins.append({
-                            "name": "basic-auth",
-                            "config": {
-                                "hide_credentials": True
-                            }
-                        })
+                        route_plugins.append(
+                            {"name": "basic-auth", "config": {"hide_credentials": True}}
+                        )
                     elif auth.type == "api_key":
                         key_name = auth.api_key.key_name if auth.api_key else "X-API-Key"
                         in_location = auth.api_key.in_location if auth.api_key else "header"
-                        route_plugins.append({
-                            "name": "key-auth",
-                            "config": {
-                                "key_names": [key_name],
-                                "key_in_header": in_location == "header",
-                                "key_in_query": in_location == "query",
-                                "hide_credentials": True
+                        route_plugins.append(
+                            {
+                                "name": "key-auth",
+                                "config": {
+                                    "key_names": [key_name],
+                                    "key_in_header": in_location == "header",
+                                    "key_in_query": in_location == "query",
+                                    "hide_credentials": True,
+                                },
                             }
-                        })
+                        )
                     elif auth.type == "jwt":
                         jwt_config = {}
                         if auth.jwt:
                             if auth.jwt.issuer:
                                 jwt_config["claims_to_verify"] = ["iss"]
                             if auth.jwt.audience:
-                                jwt_config["claims_to_verify"] = jwt_config.get("claims_to_verify", []) + ["aud"]
-                        route_plugins.append({
-                            "name": "jwt",
-                            "config": jwt_config if jwt_config else {}
-                        })
+                                jwt_config["claims_to_verify"] = jwt_config.get(
+                                    "claims_to_verify", []
+                                ) + ["aud"]
+                        route_plugins.append(
+                            {"name": "jwt", "config": jwt_config if jwt_config else {}}
+                        )
 
                 # Add rate limiting plugin if configured
                 if route.rate_limit and route.rate_limit.enabled:
-                    route_plugins.append({
-                        "name": "rate-limiting",
-                        "config": {
-                            "second": route.rate_limit.requests_per_second,
-                            "policy": "local",
-                            "fault_tolerant": True,
-                            "hide_client_headers": False
+                    route_plugins.append(
+                        {
+                            "name": "rate-limiting",
+                            "config": {
+                                "second": route.rate_limit.requests_per_second,
+                                "policy": "local",
+                                "fault_tolerant": True,
+                                "hide_client_headers": False,
+                            },
                         }
-                    })
+                    )
 
                 # Add header manipulation plugins if configured
                 if route.headers:
@@ -225,29 +231,33 @@ class KongProvider(Provider):
                     if headers.request_add or headers.request_set or headers.request_remove:
                         req_config = {}
                         if headers.request_add:
-                            req_config["add"] = {"headers": [f"{k}:{v}" for k, v in headers.request_add.items()]}
+                            req_config["add"] = {
+                                "headers": [f"{k}:{v}" for k, v in headers.request_add.items()]
+                            }
                         if headers.request_set:
-                            req_config["replace"] = {"headers": [f"{k}:{v}" for k, v in headers.request_set.items()]}
+                            req_config["replace"] = {
+                                "headers": [f"{k}:{v}" for k, v in headers.request_set.items()]
+                            }
                         if headers.request_remove:
                             req_config["remove"] = {"headers": headers.request_remove}
-                        route_plugins.append({
-                            "name": "request-transformer",
-                            "config": req_config
-                        })
+                        route_plugins.append({"name": "request-transformer", "config": req_config})
 
                     # Response header manipulation
                     if headers.response_add or headers.response_set or headers.response_remove:
                         resp_config = {}
                         if headers.response_add:
-                            resp_config["add"] = {"headers": [f"{k}:{v}" for k, v in headers.response_add.items()]}
+                            resp_config["add"] = {
+                                "headers": [f"{k}:{v}" for k, v in headers.response_add.items()]
+                            }
                         if headers.response_set:
-                            resp_config["replace"] = {"headers": [f"{k}:{v}" for k, v in headers.response_set.items()]}
+                            resp_config["replace"] = {
+                                "headers": [f"{k}:{v}" for k, v in headers.response_set.items()]
+                            }
                         if headers.response_remove:
                             resp_config["remove"] = {"headers": headers.response_remove}
-                        route_plugins.append({
-                            "name": "response-transformer",
-                            "config": resp_config
-                        })
+                        route_plugins.append(
+                            {"name": "response-transformer", "config": resp_config}
+                        )
 
                 # Add CORS plugin if configured
                 if route.cors and route.cors.enabled:
@@ -257,14 +267,11 @@ class KongProvider(Provider):
                         "methods": cors.allowed_methods,
                         "headers": cors.allowed_headers,
                         "credentials": cors.allow_credentials,
-                        "max_age": cors.max_age
+                        "max_age": cors.max_age,
                     }
                     if cors.expose_headers:
                         cors_config["exposed_headers"] = cors.expose_headers
-                    route_plugins.append({
-                        "name": "cors",
-                        "config": cors_config
-                    })
+                    route_plugins.append({"name": "cors", "config": cors_config})
 
                 # Add body transformation plugins if configured
                 if route.body_transformation and route.body_transformation.enabled:
@@ -304,10 +311,9 @@ class KongProvider(Provider):
                             )
 
                         if req_bt_config:
-                            route_plugins.append({
-                                "name": "request-transformer",
-                                "config": req_bt_config
-                            })
+                            route_plugins.append(
+                                {"name": "request-transformer", "config": req_bt_config}
+                            )
 
                     # Response body transformation
                     if bt.response:
@@ -331,10 +337,9 @@ class KongProvider(Provider):
                             resp_bt_config["add"] = {"json": add_fields}
 
                         if resp_bt_config:
-                            route_plugins.append({
-                                "name": "response-transformer",
-                                "config": resp_bt_config
-                            })
+                            route_plugins.append(
+                                {"name": "response-transformer", "config": resp_bt_config}
+                            )
 
                 # Circuit Breaker: Kong does not have native circuit breaker support.
                 # Third-party plugins exist (e.g., kong-circuit-breaker by Dream11),
@@ -353,9 +358,9 @@ class KongProvider(Provider):
                     output.append("    plugins:")
                     for plugin in route_plugins:
                         output.append(f"    - name: {plugin['name']}")
-                        if plugin['config']:
+                        if plugin["config"]:
                             output.append("      config:")
-                            for key, value in plugin['config'].items():
+                            for key, value in plugin["config"].items():
                                 if isinstance(value, bool):
                                     output.append(f"        {key}: {str(value).lower()}")
                                 elif isinstance(value, list):
@@ -424,11 +429,13 @@ class KongProvider(Provider):
                             output.append("        headers:")
                             for header_name in headers.response_remove:
                                 output.append(f"        - {header_name}")
-            
+
             output.append("")
 
         result = "\n".join(output)
-        logger.info(f"Kong configuration generated: {len(result)} bytes, {len(config.services)} services")
+        logger.info(
+            f"Kong configuration generated: {len(result)} bytes, {len(config.services)} services"
+        )
         return result
 
     def _generate_kong_upstream(self, service, output: list):
@@ -461,7 +468,7 @@ class KongProvider(Provider):
                 "round_robin": "round-robin",
                 "least_conn": "least-connections",
                 "ip_hash": "consistent-hashing",
-                "weighted": "round-robin"  # Weighted uses round-robin with target weights
+                "weighted": "round-robin",  # Weighted uses round-robin with target weights
             }
             output.append(f"  algorithm: {kong_algo_map.get(algorithm, 'round-robin')}")
 
@@ -502,7 +509,9 @@ class KongProvider(Provider):
                 output.append("      type: http")
                 output.append("      healthy:")
                 output.append("        successes: 1")
-                output.append("        http_statuses: [200, 201, 202, 204, 301, 302, 303, 304, 307, 308]")
+                output.append(
+                    "        http_statuses: [200, 201, 202, 204, 301, 302, 303, 304, 307, 308]"
+                )
                 output.append("      unhealthy:")
                 output.append(f"        http_failures: {passive.max_failures}")
                 output.append(f"        http_statuses: {passive.unhealthy_status_codes}")
@@ -535,17 +544,18 @@ class KongProvider(Provider):
             10
         """
         duration = duration.strip()
-        if duration.endswith('s'):
+        if duration.endswith("s"):
             return int(duration[:-1])
-        elif duration.endswith('m'):
+        elif duration.endswith("m"):
             return int(duration[:-1]) * 60
-        elif duration.endswith('h'):
+        elif duration.endswith("h"):
             return int(duration[:-1]) * 3600
         else:
             return int(duration)
 
-    def deploy(self, config: Config, output_file: Optional[str] = None,
-               admin_url: Optional[str] = None) -> bool:
+    def deploy(
+        self, config: Config, output_file: Optional[str] = None, admin_url: Optional[str] = None
+    ) -> bool:
         """Deploy Kong declarative configuration.
 
         Deploys configuration via Kong Admin API (DB-less mode) or file-based.
@@ -589,7 +599,7 @@ class KongProvider(Provider):
             # Create directory if it doesn't exist
             os.makedirs(os.path.dirname(output_file) or ".", exist_ok=True)
 
-            with open(output_file, 'w') as f:
+            with open(output_file, "w") as f:
                 f.write(generated_config)
 
             logger.info(f"Kong configuration successfully written to {output_file}")
@@ -601,7 +611,7 @@ class KongProvider(Provider):
 
         # Optionally deploy via Admin API
         if admin_url:
-            admin_url = admin_url.rstrip('/')
+            admin_url = admin_url.rstrip("/")
             logger.debug(f"Checking Kong Admin API at {admin_url}")
             try:
                 # Check if Kong Admin API is reachable
@@ -612,7 +622,7 @@ class KongProvider(Provider):
                     print(f"✓ Kong Admin API is reachable at {admin_url}")
 
                     # Upload declarative config
-                    with open(output_file, 'rb') as f:
+                    with open(output_file, "rb") as f:
                         config_data = f.read()
 
                     logger.debug(f"Uploading configuration to Kong Admin API")
@@ -620,7 +630,7 @@ class KongProvider(Provider):
                         f"{admin_url}/config",
                         data=config_data,
                         headers={"Content-Type": "application/x-yaml"},
-                        timeout=10
+                        timeout=10,
                     )
 
                     if upload_response.status_code in (200, 201):
@@ -628,7 +638,9 @@ class KongProvider(Provider):
                         print(f"✓ Configuration deployed successfully to Kong")
                         return True
                     else:
-                        logger.error(f"Failed to deploy config to Kong: {upload_response.status_code}")
+                        logger.error(
+                            f"Failed to deploy config to Kong: {upload_response.status_code}"
+                        )
                         print(f"✗ Failed to deploy config: {upload_response.status_code}")
                         print(f"  Response: {upload_response.text}")
                         return False
@@ -639,7 +651,9 @@ class KongProvider(Provider):
             except requests.RequestException as e:
                 logger.warning(f"Could not reach Kong Admin API at {admin_url}: {e}")
                 print(f"⚠ Could not reach Kong Admin API: {e}")
-                print(f"  Config written to {output_file}, use: kong config db_import {output_file}")
+                print(
+                    f"  Config written to {output_file}, use: kong config db_import {output_file}"
+                )
 
         logger.info("Kong deployment completed successfully")
         return True

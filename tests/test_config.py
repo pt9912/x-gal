@@ -2,26 +2,28 @@
 Tests for configuration loading and models
 """
 
-import pytest
-import yaml
 import tempfile
 from pathlib import Path
+
+import pytest
+import yaml
+
 from gal.config import (
-    Config,
-    Service,
-    Upstream,
-    Route,
-    GlobalConfig,
-    Transformation,
-    ComputedField,
-    Validation,
-    Plugin,
-    RateLimitConfig,
+    ApiKeyConfig,
     AuthenticationConfig,
     BasicAuthConfig,
-    ApiKeyConfig,
+    ComputedField,
+    Config,
+    GlobalConfig,
+    HeaderManipulation,
     JwtConfig,
-    HeaderManipulation
+    Plugin,
+    RateLimitConfig,
+    Route,
+    Service,
+    Transformation,
+    Upstream,
+    Validation,
 )
 
 
@@ -38,12 +40,7 @@ class TestGlobalConfig:
 
     def test_custom_values(self):
         """Test custom configuration values"""
-        config = GlobalConfig(
-            host="127.0.0.1",
-            port=8080,
-            admin_port=9000,
-            timeout="60s"
-        )
+        config = GlobalConfig(host="127.0.0.1", port=8080, admin_port=9000, timeout="60s")
         assert config.host == "127.0.0.1"
         assert config.port == 8080
         assert config.admin_port == 9000
@@ -78,16 +75,8 @@ class TestRoute:
 
     def test_route_with_rate_limit(self):
         """Test route with rate limiting"""
-        rate_limit = RateLimitConfig(
-            enabled=True,
-            requests_per_second=100,
-            burst=200
-        )
-        route = Route(
-            path_prefix="/api/v1",
-            methods=["GET", "POST"],
-            rate_limit=rate_limit
-        )
+        rate_limit = RateLimitConfig(enabled=True, requests_per_second=100, burst=200)
+        route = Route(path_prefix="/api/v1", methods=["GET", "POST"], rate_limit=rate_limit)
         assert route.path_prefix == "/api/v1"
         assert route.rate_limit is not None
         assert route.rate_limit.requests_per_second == 100
@@ -118,7 +107,7 @@ class TestRateLimitConfig:
             key_type="header",
             key_header="X-API-Key",
             response_status=503,
-            response_message="Too many requests"
+            response_message="Too many requests",
         )
         assert rate_limit.enabled is True
         assert rate_limit.requests_per_second == 50
@@ -135,10 +124,7 @@ class TestRateLimitConfig:
 
     def test_rate_limit_jwt_claim(self):
         """Test rate limit with JWT claim key"""
-        rate_limit = RateLimitConfig(
-            key_type="jwt_claim",
-            key_claim="sub"
-        )
+        rate_limit = RateLimitConfig(key_type="jwt_claim", key_claim="sub")
         assert rate_limit.key_type == "jwt_claim"
         assert rate_limit.key_claim == "sub"
 
@@ -164,10 +150,7 @@ class TestAuthenticationConfig:
 
     def test_basic_auth_config(self):
         """Test basic authentication configuration"""
-        basic = BasicAuthConfig(
-            users={"admin": "secret123", "user": "pass456"},
-            realm="Admin Area"
-        )
+        basic = BasicAuthConfig(users={"admin": "secret123", "user": "pass456"}, realm="Admin Area")
         assert len(basic.users) == 2
         assert basic.users["admin"] == "secret123"
         assert basic.realm == "Admin Area"
@@ -175,9 +158,7 @@ class TestAuthenticationConfig:
     def test_api_key_config(self):
         """Test API key configuration"""
         api_key = ApiKeyConfig(
-            keys=["key1", "key2", "key3"],
-            key_name="X-Custom-Key",
-            in_location="header"
+            keys=["key1", "key2", "key3"], key_name="X-Custom-Key", in_location="header"
         )
         assert len(api_key.keys) == 3
         assert api_key.key_name == "X-Custom-Key"
@@ -185,11 +166,7 @@ class TestAuthenticationConfig:
 
     def test_api_key_config_query(self):
         """Test API key configuration via query parameter"""
-        api_key = ApiKeyConfig(
-            keys=["key123"],
-            key_name="api_key",
-            in_location="query"
-        )
+        api_key = ApiKeyConfig(keys=["key123"], key_name="api_key", in_location="query")
         assert api_key.key_name == "api_key"
         assert api_key.in_location == "query"
 
@@ -200,7 +177,7 @@ class TestAuthenticationConfig:
             audience="api.example.com",
             jwks_uri="https://auth.example.com/.well-known/jwks.json",
             algorithms=["RS256", "ES256"],
-            required_claims=["sub", "email"]
+            required_claims=["sub", "email"],
         )
         assert jwt.issuer == "https://auth.example.com"
         assert jwt.audience == "api.example.com"
@@ -269,12 +246,7 @@ class TestComputedField:
 
     def test_computed_field_with_prefix_suffix(self):
         """Test computed field with prefix and suffix"""
-        field = ComputedField(
-            field="order_id",
-            generator="uuid",
-            prefix="order_",
-            suffix="_v1"
-        )
+        field = ComputedField(field="order_id", generator="uuid", prefix="order_", suffix="_v1")
         assert field.field == "order_id"
         assert field.generator == "uuid"
         assert field.prefix == "order_"
@@ -317,7 +289,7 @@ class TestTransformation:
             defaults={"status": "active"},
             computed_fields=[computed],
             metadata={"version": "1.0"},
-            validation=validation
+            validation=validation,
         )
 
         assert trans.enabled is True
@@ -336,11 +308,7 @@ class TestService:
         route = Route(path_prefix="/myapp.Service")
 
         service = Service(
-            name="test_service",
-            type="grpc",
-            protocol="http2",
-            upstream=upstream,
-            routes=[route]
+            name="test_service", type="grpc", protocol="http2", upstream=upstream, routes=[route]
         )
 
         assert service.name == "test_service"
@@ -353,10 +321,7 @@ class TestService:
         """Test REST service with transformation"""
         upstream = Upstream(host="api.local", port=8080)
         route = Route(path_prefix="/api/users", methods=["GET", "POST"])
-        trans = Transformation(
-            enabled=True,
-            defaults={"role": "user"}
-        )
+        trans = Transformation(enabled=True, defaults={"role": "user"})
 
         service = Service(
             name="user_api",
@@ -364,7 +329,7 @@ class TestService:
             protocol="http",
             upstream=upstream,
             routes=[route],
-            transformation=trans
+            transformation=trans,
         )
 
         assert service.name == "user_api"
@@ -386,9 +351,7 @@ class TestPlugin:
     def test_plugin_with_config(self):
         """Test plugin with configuration"""
         plugin = Plugin(
-            name="cors",
-            enabled=True,
-            config={"origins": ["*"], "methods": ["GET", "POST"]}
+            name="cors", enabled=True, config={"origins": ["*"], "methods": ["GET", "POST"]}
         )
         assert plugin.name == "cors"
         assert plugin.enabled is True
@@ -404,18 +367,11 @@ class TestConfig:
         upstream = Upstream(host="test.local", port=8080)
         route = Route(path_prefix="/api")
         service = Service(
-            name="test",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="test", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
 
         config = Config(
-            version="1.0",
-            provider="envoy",
-            global_config=global_config,
-            services=[service]
+            version="1.0", provider="envoy", global_config=global_config, services=[service]
         )
 
         assert config.version == "1.0"
@@ -429,25 +385,17 @@ class TestConfig:
         route = Route(path_prefix="/api")
 
         service1 = Service(
-            name="service1",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="service1", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
         service2 = Service(
-            name="service2",
-            type="grpc",
-            protocol="http2",
-            upstream=upstream,
-            routes=[route]
+            name="service2", type="grpc", protocol="http2", upstream=upstream, routes=[route]
         )
 
         config = Config(
             version="1.0",
             provider="envoy",
             global_config=global_config,
-            services=[service1, service2]
+            services=[service1, service2],
         )
 
         found = config.get_service("service1")
@@ -464,25 +412,17 @@ class TestConfig:
         route = Route(path_prefix="/api")
 
         rest_service = Service(
-            name="rest",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="rest", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
         grpc_service = Service(
-            name="grpc",
-            type="grpc",
-            protocol="http2",
-            upstream=upstream,
-            routes=[route]
+            name="grpc", type="grpc", protocol="http2", upstream=upstream, routes=[route]
         )
 
         config = Config(
             version="1.0",
             provider="envoy",
             global_config=global_config,
-            services=[rest_service, grpc_service]
+            services=[rest_service, grpc_service],
         )
 
         grpc_services = config.get_grpc_services()
@@ -496,25 +436,17 @@ class TestConfig:
         route = Route(path_prefix="/api")
 
         rest_service = Service(
-            name="rest",
-            type="rest",
-            protocol="http",
-            upstream=upstream,
-            routes=[route]
+            name="rest", type="rest", protocol="http", upstream=upstream, routes=[route]
         )
         grpc_service = Service(
-            name="grpc",
-            type="grpc",
-            protocol="http2",
-            upstream=upstream,
-            routes=[route]
+            name="grpc", type="grpc", protocol="http2", upstream=upstream, routes=[route]
         )
 
         config = Config(
             version="1.0",
             provider="envoy",
             global_config=global_config,
-            services=[rest_service, grpc_service]
+            services=[rest_service, grpc_service],
         )
 
         rest_services = config.get_rest_services()
@@ -563,7 +495,7 @@ plugins:
       requests_per_second: 100
 """
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             temp_file = f.name
 
@@ -620,7 +552,7 @@ services:
       - path_prefix: /api
 """
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             temp_file = f.name
 
@@ -668,7 +600,7 @@ services:
           key_header: X-API-Key
 """
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             temp_file = f.name
 
@@ -722,51 +654,38 @@ class TestHeaderManipulation:
 
     def test_header_manipulation_request_add(self):
         """Test adding request headers"""
-        headers = HeaderManipulation(
-            request_add={"X-Custom": "value", "X-API-Version": "v1"}
-        )
+        headers = HeaderManipulation(request_add={"X-Custom": "value", "X-API-Version": "v1"})
         assert len(headers.request_add) == 2
         assert headers.request_add["X-Custom"] == "value"
         assert headers.request_add["X-API-Version"] == "v1"
 
     def test_header_manipulation_request_set(self):
         """Test setting/replacing request headers"""
-        headers = HeaderManipulation(
-            request_set={"User-Agent": "GAL-Proxy"}
-        )
+        headers = HeaderManipulation(request_set={"User-Agent": "GAL-Proxy"})
         assert headers.request_set["User-Agent"] == "GAL-Proxy"
 
     def test_header_manipulation_request_remove(self):
         """Test removing request headers"""
-        headers = HeaderManipulation(
-            request_remove=["X-Debug", "X-Internal"]
-        )
+        headers = HeaderManipulation(request_remove=["X-Debug", "X-Internal"])
         assert len(headers.request_remove) == 2
         assert "X-Debug" in headers.request_remove
 
     def test_header_manipulation_response_add(self):
         """Test adding response headers"""
         headers = HeaderManipulation(
-            response_add={
-                "X-Response-Time": "100ms",
-                "X-Cache-Status": "HIT"
-            }
+            response_add={"X-Response-Time": "100ms", "X-Cache-Status": "HIT"}
         )
         assert len(headers.response_add) == 2
         assert headers.response_add["X-Cache-Status"] == "HIT"
 
     def test_header_manipulation_response_set(self):
         """Test setting/replacing response headers"""
-        headers = HeaderManipulation(
-            response_set={"Server": "GAL-Gateway"}
-        )
+        headers = HeaderManipulation(response_set={"Server": "GAL-Gateway"})
         assert headers.response_set["Server"] == "GAL-Gateway"
 
     def test_header_manipulation_response_remove(self):
         """Test removing response headers"""
-        headers = HeaderManipulation(
-            response_remove=["Server", "X-Powered-By"]
-        )
+        headers = HeaderManipulation(response_remove=["Server", "X-Powered-By"])
         assert len(headers.response_remove) == 2
         assert "Server" in headers.response_remove
 
@@ -776,7 +695,7 @@ class TestHeaderManipulation:
             request_add={"X-Request-ID": "abc123"},
             request_remove=["X-Old-Header"],
             response_add={"X-Response-ID": "xyz789"},
-            response_remove=["Server"]
+            response_remove=["Server"],
         )
         assert len(headers.request_add) == 1
         assert len(headers.request_remove) == 1
@@ -785,9 +704,7 @@ class TestHeaderManipulation:
 
     def test_route_with_headers(self):
         """Test route with header manipulation"""
-        headers = HeaderManipulation(
-            request_add={"X-Route": "api"}
-        )
+        headers = HeaderManipulation(request_add={"X-Route": "api"})
         route = Route(path_prefix="/api", headers=headers)
 
         assert route.headers is not None
@@ -796,13 +713,9 @@ class TestHeaderManipulation:
     def test_transformation_with_headers(self):
         """Test transformation with header manipulation"""
         headers = HeaderManipulation(
-            request_add={"X-Service": "backend"},
-            response_add={"X-Version": "1.0"}
+            request_add={"X-Service": "backend"}, response_add={"X-Version": "1.0"}
         )
-        trans = Transformation(
-            enabled=True,
-            headers=headers
-        )
+        trans = Transformation(enabled=True, headers=headers)
 
         assert trans.headers is not None
         assert trans.headers.request_add["X-Service"] == "backend"
@@ -815,9 +728,9 @@ class TestHeaderManipulation:
                 "X-Frame-Options": "DENY",
                 "X-Content-Type-Options": "nosniff",
                 "X-XSS-Protection": "1; mode=block",
-                "Strict-Transport-Security": "max-age=31536000"
+                "Strict-Transport-Security": "max-age=31536000",
             },
-            response_remove=["Server", "X-Powered-By"]
+            response_remove=["Server", "X-Powered-By"],
         )
 
         assert "X-Frame-Options" in headers.response_add
@@ -831,7 +744,7 @@ class TestHeaderManipulation:
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
                 "Access-Control-Allow-Headers": "Content-Type, Authorization",
-                "Access-Control-Max-Age": "86400"
+                "Access-Control-Max-Age": "86400",
             }
         )
 
@@ -866,7 +779,7 @@ services:
             - Server
 """
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             temp_file = f.name
 
@@ -914,7 +827,7 @@ services:
           X-API-Version: "2.0"
 """
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             temp_file = f.name
 
@@ -936,7 +849,7 @@ class TestCORSPolicy:
     def test_cors_policy_defaults(self):
         """Test CORS policy with default values"""
         from gal.config import CORSPolicy
-        
+
         cors = CORSPolicy()
         assert cors.enabled is True
         assert cors.allowed_origins == ["*"]
@@ -951,7 +864,7 @@ class TestCORSPolicy:
     def test_cors_policy_custom_values(self):
         """Test CORS policy with custom values"""
         from gal.config import CORSPolicy
-        
+
         cors = CORSPolicy(
             enabled=True,
             allowed_origins=["https://example.com", "https://app.example.com"],
@@ -959,7 +872,7 @@ class TestCORSPolicy:
             allowed_headers=["Content-Type", "X-API-Key"],
             expose_headers=["X-Request-ID", "X-Response-Time"],
             allow_credentials=True,
-            max_age=7200
+            max_age=7200,
         )
         assert cors.enabled is True
         assert len(cors.allowed_origins) == 2
@@ -971,18 +884,15 @@ class TestCORSPolicy:
     def test_cors_policy_wildcard_origin(self):
         """Test CORS policy with wildcard origin"""
         from gal.config import CORSPolicy
-        
+
         cors = CORSPolicy(allowed_origins=["*"])
         assert cors.allowed_origins == ["*"]
 
     def test_route_with_cors(self):
         """Test route with CORS policy"""
-        from gal.config import Route, CORSPolicy
-        
-        cors = CORSPolicy(
-            enabled=True,
-            allowed_origins=["https://example.com"]
-        )
+        from gal.config import CORSPolicy, Route
+
+        cors = CORSPolicy(enabled=True, allowed_origins=["https://example.com"])
         route = Route(path_prefix="/api", cors=cors)
 
         assert route.cors is not None
@@ -992,7 +902,7 @@ class TestCORSPolicy:
     def test_cors_disabled(self):
         """Test disabled CORS policy"""
         from gal.config import CORSPolicy
-        
+
         cors = CORSPolicy(enabled=False)
         assert cors.enabled is False
 
@@ -1024,7 +934,7 @@ services:
           max_age: 3600
 """
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             temp_file = f.name
 
@@ -1069,14 +979,14 @@ services:
           enabled: true
 """
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             temp_file = f.name
 
         try:
             config = Config.from_yaml(temp_file)
             route = config.services[0].routes[0]
-            
+
             # Check that defaults are applied
             assert route.cors is not None
             assert route.cors.enabled is True
