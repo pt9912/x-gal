@@ -426,46 +426,7 @@ class EnvoyProvider(Provider):
         # Clusters
         output.append("  clusters:")
         for service in config.services:
-            output.append(f"  - name: {service.name}_cluster")
-            output.append("    type: STRICT_DNS")
-            output.append("    lb_policy: ROUND_ROBIN")
-            if service.type == "grpc":
-                output.append("    http2_protocol_options: {}")
-
-            # Add circuit breaker (Outlier Detection) if any route has it enabled
-            circuit_breaker = None
-            for route in service.routes:
-                if route.circuit_breaker and route.circuit_breaker.enabled:
-                    circuit_breaker = route.circuit_breaker
-                    break
-
-            if circuit_breaker:
-                output.append("    outlier_detection:")
-                # Convert max_failures to consecutive error threshold
-                output.append(f"      consecutive_5xx: {circuit_breaker.max_failures}")
-                # Interval for checking outlier status (default 10s)
-                output.append("      interval: 10s")
-                # Base ejection time (how long to eject a host)
-                timeout_value = circuit_breaker.timeout.rstrip('s')
-                output.append(f"      base_ejection_time: {timeout_value}s")
-                # Max percentage of hosts that can be ejected
-                output.append("      max_ejection_percent: 50")
-                # Enforce consecutive 5xx detection (100 = always enforce)
-                output.append("      enforcing_consecutive_5xx: 100")
-                # Configure success rate enforcement
-                output.append(f"      success_rate_minimum_hosts: {circuit_breaker.half_open_requests}")
-                output.append("      success_rate_request_volume: 10")
-                output.append("      enforcing_success_rate: 100")
-
-            output.append("    load_assignment:")
-            output.append(f"      cluster_name: {service.name}_cluster")
-            output.append("      endpoints:")
-            output.append("      - lb_endpoints:")
-            output.append("        - endpoint:")
-            output.append("            address:")
-            output.append("              socket_address:")
-            output.append(f"                address: {service.upstream.host}")
-            output.append(f"                port_value: {service.upstream.port}")
+            self._generate_envoy_cluster(service, output)
             output.append("")
 
         # Add JWKS cluster if JWT authentication is configured
@@ -516,6 +477,123 @@ class EnvoyProvider(Provider):
         result = "\n".join(output)
         logger.info(f"Envoy configuration generated: {len(result)} bytes, {len(config.services)} services")
         return result
+
+    def _generate_envoy_cluster(self, service, output: list):
+        """Generate Envoy cluster configuration with health checks and load balancing.
+
+        Creates Envoy cluster configuration supporting:
+        - Multiple endpoints with load balancing
+        - Active health checks (HTTP/TCP/gRPC)
+        - Passive health checks (Outlier Detection)
+        - Load balancing policies
+
+        Args:
+            service: Service object with upstream configuration
+            output: Output list to append YAML lines to
+        """
+        output.append(f"  - name: {service.name}_cluster")
+        output.append("    type: STRICT_DNS")
+
+        # Configure load balancing policy
+        lb_policy = "ROUND_ROBIN"  # Default
+        if service.upstream.load_balancer:
+            algorithm = service.upstream.load_balancer.algorithm
+            # Envoy policies: ROUND_ROBIN, LEAST_REQUEST, RING_HASH, RANDOM, MAGLEV
+            envoy_lb_map = {
+                "round_robin": "ROUND_ROBIN",
+                "least_conn": "LEAST_REQUEST",
+                "ip_hash": "RING_HASH",
+                "weighted": "ROUND_ROBIN"  # Weighted uses ROUND_ROBIN with endpoint weights
+            }
+            lb_policy = envoy_lb_map.get(algorithm, "ROUND_ROBIN")
+
+        output.append(f"    lb_policy: {lb_policy}")
+
+        # Configure ring hash for IP-based hashing
+        if service.upstream.load_balancer and service.upstream.load_balancer.algorithm == "ip_hash":
+            output.append("    ring_hash_lb_config:")
+            output.append("      minimum_ring_size: 1024")
+
+        # gRPC support
+        if service.type == "grpc":
+            output.append("    http2_protocol_options: {}")
+
+        # Configure health checks
+        if service.upstream.health_check:
+            hc = service.upstream.health_check
+
+            # Active health checks
+            if hc.active and hc.active.enabled:
+                active = hc.active
+                output.append("    health_checks:")
+                output.append("    - timeout: " + active.timeout)
+                output.append("      interval: " + active.interval)
+                output.append(f"      unhealthy_threshold: {active.unhealthy_threshold}")
+                output.append(f"      healthy_threshold: {active.healthy_threshold}")
+                output.append("      http_health_check:")
+                output.append(f"        path: {active.http_path}")
+                output.append("        expected_statuses:")
+                for status_code in active.healthy_status_codes:
+                    output.append(f"        - start: {status_code}")
+                    output.append(f"          end: {status_code + 1}")
+
+            # Passive health checks (Outlier Detection)
+            if hc.passive and hc.passive.enabled:
+                passive = hc.passive
+                output.append("    outlier_detection:")
+                output.append(f"      consecutive_5xx: {passive.max_failures}")
+                output.append("      interval: 10s")
+                output.append("      base_ejection_time: 30s")
+                output.append("      max_ejection_percent: 50")
+                output.append("      enforcing_consecutive_5xx: 100")
+                output.append("      success_rate_minimum_hosts: 5")
+                output.append("      success_rate_request_volume: 10")
+                output.append("      enforcing_success_rate: 100")
+
+        # Check if any route has circuit breaker enabled (for backward compatibility)
+        circuit_breaker = None
+        for route in service.routes:
+            if route.circuit_breaker and route.circuit_breaker.enabled:
+                circuit_breaker = route.circuit_breaker
+                break
+
+        if circuit_breaker and not (service.upstream.health_check and service.upstream.health_check.passive):
+            # Only add if not already added via passive health check
+            output.append("    outlier_detection:")
+            output.append(f"      consecutive_5xx: {circuit_breaker.max_failures}")
+            output.append("      interval: 10s")
+            timeout_value = circuit_breaker.timeout.rstrip('s')
+            output.append(f"      base_ejection_time: {timeout_value}s")
+            output.append("      max_ejection_percent: 50")
+            output.append("      enforcing_consecutive_5xx: 100")
+            output.append(f"      success_rate_minimum_hosts: {circuit_breaker.half_open_requests}")
+            output.append("      success_rate_request_volume: 10")
+            output.append("      enforcing_success_rate: 100")
+
+        # Configure load assignment (endpoints)
+        output.append("    load_assignment:")
+        output.append(f"      cluster_name: {service.name}_cluster")
+        output.append("      endpoints:")
+        output.append("      - lb_endpoints:")
+
+        if service.upstream.targets:
+            # Multiple targets mode
+            for target in service.upstream.targets:
+                output.append("        - endpoint:")
+                output.append("            address:")
+                output.append("              socket_address:")
+                output.append(f"                address: {target.host}")
+                output.append(f"                port_value: {target.port}")
+                if service.upstream.load_balancer and service.upstream.load_balancer.algorithm == "weighted":
+                    output.append("          load_balancing_weight:")
+                    output.append(f"            value: {target.weight}")
+        else:
+            # Simple mode (single host/port)
+            output.append("        - endpoint:")
+            output.append("            address:")
+            output.append("              socket_address:")
+            output.append(f"                address: {service.upstream.host}")
+            output.append(f"                port_value: {service.upstream.port}")
 
     def deploy(self, config: Config, output_file: Optional[str] = None,
                admin_url: Optional[str] = None) -> bool:
