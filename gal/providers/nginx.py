@@ -392,18 +392,62 @@ class NginxProvider(Provider):
             output.append("            proxy_set_header Upgrade $http_upgrade;")
             output.append('            proxy_set_header Connection "upgrade";')
 
-            # WebSocket timeouts
-            output.append(f"            proxy_connect_timeout 5s;")
-            output.append(f"            proxy_send_timeout 60s;")
-            # Use idle_timeout for WebSocket connections
-            output.append(f"            proxy_read_timeout {ws.idle_timeout};")
+            # WebSocket timeouts (use configured timeout or defaults)
+            if route.timeout:
+                output.append(f"            proxy_connect_timeout {route.timeout.connect};")
+                output.append(f"            proxy_send_timeout {route.timeout.send};")
+                output.append(f"            proxy_read_timeout {ws.idle_timeout};")
+            else:
+                output.append(f"            proxy_connect_timeout 5s;")
+                output.append(f"            proxy_send_timeout 60s;")
+                output.append(f"            proxy_read_timeout {ws.idle_timeout};")
         else:
             output.append('            proxy_set_header Connection "";')
 
-            # Regular HTTP timeouts
-            output.append(f"            proxy_connect_timeout 5s;")
-            output.append(f"            proxy_send_timeout 60s;")
-            output.append(f"            proxy_read_timeout 60s;")
+            # Regular HTTP timeouts (use configured timeout or defaults)
+            if route.timeout:
+                output.append(f"            proxy_connect_timeout {route.timeout.connect};")
+                output.append(f"            proxy_send_timeout {route.timeout.send};")
+                output.append(f"            proxy_read_timeout {route.timeout.read};")
+            else:
+                output.append(f"            proxy_connect_timeout 5s;")
+                output.append(f"            proxy_send_timeout 60s;")
+                output.append(f"            proxy_read_timeout 60s;")
+
+        # Retry configuration
+        if route.retry and route.retry.enabled:
+            retry = route.retry
+            # Map retry_on conditions to Nginx format
+            retry_conditions = []
+            for condition in retry.retry_on:
+                if condition == "connect_timeout":
+                    retry_conditions.append("timeout")
+                elif condition == "http_5xx":
+                    retry_conditions.append("http_500 http_502 http_503 http_504")
+                elif condition == "http_502":
+                    retry_conditions.append("http_502")
+                elif condition == "http_503":
+                    retry_conditions.append("http_503")
+                elif condition == "http_504":
+                    retry_conditions.append("http_504")
+                elif condition == "reset":
+                    retry_conditions.append("error")
+                elif condition == "refused":
+                    retry_conditions.append("error")
+
+            if retry_conditions:
+                # Join all conditions and remove duplicates
+                unique_conditions = []
+                seen = set()
+                for cond in retry_conditions:
+                    for part in cond.split():
+                        if part not in seen:
+                            unique_conditions.append(part)
+                            seen.add(part)
+                output.append(f"            proxy_next_upstream {' '.join(unique_conditions)};")
+                output.append(f"            proxy_next_upstream_tries {retry.attempts};")
+                # Use max_interval as overall timeout
+                output.append(f"            proxy_next_upstream_timeout {retry.max_interval};")
 
         output.append("        }")
         output.append("")
