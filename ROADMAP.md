@@ -32,8 +32,8 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 ## 🚀 v1.1.0 (Q4 2025 - In Development)
 
 **Focus:** Traffic Management & Security Basics
-**Status:** 🔄 In Development (5/7 Features Complete)
-**Progress:** 71% (8 von 10.5 Wochen)
+**Status:** 🔄 In Development (6/7 Features Complete)
+**Progress:** 86% (10 von 10.5 Wochen)
 
 ### High Priority Features
 
@@ -188,27 +188,53 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 - **Tests:** 30+ Circuit Breaker Tests (357 total)
 - **Coverage:** 75% native provider support (3 von 4)
 
-#### 7. Health Checks & Load Balancing
-- **Active Health Checks**
-- **Passive Health Checks**
-- **Load Balancing Algorithms:**
-  - Round Robin
-  - Least Connections
-  - Weighted
-  - IP Hash
-- **Config Format:**
+#### 7. Health Checks & Load Balancing ✅
+**Status:** ✅ **IMPLEMENTED** (Commit: `31844a9`)
+- **Active Health Checks** ✅ (Periodic HTTP/TCP probing)
+- **Passive Health Checks** ✅ (Traffic-based failure detection)
+- **Multiple Backend Targets** ✅ (Load balancing pool)
+- **Load Balancing Algorithms** ✅:
+  - Round Robin ✅ (Gleichmäßige Verteilung)
+  - Least Connections ✅ (Wenigste Verbindungen)
+  - Weighted ✅ (Gewichtete Verteilung)
+  - IP Hash ✅ (Session Persistence)
+- **Sticky Sessions** ✅ (Cookie-based affinity)
+- **Provider Support:**
+  - ✅ APISIX: Native checks with active/passive, all algorithms
+  - ✅ Kong: Upstream healthchecks, targets, all algorithms
+  - ✅ Traefik: LoadBalancer healthCheck, weighted, sticky sessions
+  - ✅ Envoy: health_checks, outlier_detection, all policies
+- **Implemented Config:**
   ```yaml
-  health_check:
-    path: /health
-    interval: 10s
-    timeout: 5s
-    healthy_threshold: 2
-    unhealthy_threshold: 3
-
-  load_balancing:
-    algorithm: round_robin
-    sticky_sessions: true
+  upstream:
+    targets:
+      - host: api-1.internal
+        port: 8080
+        weight: 2
+      - host: api-2.internal
+        port: 8080
+        weight: 1
+    health_check:
+      active:
+        enabled: true
+        http_path: /health
+        interval: "10s"
+        timeout: "5s"
+        healthy_threshold: 2
+        unhealthy_threshold: 3
+        healthy_status_codes: [200, 201, 204]
+      passive:
+        enabled: true
+        max_failures: 5
+        unhealthy_status_codes: [500, 502, 503, 504]
+    load_balancer:
+      algorithm: round_robin  # round_robin, least_conn, ip_hash, weighted
+      sticky_sessions: false
+      cookie_name: galSession
   ```
+- **Documentation:** [docs/guides/HEALTH_CHECKS.md](docs/guides/HEALTH_CHECKS.md)
+- **Tests:** 50+ Health Check & Load Balancing Tests
+- **Coverage:** 100% active HC, 75% passive HC, 100% LB (4 von 4 Providern)
 
 #### 8. Enhanced Logging & Observability
 - **Structured Access Logs**
@@ -367,7 +393,7 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 | Header Manipulation | ✅ Done | 🔴 High | Medium | High | 100% |
 | CORS | ✅ Done | 🔴 High | Low | High | 100% |
 | Circuit Breaker | ✅ Done | 🟡 Medium | Medium | Medium | 75% |
-| Health Checks | 🔄 Pending | 🟡 Medium | Medium | High | 90% |
+| Health Checks | ✅ Done | 🟡 Medium | Medium | High | 100% |
 | Caching | 🔄 Pending | 🟢 Low | Medium | Medium | 60% |
 | AWS API Gateway | 🔄 Pending | 🟡 Medium | High | High | N/A |
 | Web UI | 🔄 Pending | 🟢 Low | Very High | Medium | N/A |
