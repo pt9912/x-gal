@@ -261,6 +261,32 @@ class HAProxyProvider(Provider):
                     for header in route.headers.response_remove:
                         output.append(f"    http-response del-header {header} if {acl_name}")
 
+                # Body transformation (requires Lua scripting)
+                if route.body_transformation and route.body_transformation.enabled:
+                    output.append(f"    # Body transformation for {route.path_prefix} (requires Lua)")
+                    bt = route.body_transformation
+
+                    # Request body transformation
+                    if bt.request:
+                        lua_func_name = f"transform_request_{service.name}_route{idx}"
+                        output.append(f"    http-request lua.{lua_func_name} if {acl_name}")
+                        # Note: Actual Lua function must be registered in haproxy.cfg global section
+
+                    # Response body transformation
+                    if bt.response:
+                        lua_func_name = f"transform_response_{service.name}_route{idx}"
+                        output.append(f"    http-response lua.{lua_func_name} if {acl_name}")
+                        # Note: Actual Lua function must be registered in haproxy.cfg global section
+
+                    # Add warning about Lua requirement
+                    logger.warning(
+                        f"Body transformation configured for {service.name}/{route.path_prefix}. "
+                        "HAProxy requires Lua scripts to be loaded in global section. "
+                        "Add 'lua-load /path/to/transform.lua' directive to global section and "
+                        "implement transformation functions in Lua. "
+                        "See HAProxy Lua documentation for details."
+                    )
+
                 output.append("")
 
         # Add stick-table for rate limiting at the end of frontend

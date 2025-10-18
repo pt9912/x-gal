@@ -413,28 +413,203 @@ class EnvoyProvider(Provider):
             output.append("                    value: 'true'")
             output.append(f"              status_code: {first_rate_limit.response_status}")
 
-        # Add transformation filter if any service has transformations
-        has_transformations = any(s.transformation and s.transformation.enabled for s in config.services)
-        if has_transformations:
+        # Add body transformation filter if any route has body transformation enabled
+        has_body_transformations = any(
+            route.body_transformation and route.body_transformation.enabled
+            for service in config.services
+            for route in service.routes
+        )
+        if has_body_transformations:
             output.append("          - name: envoy.filters.http.lua")
             output.append("            typed_config:")
             output.append("              '@type': type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua")
             output.append("              inline_code: |")
+            output.append("                local cjson = require('cjson')")
+            output.append("")
+            output.append("                -- Helper function to generate UUID")
+            output.append("                function generate_uuid()")
+            output.append("                  local random = math.random")
+            output.append("                  local template = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'")
+            output.append("                  return string.gsub(template, '[xy]', function (c)")
+            output.append("                    local v = (c == 'x') and random(0, 0xf) or random(8, 0xb)")
+            output.append("                    return string.format('%x', v)")
+            output.append("                  end)")
+            output.append("                end")
+            output.append("")
+            output.append("                -- Helper function to get current timestamp")
+            output.append("                function get_timestamp()")
+            output.append("                  return os.date('%Y-%m-%dT%H:%M:%SZ')")
+            output.append("                end")
+            output.append("")
+            output.append("                -- Helper function to transform request body")
+            output.append("                function transform_request_body(body_json, add_fields, remove_fields, rename_fields)")
+            output.append("                  -- Add fields")
+            output.append("                  if add_fields then")
+            output.append("                    for key, value in pairs(add_fields) do")
+            output.append("                      -- Replace template variables")
+            output.append("                      if value == '{{uuid}}' then")
+            output.append("                        body_json[key] = generate_uuid()")
+            output.append("                      elseif value == '{{now}}' or value == '{{timestamp}}' then")
+            output.append("                        body_json[key] = get_timestamp()")
+            output.append("                      else")
+            output.append("                        body_json[key] = value")
+            output.append("                      end")
+            output.append("                    end")
+            output.append("                  end")
+            output.append("")
+            output.append("                  -- Remove fields")
+            output.append("                  if remove_fields then")
+            output.append("                    for _, field_name in ipairs(remove_fields) do")
+            output.append("                      body_json[field_name] = nil")
+            output.append("                    end")
+            output.append("                  end")
+            output.append("")
+            output.append("                  -- Rename fields")
+            output.append("                  if rename_fields then")
+            output.append("                    for old_name, new_name in pairs(rename_fields) do")
+            output.append("                      if body_json[old_name] ~= nil then")
+            output.append("                        body_json[new_name] = body_json[old_name]")
+            output.append("                        body_json[old_name] = nil")
+            output.append("                      end")
+            output.append("                    end")
+            output.append("                  end")
+            output.append("")
+            output.append("                  return body_json")
+            output.append("                end")
+            output.append("")
+            output.append("                -- Helper function to transform response body")
+            output.append("                function transform_response_body(body_json, filter_fields, add_fields)")
+            output.append("                  -- Filter (remove) sensitive fields")
+            output.append("                  if filter_fields then")
+            output.append("                    for _, field_name in ipairs(filter_fields) do")
+            output.append("                      body_json[field_name] = nil")
+            output.append("                    end")
+            output.append("                  end")
+            output.append("")
+            output.append("                  -- Add metadata fields")
+            output.append("                  if add_fields then")
+            output.append("                    for key, value in pairs(add_fields) do")
+            output.append("                      -- Replace template variables")
+            output.append("                      if value == '{{uuid}}' then")
+            output.append("                        body_json[key] = generate_uuid()")
+            output.append("                      elseif value == '{{now}}' or value == '{{timestamp}}' then")
+            output.append("                        body_json[key] = get_timestamp()")
+            output.append("                      else")
+            output.append("                        body_json[key] = value")
+            output.append("                      end")
+            output.append("                    end")
+            output.append("                  end")
+            output.append("")
+            output.append("                  return body_json")
+            output.append("                end")
+            output.append("")
+            output.append("                -- Request transformation")
             output.append("                function envoy_on_request(request_handle)")
-            output.append("                  -- Transformation logic here")
             output.append("                  local path = request_handle:headers():get(':path')")
-            
+            output.append("")
+
+            # Generate route-specific transformation logic
             for service in config.services:
-                if service.transformation and service.transformation.enabled:
-                    output.append(f"                  -- {service.name} transformations")
-                    for route in service.routes:
-                        output.append(f"                  if string.find(path, '{route.path_prefix}') then")
-                        output.append("                    local body = request_handle:body()")
-                        output.append("                    if body then")
-                        output.append("                      -- Apply defaults and computed fields")
-                        output.append("                    end")
-                        output.append("                  end")
-            
+                for route in service.routes:
+                    if route.body_transformation and route.body_transformation.enabled:
+                        bt = route.body_transformation
+                        if bt.request:
+                            output.append(f"                  -- Body transformation for {service.name} {route.path_prefix}")
+                            output.append(f"                  if string.find(path, '{route.path_prefix}') then")
+                            output.append("                    local body = request_handle:body()")
+                            output.append("                    if body and body:length() > 0 then")
+                            output.append("                      local success, body_json = pcall(cjson.decode, body:getBytes(0, body:length()))")
+                            output.append("                      if success then")
+
+                            # Generate add_fields table
+                            if bt.request.add_fields:
+                                output.append("                        local add_fields = {")
+                                for key, value in bt.request.add_fields.items():
+                                    if isinstance(value, str):
+                                        output.append(f"                          {key} = '{value}',")
+                                    else:
+                                        output.append(f"                          {key} = {value},")
+                                output.append("                        }")
+                            else:
+                                output.append("                        local add_fields = nil")
+
+                            # Generate remove_fields table
+                            if bt.request.remove_fields:
+                                output.append("                        local remove_fields = {")
+                                for field in bt.request.remove_fields:
+                                    output.append(f"                          '{field}',")
+                                output.append("                        }")
+                            else:
+                                output.append("                        local remove_fields = nil")
+
+                            # Generate rename_fields table
+                            if bt.request.rename_fields:
+                                output.append("                        local rename_fields = {")
+                                for old_name, new_name in bt.request.rename_fields.items():
+                                    output.append(f"                          {old_name} = '{new_name}',")
+                                output.append("                        }")
+                            else:
+                                output.append("                        local rename_fields = nil")
+
+                            output.append("")
+                            output.append("                        body_json = transform_request_body(body_json, add_fields, remove_fields, rename_fields)")
+                            output.append("                        local new_body = cjson.encode(body_json)")
+                            output.append("                        request_handle:body():setBytes(new_body)")
+                            output.append("                      end")
+                            output.append("                    end")
+                            output.append("                  end")
+                            output.append("")
+
+            output.append("                end")
+            output.append("")
+            output.append("                -- Response transformation")
+            output.append("                function envoy_on_response(response_handle)")
+            output.append("                  local path = response_handle:headers():get(':path')")
+            output.append("")
+
+            # Generate response transformation logic
+            for service in config.services:
+                for route in service.routes:
+                    if route.body_transformation and route.body_transformation.enabled:
+                        bt = route.body_transformation
+                        if bt.response:
+                            output.append(f"                  -- Response transformation for {service.name} {route.path_prefix}")
+                            output.append(f"                  if string.find(path, '{route.path_prefix}') then")
+                            output.append("                    local body = response_handle:body()")
+                            output.append("                    if body and body:length() > 0 then")
+                            output.append("                      local success, body_json = pcall(cjson.decode, body:getBytes(0, body:length()))")
+                            output.append("                      if success then")
+
+                            # Generate filter_fields table
+                            if bt.response.filter_fields:
+                                output.append("                        local filter_fields = {")
+                                for field in bt.response.filter_fields:
+                                    output.append(f"                          '{field}',")
+                                output.append("                        }")
+                            else:
+                                output.append("                        local filter_fields = nil")
+
+                            # Generate add_fields table
+                            if bt.response.add_fields:
+                                output.append("                        local add_fields = {")
+                                for key, value in bt.response.add_fields.items():
+                                    if isinstance(value, str):
+                                        output.append(f"                          {key} = '{value}',")
+                                    else:
+                                        output.append(f"                          {key} = {value},")
+                                output.append("                        }")
+                            else:
+                                output.append("                        local add_fields = nil")
+
+                            output.append("")
+                            output.append("                        body_json = transform_response_body(body_json, filter_fields, add_fields)")
+                            output.append("                        local new_body = cjson.encode(body_json)")
+                            output.append("                        response_handle:body():setBytes(new_body)")
+                            output.append("                      end")
+                            output.append("                    end")
+                            output.append("                  end")
+                            output.append("")
+
             output.append("                end")
         
         output.append("          - name: envoy.filters.http.router")
