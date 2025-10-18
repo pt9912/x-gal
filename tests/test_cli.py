@@ -237,12 +237,16 @@ services:
             assert "kong" in result.output
             assert "apisix" in result.output
             assert "traefik" in result.output
+            assert "nginx" in result.output
+            assert "haproxy" in result.output
 
             # Verify files exist
             assert Path("generated/envoy.yaml").exists()
             assert Path("generated/kong.yaml").exists()
             assert Path("generated/apisix.json").exists()
             assert Path("generated/traefik.yaml").exists()
+            assert Path("generated/nginx.conf").exists()
+            assert Path("generated/haproxy.cfg").exists()
 
     def test_generate_all_custom_dir(self, runner, config_file, tmp_path):
         """Test generating all configs to custom directory"""
@@ -262,6 +266,8 @@ services:
         assert (output_dir / "kong.yaml").exists()
         assert (output_dir / "apisix.json").exists()
         assert (output_dir / "traefik.yaml").exists()
+        assert (output_dir / "nginx.conf").exists()
+        assert (output_dir / "haproxy.cfg").exists()
 
     def test_generate_all_verifies_content(self, runner, config_file, tmp_path):
         """Test that generated configs have correct format"""
@@ -291,6 +297,15 @@ services:
         # Verify Traefik YAML
         traefik_content = (output_dir / "traefik.yaml").read_text()
         assert "http:" in traefik_content
+
+        # Verify Nginx conf
+        nginx_content = (output_dir / "nginx.conf").read_text()
+        assert "server {" in nginx_content
+
+        # Verify HAProxy cfg
+        haproxy_content = (output_dir / "haproxy.cfg").read_text()
+        assert "frontend" in haproxy_content
+        assert "backend" in haproxy_content
 
 
 class TestCLIInfo:
