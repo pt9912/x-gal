@@ -5,13 +5,33 @@ Generates Kong declarative configuration (DB-less mode) in YAML format
 with support for services, routes, and plugin-based transformations.
 """
 
+import json
 import logging
 import os
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 import requests
+import yaml
 
-from ..config import Config
+from ..config import (
+    ActiveHealthCheck,
+    ApiKeyConfig,
+    AuthenticationConfig,
+    BasicAuthConfig,
+    Config,
+    CORSPolicy,
+    GlobalConfig,
+    HeaderManipulation,
+    HealthCheckConfig,
+    JwtConfig,
+    LoadBalancerConfig,
+    PassiveHealthCheck,
+    RateLimitConfig,
+    Route,
+    Service,
+    Upstream,
+    UpstreamTarget,
+)
 from ..provider import Provider
 
 logger = logging.getLogger(__name__)
@@ -742,18 +762,457 @@ class KongProvider(Provider):
         logger.info("Kong deployment completed successfully")
         return True
 
-    def parse(self, provider_config: str):
+    def parse(self, provider_config: str) -> Config:
         """Parse Kong declarative config to GAL format.
 
-        TODO: Implementation pending for v1.3.0 Feature 2.
-
         Args:
-            provider_config: Kong declarative YAML/JSON configuration
+            provider_config: Kong YAML/JSON configuration string
+
+        Returns:
+            Config: GAL configuration object
 
         Raises:
-            NotImplementedError: Kong parser not yet implemented
+            ValueError: If config is invalid or cannot be parsed
         """
-        raise NotImplementedError(
-            "Kong config import will be implemented in v1.3.0 Feature 2. "
-            "Use 'gal import --provider kong' after the feature is released."
+        logger.info("Parsing Kong configuration to GAL format")
+
+        # Try YAML first, then JSON
+        try:
+            kong_config = yaml.safe_load(provider_config)
+        except yaml.YAMLError:
+            try:
+                kong_config = json.loads(provider_config)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid YAML/JSON: {e}")
+
+        self._import_warnings = []
+
+        # Create default global config
+        global_config = GlobalConfig(host="0.0.0.0", port=8000, timeout="60s")  # Kong proxy port
+
+        return Config(
+            version="1.0",
+            provider="kong",
+            global_config=global_config,
+            services=self._parse_services(kong_config),
         )
+
+    def _parse_services(self, kong_config: dict) -> List[Service]:
+        """Parse Kong services to GAL services."""
+        services = []
+
+        kong_services = kong_config.get("services", [])
+        kong_routes = kong_config.get("routes", [])
+        kong_plugins = kong_config.get("plugins", [])
+        kong_upstreams = kong_config.get("upstreams", [])
+        kong_targets = kong_config.get("targets", [])
+
+        for kong_service in kong_services:
+            service = self._parse_service(
+                kong_service, kong_routes, kong_plugins, kong_upstreams, kong_targets
+            )
+            if service:
+                services.append(service)
+
+        return services
+
+    def _parse_service(
+        self,
+        kong_service: dict,
+        kong_routes: list,
+        kong_plugins: list,
+        kong_upstreams: list,
+        kong_targets: list,
+    ) -> Optional[Service]:
+        """Convert Kong service to GAL service."""
+        name = kong_service.get("name")
+        if not name:
+            return None
+
+        # Parse upstream
+        upstream = self._parse_upstream(kong_service, kong_upstreams, kong_targets)
+
+        # Parse routes for this service
+        routes = []
+        for kong_route in kong_routes:
+            # Check if route references this service
+            route_service = kong_route.get("service")
+            if isinstance(route_service, dict):
+                route_service_name = route_service.get("name")
+            elif isinstance(route_service, str):
+                route_service_name = route_service
+            else:
+                route_service_name = None
+
+            if route_service_name == name:
+                route = self._parse_route(kong_route, kong_plugins)
+                if route:
+                    routes.append(route)
+
+        return Service(
+            name=name,
+            type="rest",  # Kong services are typically REST
+            protocol="http",
+            upstream=upstream,
+            routes=routes,
+        )
+
+    def _parse_upstream(
+        self, kong_service: dict, kong_upstreams: list, kong_targets: list
+    ) -> Optional[Upstream]:
+        """Parse Kong upstream to GAL upstream."""
+        # Check if service has url or host
+        url = kong_service.get("url")
+        host = kong_service.get("host")
+        port = kong_service.get("port", 80)
+
+        # Determine upstream name
+        upstream_name = None
+        if url:
+            # Parse URL: http://host:port
+            if "://" in url:
+                protocol_and_rest = url.split("://", 1)
+                rest = protocol_and_rest[1]
+                if ":" in rest:
+                    host, port_str = rest.rsplit(":", 1)
+                    try:
+                        port = int(port_str)
+                    except ValueError:
+                        port = 80
+                else:
+                    host = rest
+                    port = 80
+            else:
+                host = url
+
+        upstream_name = host
+
+        # Find matching upstream
+        kong_upstream = None
+        for upstream in kong_upstreams:
+            if upstream.get("name") == upstream_name:
+                kong_upstream = upstream
+                break
+
+        if kong_upstream:
+            # Service uses upstream with load balancing
+            targets = self._parse_targets(upstream_name, kong_targets)
+
+            # Parse load balancing algorithm
+            algorithm = self._map_lb_algorithm(kong_upstream.get("algorithm", "round-robin"))
+
+            # Parse health checks
+            health_check = self._parse_health_check(kong_upstream)
+
+            return Upstream(
+                targets=targets,
+                load_balancer=LoadBalancerConfig(algorithm=algorithm),
+                health_check=health_check,
+            )
+        else:
+            # Direct host:port without upstream
+            if not host:
+                return None
+
+            return Upstream(
+                targets=[UpstreamTarget(host=host, port=port)],
+                load_balancer=LoadBalancerConfig(algorithm="round_robin"),
+            )
+
+    def _parse_targets(self, upstream_name: str, kong_targets: list) -> List[UpstreamTarget]:
+        """Parse Kong targets for upstream."""
+        targets = []
+
+        for target in kong_targets:
+            # Check upstream reference
+            target_upstream = target.get("upstream")
+            if isinstance(target_upstream, dict):
+                target_upstream_name = target_upstream.get("name")
+            elif isinstance(target_upstream, str):
+                target_upstream_name = target_upstream
+            else:
+                continue
+
+            if target_upstream_name != upstream_name:
+                continue
+
+            target_str = target.get("target")  # Format: "host:port"
+            weight = target.get("weight", 1)
+
+            if not target_str:
+                continue
+
+            # Parse host:port
+            if ":" in target_str:
+                host, port_str = target_str.rsplit(":", 1)
+                try:
+                    port = int(port_str)
+                except ValueError:
+                    port = 80
+            else:
+                host = target_str
+                port = 80
+
+            targets.append(UpstreamTarget(host=host, port=port, weight=weight))
+
+        return targets
+
+    def _map_lb_algorithm(self, kong_algorithm: str) -> str:
+        """Map Kong algorithm to GAL."""
+        mapping = {
+            "round-robin": "round_robin",
+            "least-connections": "least_conn",
+            "consistent-hashing": "ip_hash",
+            "latency": "least_conn",
+        }
+        return mapping.get(kong_algorithm, "round_robin")
+
+    def _parse_health_check(self, kong_upstream: dict) -> Optional[HealthCheckConfig]:
+        """Parse Kong health checks."""
+        healthchecks = kong_upstream.get("healthchecks", {})
+
+        active = healthchecks.get("active", {})
+        passive = healthchecks.get("passive", {})
+
+        active_hc = None
+        passive_hc = None
+
+        if active and active.get("healthy", {}).get("interval"):
+            # Active health checks enabled
+            healthy = active.get("healthy", {})
+            unhealthy = active.get("unhealthy", {})
+
+            http_path = active.get("http_path", "/")
+            interval = f"{healthy.get('interval', 10)}s"
+            timeout = f"{active.get('timeout', 5)}s"
+            healthy_threshold = healthy.get("successes", 2)
+            unhealthy_threshold = unhealthy.get("http_failures", 3)
+
+            active_hc = ActiveHealthCheck(
+                enabled=True,
+                http_path=http_path,
+                interval=interval,
+                timeout=timeout,
+                healthy_threshold=healthy_threshold,
+                unhealthy_threshold=unhealthy_threshold,
+                healthy_status_codes=[200, 302],
+            )
+
+        if passive and passive.get("healthy", {}).get("successes"):
+            # Passive health checks enabled
+            unhealthy = passive.get("unhealthy", {})
+            max_failures = unhealthy.get("http_failures", 3)
+
+            passive_hc = PassiveHealthCheck(enabled=True, max_failures=max_failures)
+
+        if active_hc or passive_hc:
+            return HealthCheckConfig(active=active_hc, passive=passive_hc)
+
+        return None
+
+    def _parse_route(self, kong_route: dict, kong_plugins: list) -> Optional[Route]:
+        """Parse Kong route to GAL route."""
+        # Parse paths
+        paths = kong_route.get("paths", [])
+        if not paths:
+            return None
+
+        path_prefix = paths[0]  # Take first path
+
+        # Parse methods
+        methods = kong_route.get("methods")
+
+        # Parse plugins for this route
+        route_name = kong_route.get("name")
+
+        rate_limit = None
+        authentication = None
+        headers = None
+        cors = None
+
+        for plugin in kong_plugins:
+            # Check if plugin applies to this route
+            plugin_route = plugin.get("route")
+            if isinstance(plugin_route, dict):
+                plugin_route_name = plugin_route.get("name")
+            elif isinstance(plugin_route, str):
+                plugin_route_name = plugin_route
+            else:
+                plugin_route_name = None
+
+            if plugin_route_name != route_name:
+                continue
+
+            plugin_name = plugin.get("name")
+            plugin_config = plugin.get("config", {})
+
+            if plugin_name == "rate-limiting":
+                rate_limit = self._parse_rate_limiting_plugin(plugin_config)
+            elif plugin_name == "key-auth":
+                authentication = self._parse_key_auth_plugin(plugin_config)
+            elif plugin_name == "basic-auth":
+                authentication = self._parse_basic_auth_plugin(plugin_config)
+            elif plugin_name == "jwt":
+                authentication = self._parse_jwt_plugin(plugin_config)
+            elif plugin_name == "request-transformer":
+                headers = self._parse_request_transformer_plugin(plugin_config)
+            elif plugin_name == "response-transformer":
+                if headers:
+                    self._enrich_response_headers(headers, plugin_config)
+                else:
+                    headers = self._parse_response_transformer_plugin(plugin_config)
+            elif plugin_name == "cors":
+                cors = self._parse_cors_plugin(plugin_config)
+
+        return Route(
+            path_prefix=path_prefix,
+            methods=methods,
+            rate_limit=rate_limit,
+            authentication=authentication,
+            headers=headers,
+            cors=cors,
+        )
+
+    def _parse_rate_limiting_plugin(self, config: dict) -> RateLimitConfig:
+        """Parse Kong rate-limiting plugin."""
+        # Kong supports minute, hour, day, month, year
+        # We'll use minute and convert to per-second
+        limit_by = config.get("limit_by", "consumer")
+        minute = config.get("minute")
+        second = config.get("second")
+
+        if second:
+            rps = second
+        elif minute:
+            rps = minute // 60  # Approximation
+        else:
+            rps = 100  # Default
+
+        key_type = "ip_address" if limit_by == "ip" else "header"
+        key_header = "X-Consumer-ID" if limit_by == "consumer" else None
+
+        return RateLimitConfig(
+            enabled=True,
+            requests_per_second=rps,
+            burst=rps * 2,
+            key_type=key_type,
+            key_header=key_header,
+        )
+
+    def _parse_key_auth_plugin(self, config: dict) -> AuthenticationConfig:
+        """Parse Kong key-auth plugin."""
+        return AuthenticationConfig(
+            enabled=True,
+            type="api_key",
+            api_key=ApiKeyConfig(
+                keys=[],  # Keys not imported for security
+                key_name=config.get("key_names", ["apikey"])[0],
+                in_location="header",
+            ),
+        )
+
+    def _parse_basic_auth_plugin(self, config: dict) -> AuthenticationConfig:
+        """Parse Kong basic-auth plugin."""
+        # Kong stores users separately, we can't import them
+        self._import_warnings.append("Basic auth users not imported - configure manually")
+
+        return AuthenticationConfig(
+            enabled=True,
+            type="basic",
+            basic_auth=BasicAuthConfig(users={}, realm="Protected"),  # Must be configured manually
+        )
+
+    def _parse_jwt_plugin(self, config: dict) -> AuthenticationConfig:
+        """Parse Kong JWT plugin."""
+        # Extract algorithm (Kong supports multiple)
+        algorithm = config.get("algorithm", "HS256")
+        if isinstance(algorithm, str):
+            algorithms = [algorithm]
+        else:
+            algorithms = algorithm if algorithm else ["HS256"]
+
+        self._import_warnings.append("JWT keys/secrets not imported - configure manually")
+
+        return AuthenticationConfig(
+            enabled=True,
+            type="jwt",
+            jwt=JwtConfig(
+                issuer="CONFIGURE_MANUALLY",
+                audience="CONFIGURE_MANUALLY",
+                jwks_uri="",
+                algorithms=algorithms,
+                required_claims=[],
+            ),
+        )
+
+    def _parse_request_transformer_plugin(self, config: dict) -> HeaderManipulation:
+        """Parse Kong request-transformer plugin."""
+        add = config.get("add", {}).get("headers", [])
+        remove = config.get("remove", {}).get("headers", [])
+
+        request_add = {}
+        for header_value in add:
+            # Format: "Header-Name:value"
+            if ":" in header_value:
+                key, value = header_value.split(":", 1)
+                request_add[key] = value.strip()
+
+        request_remove = remove if remove else None
+
+        return HeaderManipulation(
+            request_add=request_add if request_add else None, request_remove=request_remove
+        )
+
+    def _parse_response_transformer_plugin(self, config: dict) -> HeaderManipulation:
+        """Parse Kong response-transformer plugin."""
+        add = config.get("add", {}).get("headers", [])
+        remove = config.get("remove", {}).get("headers", [])
+
+        response_add = {}
+        for header_value in add:
+            if ":" in header_value:
+                key, value = header_value.split(":", 1)
+                response_add[key] = value.strip()
+
+        response_remove = remove if remove else None
+
+        return HeaderManipulation(
+            response_add=response_add if response_add else None, response_remove=response_remove
+        )
+
+    def _enrich_response_headers(self, headers: HeaderManipulation, config: dict):
+        """Add response headers to existing HeaderManipulation."""
+        add = config.get("add", {}).get("headers", [])
+        remove = config.get("remove", {}).get("headers", [])
+
+        if not headers.response_add:
+            headers.response_add = {}
+
+        for header_value in add:
+            if ":" in header_value:
+                key, value = header_value.split(":", 1)
+                headers.response_add[key] = value.strip()
+
+        if remove and not headers.response_remove:
+            headers.response_remove = remove
+
+    def _parse_cors_plugin(self, config: dict) -> CORSPolicy:
+        """Parse Kong CORS plugin."""
+        origins = config.get("origins", ["*"])
+        methods = config.get("methods", ["GET", "POST", "PUT", "DELETE"])
+        headers = config.get("headers", [])
+        credentials = config.get("credentials", False)
+        max_age = config.get("max_age", 86400)
+
+        return CORSPolicy(
+            enabled=True,
+            allowed_origins=origins,
+            allowed_methods=methods,
+            allowed_headers=headers if headers else None,
+            allow_credentials=credentials,
+            max_age=str(max_age),
+        )
+
+    def get_import_warnings(self) -> List[str]:
+        """Return warnings from last import."""
+        return getattr(self, "_import_warnings", [])
