@@ -31,6 +31,8 @@ class GlobalConfig:
     port: int = 10000
     admin_port: int = 9901
     timeout: str = "30s"
+    logging: Optional["LoggingConfig"] = None
+    metrics: Optional["MetricsConfig"] = None
 
 
 @dataclass
@@ -793,6 +795,60 @@ class RetryConfig:
     base_interval: str = "25ms"
     max_interval: str = "250ms"
     retry_on: List[str] = field(default_factory=lambda: ["connect_timeout", "http_5xx"])
+
+
+@dataclass
+class LoggingConfig:
+    """Logging configuration for access logs and observability.
+
+    Attributes:
+        enabled: Enable structured logging (default: True)
+        format: Log format - "json", "text", "custom" (default: "json")
+        level: Log level - "debug", "info", "warning", "error" (default: "info")
+        access_log_path: Path to access log file (default: "/var/log/gateway/access.log")
+        error_log_path: Path to error log file (default: "/var/log/gateway/error.log")
+        sample_rate: Sampling rate 0.0-1.0 for high-traffic (default: 1.0 = all logs)
+        include_request_body: Include request body in logs (default: False)
+        include_response_body: Include response body in logs (default: False)
+        include_headers: Headers to include in logs (default: ["X-Request-ID", "User-Agent"])
+        exclude_paths: Paths to exclude from logging (e.g., health checks)
+        custom_fields: Additional custom fields to add to logs
+    """
+    enabled: bool = True
+    format: str = "json"  # json, text, custom
+    level: str = "info"  # debug, info, warning, error
+    access_log_path: str = "/var/log/gateway/access.log"
+    error_log_path: str = "/var/log/gateway/error.log"
+    sample_rate: float = 1.0  # 0.0-1.0
+    include_request_body: bool = False
+    include_response_body: bool = False
+    include_headers: List[str] = field(default_factory=lambda: ["X-Request-ID", "User-Agent"])
+    exclude_paths: List[str] = field(default_factory=lambda: ["/health", "/metrics"])
+    custom_fields: Dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class MetricsConfig:
+    """Metrics configuration for Prometheus/OpenTelemetry export.
+
+    Attributes:
+        enabled: Enable metrics export (default: True)
+        exporter: Metrics exporter - "prometheus", "opentelemetry", "both" (default: "prometheus")
+        prometheus_port: Prometheus metrics port (default: 9090)
+        prometheus_path: Prometheus metrics path (default: "/metrics")
+        opentelemetry_endpoint: OpenTelemetry collector endpoint
+        include_histograms: Include request duration histograms (default: True)
+        include_counters: Include request/error counters (default: True)
+        custom_labels: Additional labels for metrics
+    """
+    enabled: bool = True
+    exporter: str = "prometheus"  # prometheus, opentelemetry, both
+    prometheus_port: int = 9090
+    prometheus_path: str = "/metrics"
+    opentelemetry_endpoint: str = ""
+    include_histograms: bool = True
+    include_counters: bool = True
+    custom_labels: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass

@@ -23,12 +23,13 @@ Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong
 - ✅ **Strukturiertes Logging** mit konfigurierbaren Log-Levels
 - ✅ **Reines Python** - kein Go erforderlich!
 - ✅ **CI/CD Ready** - GitHub Actions Workflows integriert
-- ✅ **Umfassende Tests** - 345 Tests mit 89% Coverage
+- ✅ **Umfassende Tests** - 364 Tests mit 89% Coverage
 - 🆕 **Traffic Management** - Rate Limiting, Circuit Breaker, Health Checks & Load Balancing
 - 🆕 **Security** - Authentication (Basic, API Key, JWT), Header Manipulation, CORS
 - 🆕 **WebSocket Support** - Real-time bidirectional communication (all 6 providers)
 - 🆕 **Body Transformation** - Request/Response body manipulation with dynamic fields
 - 🆕 **Timeout & Retry** - Connection/read/send timeouts, automatic retries with exponential backoff
+- 🆕 **Logging & Observability** - Structured logging (JSON), Prometheus/OpenTelemetry metrics, log sampling, custom fields
 
 ## Installation
 
@@ -284,6 +285,7 @@ CONFIG_FILE=examples/gateway-config.yaml docker-compose --profile validate up ga
 - [**WebSocket Support**](docs/guides/WEBSOCKET.md) - Real-time bidirectional communication
 - [**Body Transformation**](docs/guides/BODY_TRANSFORMATION.md) - Request/Response body manipulation (add/remove/rename fields, PII filtering)
 - [**Timeout & Retry Policies**](docs/guides/TIMEOUT_RETRY.md) - Connection/read/send timeouts, automatic retries with exponential backoff
+- [**Logging & Observability**](docs/guides/LOGGING_OBSERVABILITY.md) - Structured logging (JSON/text), Prometheus/OpenTelemetry metrics, log sampling, custom fields
 
 ### Provider-Guides
 - [**Envoy Provider**](docs/guides/ENVOY.md) - CNCF cloud-native proxy, Filter-Architektur, xDS API
@@ -296,7 +298,7 @@ CONFIG_FILE=examples/gateway-config.yaml docker-compose --profile validate up ga
 ### Roadmap & Changelog
 - [**Roadmap**](ROADMAP.md) - Geplante Features und Releases
 - [**v1.1.0 Plan**](docs/v1.1.0-PLAN.md) - v1.1.0 Implementierungsplan (100% abgeschlossen)
-- [**v1.2.0 Plan**](docs/v1.2.0-PLAN.md) - v1.2.0 Implementierungsplan (83.3% abgeschlossen - 5/6 Features)
+- [**v1.2.0 Plan**](docs/v1.2.0-PLAN.md) - v1.2.0 Implementierungsplan (✅ 100% abgeschlossen - 6/6 Features)
 - [Changelog](CHANGELOG.md)
 
 ## Testing & Development
@@ -319,14 +321,14 @@ pytest -v --log-cli-level=DEBUG
 
 ### Test-Suite
 
-- **323 Tests** mit **89% Code Coverage**
+- **364 Tests** mit **89% Code Coverage**
 - Unit Tests für alle Module
 - Provider-spezifische Tests (Envoy, Kong, APISIX, Traefik, Nginx, HAProxy)
 - CLI Tests mit Click CliRunner
 - End-to-End Workflow Tests
 - Deployment Tests (mit Mocking)
 - Real-World Szenario Tests
-- Feature Tests (Rate Limiting, Auth, Headers, CORS, Circuit Breaker, Health Checks, WebSocket, Body Transformation)
+- Feature Tests (Rate Limiting, Auth, Headers, CORS, Circuit Breaker, Health Checks, WebSocket, Body Transformation, Timeout & Retry, Logging & Observability)
 
 ### Code Quality
 
