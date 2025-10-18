@@ -23,11 +23,12 @@ Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong
 - ✅ **Strukturiertes Logging** mit konfigurierbaren Log-Levels
 - ✅ **Reines Python** - kein Go erforderlich!
 - ✅ **CI/CD Ready** - GitHub Actions Workflows integriert
-- ✅ **Umfassende Tests** - 323 Tests mit 89% Coverage
+- ✅ **Umfassende Tests** - 345 Tests mit 89% Coverage
 - 🆕 **Traffic Management** - Rate Limiting, Circuit Breaker, Health Checks & Load Balancing
 - 🆕 **Security** - Authentication (Basic, API Key, JWT), Header Manipulation, CORS
 - 🆕 **WebSocket Support** - Real-time bidirectional communication (all 6 providers)
 - 🆕 **Body Transformation** - Request/Response body manipulation with dynamic fields
+- 🆕 **Timeout & Retry** - Connection/read/send timeouts, automatic retries with exponential backoff
 
 ## Installation
 
@@ -282,13 +283,14 @@ CONFIG_FILE=examples/gateway-config.yaml docker-compose --profile validate up ga
 - [Health Checks & Load Balancing](docs/guides/HEALTH_CHECKS.md) - Hochverfügbarkeit
 - [**WebSocket Support**](docs/guides/WEBSOCKET.md) - Real-time bidirectional communication
 - [**Body Transformation**](docs/guides/BODY_TRANSFORMATION.md) - Request/Response body manipulation (add/remove/rename fields, PII filtering)
+- [**Timeout & Retry Policies**](docs/guides/TIMEOUT_RETRY.md) - Connection/read/send timeouts, automatic retries with exponential backoff
 - [Nginx Provider](docs/guides/NGINX.md) - Nginx-spezifische Features
 - [HAProxy Provider](docs/guides/HAPROXY.md) - HAProxy-spezifische Features
 
 ### Roadmap & Changelog
 - [**Roadmap**](ROADMAP.md) - Geplante Features und Releases
 - [**v1.1.0 Plan**](docs/v1.1.0-PLAN.md) - v1.1.0 Implementierungsplan (100% abgeschlossen)
-- [**v1.2.0 Plan**](docs/v1.2.0-PLAN.md) - v1.2.0 Implementierungsplan (66.7% abgeschlossen - 4/6 Features)
+- [**v1.2.0 Plan**](docs/v1.2.0-PLAN.md) - v1.2.0 Implementierungsplan (83.3% abgeschlossen - 5/6 Features)
 - [Changelog](CHANGELOG.md)
 
 ## Testing & Development
