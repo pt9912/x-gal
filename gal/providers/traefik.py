@@ -145,6 +145,8 @@ class TraefikProvider(Provider):
                     middlewares.append(f"{router_name}_headers")
                 if route.cors and route.cors.enabled:
                     middlewares.append(f"{router_name}_cors")
+                if route.circuit_breaker and route.circuit_breaker.enabled:
+                    middlewares.append(f"{router_name}_circuitbreaker")
 
                 # Add middlewares if any
                 if middlewares:
@@ -184,8 +186,13 @@ class TraefikProvider(Provider):
             for service in config.services
             for route in service.routes
         )
+        has_circuit_breakers = any(
+            route.circuit_breaker and route.circuit_breaker.enabled
+            for service in config.services
+            for route in service.routes
+        )
 
-        if has_authentication or has_transformations or has_rate_limits or has_headers or has_cors:
+        if has_authentication or has_transformations or has_rate_limits or has_headers or has_cors or has_circuit_breakers:
             output.append("  middlewares:")
 
             # Authentication middlewares
@@ -334,6 +341,32 @@ class TraefikProvider(Provider):
                                 output.append(f"          - {header}")
                         output.append(f"        accessControlAllowCredentials: {str(cors.allow_credentials).lower()}")
                         output.append(f"        accessControlMaxAge: {cors.max_age}")
+                        output.append("")
+
+            # Circuit Breaker middlewares (route-level)
+            for service in config.services:
+                for i, route in enumerate(service.routes):
+                    if route.circuit_breaker and route.circuit_breaker.enabled:
+                        router_name = f"{service.name}_router_{i}"
+                        cb = route.circuit_breaker
+                        output.append(f"    {router_name}_circuitbreaker:")
+                        output.append("      circuitBreaker:")
+
+                        # Traefik uses expression-based circuit breaker
+                        # Build expression based on unhealthy status codes and max failures
+                        if cb.unhealthy_status_codes:
+                            min_code = min(cb.unhealthy_status_codes)
+                            max_code = max(cb.unhealthy_status_codes) + 1
+                            # Calculate failure ratio threshold from max_failures
+                            # Assuming a window of 10 requests, convert max_failures to ratio
+                            failure_ratio = min(cb.max_failures / 10.0, 0.9)
+                            expression = f"ResponseCodeRatio({min_code}, {max_code}, 0, 600) > {failure_ratio:.2f}"
+                        else:
+                            # Fallback to network error ratio
+                            failure_ratio = min(cb.max_failures / 10.0, 0.9)
+                            expression = f"NetworkErrorRatio() > {failure_ratio:.2f}"
+
+                        output.append(f"        expression: '{expression}'")
                         output.append("")
 
         result = "\n".join(output)

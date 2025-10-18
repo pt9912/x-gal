@@ -1,0 +1,214 @@
+version: "1.0"
+provider: apisix
+
+global:
+  host: 0.0.0.0
+  port: 10000
+  admin_port: 9180
+  timeout: 30s
+
+services:
+  # Kritischer Payment Service - Sehr sensitive Settings
+  - name: payment_service
+    type: rest
+    protocol: http
+    upstream:
+      host: payment.internal
+      port: 8080
+    routes:
+      - path_prefix: /api/payments
+        methods: [GET, POST]
+        circuit_breaker:
+          enabled: true
+          max_failures: 3                 # Sehr sensitiv - nach 3 Fehlern → OPEN
+          timeout: "60s"                  # Längere Erholung für kritische Services
+          half_open_requests: 1           # Vorsichtig testen
+          unhealthy_status_codes: [500, 502, 503, 504]
+          healthy_status_codes: [200, 201, 202]
+          failure_response_code: 503
+          failure_response_message: "Payment service temporarily unavailable. Please try again later."
+
+  # External API - Längere Erholung wegen externer Abhängigkeit
+  - name: external_api
+    type: rest
+    protocol: http
+    upstream:
+      host: api.external.com
+      port: 443
+    routes:
+      - path_prefix: /api/external
+        methods: [GET, POST]
+        circuit_breaker:
+          enabled: true
+          max_failures: 5
+          timeout: "2m"                   # Externe APIs brauchen länger zur Erholung
+          half_open_requests: 2
+          unhealthy_status_codes: [429, 500, 502, 503, 504]  # Inkl. Rate Limiting
+          healthy_status_codes: [200, 201, 202, 204]
+          failure_response_code: 503
+          failure_response_message: "External API unavailable"
+
+  # Database API - Moderate Settings
+  - name: database_api
+    type: rest
+    protocol: http
+    upstream:
+      host: db-api.internal
+      port: 8080
+    routes:
+      - path_prefix: /api/db
+        methods: [GET, POST, PUT, DELETE]
+        circuit_breaker:
+          enabled: true
+          max_failures: 10                # Toleriert mehr Fehler
+          timeout: "30s"
+          half_open_requests: 5           # Aggressiver testen
+          unhealthy_status_codes: [500, 503]
+          healthy_status_codes: [200, 201, 202, 204]
+          failure_response_code: 503
+          failure_response_message: "Database temporarily unavailable"
+
+  # User Service - Standard Settings
+  - name: user_service
+    type: rest
+    protocol: http
+    upstream:
+      host: users.internal
+      port: 8080
+    routes:
+      - path_prefix: /api/users
+        methods: [GET, POST, PUT, DELETE]
+        circuit_breaker:
+          enabled: true
+          max_failures: 5                 # Standard: 5 Fehler
+          timeout: "30s"                  # Standard: 30 Sekunden
+          half_open_requests: 3           # Standard: 3 Test-Requests
+          unhealthy_status_codes: [500, 502, 503, 504]
+          healthy_status_codes: [200, 201, 202, 204]
+          failure_response_code: 503
+          failure_response_message: "User service temporarily unavailable"
+
+  # Order Service - Mit Rate Limiting kombiniert
+  - name: order_service
+    type: rest
+    protocol: http
+    upstream:
+      host: orders.internal
+      port: 8080
+    routes:
+      - path_prefix: /api/orders
+        methods: [GET, POST]
+        # Rate Limiting: Überlastungsschutz
+        rate_limit:
+          enabled: true
+          requests_per_second: 100
+          burst: 150
+          key_type: ip_address
+          response_status: 429
+        # Circuit Breaker: Fehler-Schutz
+        circuit_breaker:
+          enabled: true
+          max_failures: 7
+          timeout: "45s"
+          half_open_requests: 3
+          unhealthy_status_codes: [500, 502, 503, 504]
+          healthy_status_codes: [200, 201, 202]
+
+  # Inventory Service - Robuste Settings (toleriert viele Fehler)
+  - name: inventory_service
+    type: rest
+    protocol: http
+    upstream:
+      host: inventory.internal
+      port: 8080
+    routes:
+      - path_prefix: /api/inventory
+        methods: [GET]
+        circuit_breaker:
+          enabled: true
+          max_failures: 20                # Sehr tolerant
+          timeout: "15s"                  # Kurze Erholung
+          half_open_requests: 10          # Aggressive Tests
+          unhealthy_status_codes: [500, 502, 503, 504]
+          healthy_status_codes: [200, 304]  # Inkl. Not Modified
+
+  # Notification Service - Nicht-kritisch, kein Circuit Breaker
+  - name: notification_service
+    type: rest
+    protocol: http
+    upstream:
+      host: notifications.internal
+      port: 8080
+    routes:
+      - path_prefix: /api/notifications
+        methods: [POST]
+        # Kein circuit_breaker - zeigt dass es optional ist
+        # Notifications sind nicht kritisch genug für Circuit Breaker
+
+  # gRPC Service mit Circuit Breaker
+  - name: grpc_service
+    type: grpc
+    protocol: http2
+    upstream:
+      host: grpc.internal
+      port: 9090
+    routes:
+      - path_prefix: /myapp.DataService
+        circuit_breaker:
+          enabled: true
+          max_failures: 5
+          timeout: "30s"
+          half_open_requests: 3
+          unhealthy_status_codes: [500, 502, 503, 504]
+
+  # Multi-Feature Service - Circuit Breaker + Rate Limiting + Authentication
+  - name: premium_api
+    type: rest
+    protocol: http
+    upstream:
+      host: premium.internal
+      port: 8080
+    routes:
+      - path_prefix: /api/premium
+        methods: [GET, POST, PUT, DELETE]
+        # 1. Authentication (Zugriffsschutz)
+        authentication:
+          enabled: true
+          type: jwt
+          jwt:
+            issuer: "https://auth.example.com"
+            audience: "api.example.com"
+            jwks_uri: "https://auth.example.com/.well-known/jwks.json"
+        # 2. Rate Limiting (Überlastungsschutz)
+        rate_limit:
+          enabled: true
+          requests_per_second: 50
+          burst: 100
+          key_type: header
+          key_header: X-User-ID
+        # 3. Circuit Breaker (Fehler-Schutz)
+        circuit_breaker:
+          enabled: true
+          max_failures: 5
+          timeout: "30s"
+          half_open_requests: 3
+          unhealthy_status_codes: [500, 502, 503, 504]
+          failure_response_code: 503
+          failure_response_message: "Premium API temporarily unavailable"
+
+  # Health Check Service - Sehr tolerante Settings
+  - name: health_service
+    type: rest
+    protocol: http
+    upstream:
+      host: health.internal
+      port: 8080
+    routes:
+      - path_prefix: /health
+        methods: [GET]
+        circuit_breaker:
+          enabled: true
+          max_failures: 50                # Sehr tolerant für Health Checks
+          timeout: "10s"                  # Schnelle Erholung
+          half_open_requests: 1
+          unhealthy_status_codes: [500, 503]
