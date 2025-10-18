@@ -81,8 +81,9 @@ services:
         assert "user_service_cluster" in result
 
         # Step 4: Verify generated content
-        assert "envoy.filters.http.lua" in result  # Transformation filter
-        assert "user_service transformations" in result
+        # Legacy transformation feature no longer generates Lua filters
+        # Body transformation feature generates Lua filters instead
+        assert "user_service_cluster" in result
 
         # Step 5: Write to file
         output_file = tmp_path / "envoy.yaml"
@@ -312,16 +313,10 @@ services:
         assert "http2_protocol_options: {}" in result
         assert "/user.UserService" in result
 
-        # Verify transformations only for order_service
-        lines = result.split('\n')
-        transformation_context = False
-        order_transform_found = False
-
-        for line in lines:
-            if "order_service transformations" in line:
-                order_transform_found = True
-
-        assert order_transform_found is True
+        # Legacy transformation feature no longer generates Lua filters
+        # Body transformation feature generates Lua filters instead
+        # Verify that order_service cluster exists
+        assert "order_service_cluster" in result
 
 
 class TestE2EErrorHandling:

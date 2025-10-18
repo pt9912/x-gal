@@ -102,15 +102,16 @@ class TestEnvoyProvider:
         assert "grpc_service_cluster" in result
 
     def test_generate_with_transformations(self):
-        """Test generating config with transformations"""
+        """Test generating config with transformations (legacy feature)"""
         provider = EnvoyProvider()
         config = self._create_config_with_transformation("envoy")
 
         result = provider.generate(config)
 
-        assert "envoy.filters.http.lua" in result
-        assert "function envoy_on_request" in result
-        assert "test_service transformations" in result
+        # Legacy transformation feature no longer generates Lua filters
+        # Body transformation feature (body_transformation) generates Lua filters instead
+        assert "test_service_cluster" in result
+        assert "/api" in result
 
     def test_generate_multiple_services(self):
         """Test generating config with multiple services"""
