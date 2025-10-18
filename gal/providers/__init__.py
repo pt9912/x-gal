@@ -6,5 +6,12 @@ from .envoy import EnvoyProvider
 from .kong import KongProvider
 from .apisix import APISIXProvider
 from .traefik import TraefikProvider
+from .nginx import NginxProvider
 
-__all__ = ["EnvoyProvider", "KongProvider", "APISIXProvider", "TraefikProvider"]
+__all__ = [
+    "EnvoyProvider",
+    "KongProvider",
+    "APISIXProvider",
+    "TraefikProvider",
+    "NginxProvider"
+]
