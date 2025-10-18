@@ -284,7 +284,7 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 
 **Focus:** Neue Gateway-Provider & Erweiterte Features
 **Status:** 🚧 In Development (siehe [docs/v1.2.0-PLAN.md](docs/v1.2.0-PLAN.md))
-**Progress:** 33.3% (2 von 6 Features komplett)
+**Progress:** 50.0% (3 von 6 Features komplett)
 **Estimated Effort:** 11.5 Wochen
 
 ### High Priority Features
@@ -345,19 +345,52 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 | Active HC | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
 | Passive HC | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ |
 | Load Balancing | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **WebSocket** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ### Medium Priority Features
 
-#### 3. WebSocket Support
-**Status:** 🔄 Pending
+#### 3. WebSocket Support ✅
+**Status:** ✅ **IMPLEMENTED** (Commit: e249bb9)
 **Effort:** 2 Wochen
-- **WebSocket Routing**
-- **Connection Limits**
-- **Idle Timeout Configuration**
-- **Ping/Pong Heartbeat**
+- ✅ **WebSocket Routing** (HTTP → WebSocket upgrade)
+- ✅ **Idle Timeout Configuration** (per route)
+- ✅ **Ping Interval** (keep-alive configuration)
+- ✅ **Max Message Size** (1MB default, configurable)
+- ✅ **Compression** (Per-Message Deflate support)
 
 **Provider Support:**
-- ✅ All 6 Providers (Envoy, Kong, APISIX, Traefik, Nginx, HAProxy)
+- ✅ **Envoy:** upgrade_configs + idle_timeout
+- ✅ **Kong:** read_timeout/write_timeout (native WebSocket support)
+- ✅ **APISIX:** enable_websocket flag
+- ✅ **Traefik:** passHostHeader + flushInterval (automatic WebSocket)
+- ✅ **Nginx:** proxy_http_version 1.1 + Upgrade headers
+- ✅ **HAProxy:** timeout tunnel for WebSocket connections
+
+**Implementierung:**
+- Config Model: `WebSocketConfig` in `gal/config.py` (lines 508-544)
+- Providers: All 6 providers updated with WebSocket support
+- Tests: `tests/test_websocket.py` (20 tests, all passing)
+- Dokumentation: `docs/guides/WEBSOCKET.md` (1100+ lines, German)
+- Beispiele: `examples/websocket-example.yaml` (6 production scenarios)
+
+**Use Cases:**
+- Chat Applications (Slack, Discord)
+- Live Dashboards (Grafana-like real-time metrics)
+- IoT Sensor Data Streaming
+- Multiplayer Gaming (low-latency gameplay)
+- File Upload Streaming (resumable uploads)
+
+**Config Example:**
+```yaml
+routes:
+  - path_prefix: /ws/chat
+    websocket:
+      enabled: true
+      idle_timeout: "600s"      # 10 minutes
+      ping_interval: "20s"      # Keep-alive
+      max_message_size: 524288  # 512KB
+      compression: true         # Per-Message Deflate
+```
 
 #### 4. Request/Response Body Transformation
 **Status:** 🔄 Pending
