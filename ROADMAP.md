@@ -394,7 +394,119 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 
 ---
 
-## 🔮 v1.3.0 (Q2 2026 - Vision)
+## 🔄 v1.3.0 (Q2 2026 - Planning)
+
+**Focus:** Import/Migration & Provider Portability
+**Status:** 🔄 Planning (siehe [docs/v1.3.0-PLAN.md](docs/v1.3.0-PLAN.md))
+**Estimated Effort:** 10-12 Wochen
+
+### Mission
+
+**Provider Lock-in brechen:** Ermögliche Migration bestehender Gateway-Konfigurationen zu GAL und damit zu jedem anderen Provider.
+
+### High Priority Features
+
+#### 1. Config Import (Provider → GAL)
+**Status:** 🔄 Planned
+**Effort:** 8 Wochen
+
+Reverse Engineering: Provider-spezifische Configs nach GAL konvertieren.
+
+**Unterstützte Import-Formate:**
+- ✅ **Envoy** (envoy.yaml → gal-config.yaml)
+- ✅ **Kong** (kong.yaml → gal-config.yaml)
+- ✅ **APISIX** (apisix.json → gal-config.yaml)
+- ✅ **Traefik** (traefik.yaml → gal-config.yaml)
+- ✅ **Nginx** (nginx.conf → gal-config.yaml)
+- ✅ **HAProxy** (haproxy.cfg → gal-config.yaml)
+
+**CLI Commands:**
+```bash
+# Import: Provider-Config → GAL
+gal import --provider nginx --input nginx.conf --output gal-config.yaml
+
+# Migration Workflow (Nginx → HAProxy)
+gal import --provider nginx --input nginx.conf --output gal-config.yaml
+gal generate --config gal-config.yaml --provider haproxy --output haproxy.cfg
+
+# Validate Import
+gal import --provider envoy --input envoy.yaml --validate-only
+
+# Diff: Show what would be imported
+gal import --provider kong --input kong.yaml --dry-run
+```
+
+**Implementation:**
+```python
+class Provider(ABC):
+    @abstractmethod
+    def generate(self, config: Config) -> str:
+        """GAL → Provider (existiert bereits)"""
+        pass
+
+    @abstractmethod
+    def parse(self, provider_config: str) -> Config:
+        """Provider → GAL (NEU!)"""
+        pass
+```
+
+**Feature Mapping:**
+- ✅ Routing (paths, methods, domains)
+- ✅ Upstream (targets, load balancing)
+- ✅ Rate Limiting
+- ✅ Authentication (Basic, API Key, JWT)
+- ✅ Headers (request/response)
+- ✅ CORS
+- ✅ Health Checks (active/passive)
+- ✅ Circuit Breaker
+- ⚠️ Provider-specific → `provider_specific` section
+
+**Challenges:**
+- Complex parsing (YAML/JSON/Custom Formats)
+- Information loss (non-mappable features)
+- Ambiguity resolution (best-effort + warnings)
+
+#### 2. Config Validation & Compatibility Checker
+**Status:** 🔄 Planned
+**Effort:** 2 Wochen
+
+Validiere ob eine GAL-Config auf einem bestimmten Provider lauffähig ist.
+
+```bash
+# Check compatibility
+gal validate --config gal-config.yaml --target-provider haproxy
+# → Warnings: "JWT auth requires Lua scripting in HAProxy"
+
+# Compare providers
+gal compare --config gal-config.yaml --providers envoy,kong,nginx
+# → Feature matrix showing what works on each provider
+```
+
+#### 3. Migration Assistant
+**Status:** 🔄 Planned
+**Effort:** 2 Wochen
+
+Interaktiver Migration-Workflow mit Guidance.
+
+```bash
+# Interactive migration
+gal migrate
+# → Prompts: Source provider? Target provider? Config path?
+# → Shows: Feature compatibility, potential issues, recommendations
+# → Generates: GAL config + Target provider config
+# → Creates: Migration report (Markdown)
+```
+
+### Success Metrics
+- **6 Providers** mit Import-Support
+- **95%+ Feature Coverage** bei Standard-Konfigurationen
+- **Migration Reports** für Nicht-Mappable Features
+- **500+ Tests** für Parser
+- **Dokumentation:** Migration Guides pro Provider
+
+---
+
+## 🔮 v1.4.0 (Q3 2026 - Vision)
 
 **Focus:** Advanced Traffic Management & Multi-Cloud
 **Status:** Concept
@@ -437,7 +549,7 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 
 ---
 
-## 🌟 v1.4.0 (Q3 2026 - Vision)
+## 🌟 v1.5.0 (Q4 2026 - Vision)
 
 **Focus:** Enterprise Features & Developer Experience
 **Status:** Concept
@@ -535,6 +647,14 @@ GAL soll die **umfassendste** und **einfachste** Abstraktionsschicht für API-Ga
 - 🔴 **High Priority**: v1.1.0
 - 🟡 **Medium Priority**: v1.2.0
 - 🟢 **Low Priority**: v1.3.0+
+
+### Version Timeline:
+- **v1.1.0 (Q4 2025):** ✅ Released - Traffic Management & Security
+- **v1.2.0 (Q1 2026):** 🚧 In Development (33.3%) - New Providers & Features
+- **v1.3.0 (Q2 2026):** 🔄 Planning - Import/Migration & Portability
+- **v1.4.0 (Q3 2026):** Concept - Advanced Traffic & Multi-Cloud
+- **v1.5.0 (Q4 2026):** Concept - Enterprise Features & Developer UX
+- **v2.0+ (2027+):** Vision - Advanced Features & Extensibility
 
 ---
 
