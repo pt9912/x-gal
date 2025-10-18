@@ -35,6 +35,15 @@ class MockProvider(Provider):
         self.deployed_config = config
         return True
 
+    def parse(self, provider_config: str) -> Config:
+        """Mock parse implementation for testing"""
+        # Return a minimal valid config for testing
+        return Config(
+            version="1.0",
+            provider=self._name,
+            services=[]
+        )
+
 
 class TestManager:
     """Test Manager class"""
