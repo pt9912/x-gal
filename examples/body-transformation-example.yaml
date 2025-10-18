@@ -1,0 +1,615 @@
+# Body Transformation Examples
+# Demonstrates request/response body manipulation across different use cases
+
+version: "1.0"
+provider: envoy  # Works with: envoy, kong, apisix, nginx (OpenResty), haproxy (manual Lua)
+
+global_config:
+  host: "0.0.0.0"
+  port: 8080
+  timeout: "30s"
+
+services:
+  # =============================================================================
+  # Example 1: Basic Request Transformation - Add Trace ID
+  # =============================================================================
+  - name: basic_trace_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api-basic.internal
+      port: 8080
+
+    routes:
+      - path_prefix: /api/basic
+        body_transformation:
+          enabled: true
+          request:
+            add_fields:
+              trace_id: "{{uuid}}"          # Unique trace ID
+              timestamp: "{{now}}"          # ISO 8601 timestamp
+
+        # Example Request (before transformation):
+        # {
+        #   "username": "alice",
+        #   "action": "login"
+        # }
+        #
+        # Example Request (after transformation):
+        # {
+        #   "username": "alice",
+        #   "action": "login",
+        #   "trace_id": "550e8400-e29b-41d4-a716-446655440000",
+        #   "timestamp": "2025-01-18T14:30:00Z"
+        # }
+
+  # =============================================================================
+  # Example 2: Security - Remove Sensitive Fields
+  # =============================================================================
+  - name: security_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api-security.internal
+      port: 8080
+
+    routes:
+      - path_prefix: /api/secure
+        body_transformation:
+          enabled: true
+          request:
+            remove_fields:
+              - internal_id         # Remove internal IDs
+              - secret_key          # Remove secrets
+              - debug_info          # Remove debug information
+
+        # Example Request (before transformation):
+        # {
+        #   "username": "alice",
+        #   "password": "hashed_password",
+        #   "internal_id": "INT12345",
+        #   "secret_key": "abc123",
+        #   "debug_info": "test mode"
+        # }
+        #
+        # Example Request (after transformation):
+        # {
+        #   "username": "alice",
+        #   "password": "hashed_password"
+        # }
+
+  # =============================================================================
+  # Example 3: Response Filtering - Remove PII
+  # =============================================================================
+  - name: pii_filter_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api-users.internal
+      port: 8080
+
+    routes:
+      - path_prefix: /api/users
+        body_transformation:
+          enabled: true
+          response:
+            filter_fields:
+              - password            # Remove password hash
+              - ssn                 # Remove social security number
+              - credit_card         # Remove credit card
+              - api_key             # Remove API keys
+              - internal_notes      # Remove internal notes
+
+        # Example Response (before transformation):
+        # {
+        #   "id": 1,
+        #   "username": "alice",
+        #   "email": "alice@example.com",
+        #   "password": "bcrypt_hash",
+        #   "ssn": "123-45-6789",
+        #   "internal_notes": "VIP customer"
+        # }
+        #
+        # Example Response (after transformation):
+        # {
+        #   "id": 1,
+        #   "username": "alice",
+        #   "email": "alice@example.com"
+        # }
+
+  # =============================================================================
+  # Example 4: Field Renaming - Legacy System Integration
+  # =============================================================================
+  - name: legacy_integration_service
+    type: rest
+    protocol: http
+    upstream:
+      host: legacy-api.internal
+      port: 8080
+
+    routes:
+      - path_prefix: /legacy/users
+        body_transformation:
+          enabled: true
+          request:
+            rename_fields:
+              id: userId              # Modern → Legacy
+              name: userName
+              email: userEmail
+              created: createdAt
+              updated: updatedAt
+
+        # Example Request (before transformation):
+        # {
+        #   "id": 1,
+        #   "name": "Alice Smith",
+        #   "email": "alice@example.com",
+        #   "created": "2025-01-01T00:00:00Z"
+        # }
+        #
+        # Example Request (after transformation):
+        # {
+        #   "userId": 1,
+        #   "userName": "Alice Smith",
+        #   "userEmail": "alice@example.com",
+        #   "createdAt": "2025-01-01T00:00:00Z"
+        # }
+
+  # =============================================================================
+  # Example 5: API Versioning - Add Metadata
+  # =============================================================================
+  - name: versioned_api_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api-v1.internal
+      port: 8080
+
+    routes:
+      - path_prefix: /api/v1
+        body_transformation:
+          enabled: true
+          response:
+            add_fields:
+              api_version: "v1.2.0"      # Static version
+              server_id: "gateway-1"     # Static server ID
+              server_time: "{{timestamp}}"  # Dynamic timestamp
+              response_id: "{{uuid}}"    # Unique response ID
+
+        # Example Response (before transformation):
+        # {
+        #   "status": "success",
+        #   "data": [...]
+        # }
+        #
+        # Example Response (after transformation):
+        # {
+        #   "status": "success",
+        #   "data": [...],
+        #   "api_version": "v1.2.0",
+        #   "server_id": "gateway-1",
+        #   "server_time": "2025-01-18T14:30:00Z",
+        #   "response_id": "550e8400-e29b-41d4-a716-446655440000"
+        # }
+
+  # =============================================================================
+  # Example 6: Combined - Request & Response Transformation
+  # =============================================================================
+  - name: combined_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api-combined.internal
+      port: 8080
+
+    routes:
+      - path_prefix: /api/combined
+        body_transformation:
+          enabled: true
+          request:
+            add_fields:
+              trace_id: "{{uuid}}"
+              request_time: "{{timestamp}}"
+              gateway: "gal-gateway"
+            remove_fields:
+              - internal_secret
+              - debug_flag
+          response:
+            filter_fields:
+              - password
+              - api_key
+            add_fields:
+              response_time: "{{timestamp}}"
+              server: "gal-v1.2.0"
+
+  # =============================================================================
+  # Example 7: Audit Logging - Complete Audit Trail
+  # =============================================================================
+  - name: audit_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api-admin.internal
+      port: 8080
+
+    routes:
+      - path_prefix: /api/admin
+        body_transformation:
+          enabled: true
+          request:
+            add_fields:
+              audit_id: "{{uuid}}"
+              audit_timestamp: "{{timestamp}}"
+              gateway_id: "gal-gateway-1"
+              environment: "production"
+              audit_source: "api-gateway"
+          response:
+            add_fields:
+              audit_response_time: "{{timestamp}}"
+              audit_status: "processed"
+
+        # Use Case: Admin operations need complete audit trail
+        # Every request gets unique audit ID for compliance tracking
+
+  # =============================================================================
+  # Example 8: Canary Deployment - Version Marking
+  # =============================================================================
+  - name: canary_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api-canary.internal
+      port: 8080
+
+    routes:
+      - path_prefix: /api/v2-beta
+        body_transformation:
+          enabled: true
+          request:
+            add_fields:
+              deployment: "canary"
+              version: "v2.0-beta"
+              canary_weight: 10
+              feature_flags:
+                - "new-ui"
+                - "improved-search"
+
+        # Use Case: Mark requests for canary deployment
+        # Backend can distinguish canary traffic
+
+  # =============================================================================
+  # Example 9: Multi-Tenant - Tenant Context
+  # =============================================================================
+  - name: multitenant_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api-tenant.internal
+      port: 8080
+
+    routes:
+      - path_prefix: /api/tenant
+        body_transformation:
+          enabled: true
+          request:
+            add_fields:
+              tenant_id: "default-tenant"    # In production: extract from header/JWT
+              tenant_region: "eu-west-1"
+              tenant_tier: "premium"
+              isolation_level: "shared"
+
+        # Use Case: Add tenant context to requests
+        # Backend can enforce tenant-specific logic
+
+  # =============================================================================
+  # Example 10: Data Enrichment - Request Enrichment
+  # =============================================================================
+  - name: enrichment_service
+    type: rest
+    protocol: http
+    upstream:
+      host: api-enrich.internal
+      port: 8080
+
+    routes:
+      - path_prefix: /api/enrich
+        body_transformation:
+          enabled: true
+          request:
+            add_fields:
+              request_id: "{{uuid}}"
+              client_timestamp: "{{timestamp}}"
+              gateway_version: "v1.2.0"
+              protocol: "HTTP/1.1"
+              source: "api-gateway"
+            remove_fields:
+              - client_secret        # Remove before backend
+              - temp_data
+
+  # =============================================================================
+  # Example 11: Payment Service - Security + Audit
+  # =============================================================================
+  - name: payment_service
+    type: rest
+    protocol: http
+    upstream:
+      host: payment-api.internal
+      port: 8080
+
+    routes:
+      - path_prefix: /api/payments
+        body_transformation:
+          enabled: true
+          request:
+            add_fields:
+              payment_id: "{{uuid}}"
+              payment_timestamp: "{{timestamp}}"
+              gateway: "payment-gateway"
+            remove_fields:
+              - cvv                  # Remove CVV after validation
+              - full_card_number     # Remove full number (use token)
+          response:
+            filter_fields:
+              - card_number          # Never return card numbers
+              - cvv
+              - pin
+            add_fields:
+              payment_processed_at: "{{timestamp}}"
+              gateway: "gal-payment"
+
+        # Use Case: Payment processing with PCI compliance
+        # Remove sensitive card data, add audit trail
+
+  # =============================================================================
+  # Example 12: Microservices - Service Mesh Context
+  # =============================================================================
+  - name: microservice_mesh
+    type: rest
+    protocol: http
+    upstream:
+      host: microservice.internal
+      port: 8080
+
+    routes:
+      - path_prefix: /api/services
+        body_transformation:
+          enabled: true
+          request:
+            add_fields:
+              correlation_id: "{{uuid}}"     # For distributed tracing
+              span_id: "{{uuid}}"            # OpenTracing span ID
+              trace_timestamp: "{{timestamp}}"
+              service_name: "gateway"
+              service_version: "v1.2.0"
+          response:
+            add_fields:
+              upstream_service: "microservice"
+              response_span_id: "{{uuid}}"
+              response_timestamp: "{{timestamp}}"
+
+        # Use Case: Service mesh integration
+        # Add OpenTracing/OpenTelemetry context
+
+  # =============================================================================
+  # Example 13: IoT Device Data - Device Context
+  # =============================================================================
+  - name: iot_device_service
+    type: rest
+    protocol: http
+    upstream:
+      host: iot-backend.internal
+      port: 8080
+
+    routes:
+      - path_prefix: /api/devices
+        body_transformation:
+          enabled: true
+          request:
+            add_fields:
+              message_id: "{{uuid}}"
+              gateway_timestamp: "{{timestamp}}"
+              gateway_region: "eu-central-1"
+              protocol_version: "v1"
+            remove_fields:
+              - device_secret        # Remove after authentication
+              - calibration_data     # Remove temporary data
+
+        # Use Case: IoT device data ingestion
+        # Add gateway context, remove device secrets
+
+  # =============================================================================
+  # Example 14: GraphQL Gateway - Query Metadata
+  # =============================================================================
+  - name: graphql_gateway
+    type: rest
+    protocol: http
+    upstream:
+      host: graphql-api.internal
+      port: 8080
+
+    routes:
+      - path_prefix: /graphql
+        body_transformation:
+          enabled: true
+          request:
+            add_fields:
+              query_id: "{{uuid}}"
+              query_timestamp: "{{timestamp}}"
+              gateway: "graphql-gateway"
+              client_version: "v1"
+          response:
+            add_fields:
+              query_execution_timestamp: "{{timestamp}}"
+              gateway_version: "v1.2.0"
+
+        # Use Case: GraphQL query tracking
+        # Add query IDs for performance monitoring
+
+  # =============================================================================
+  # Example 15: All Features Combined - Production API
+  # =============================================================================
+  - name: production_api_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: api-prod-1.internal
+          port: 8080
+          weight: 3
+        - host: api-prod-2.internal
+          port: 8080
+          weight: 1
+      load_balancer:
+        algorithm: weighted
+
+    routes:
+      - path_prefix: /api/production
+
+        # Rate limiting
+        rate_limit:
+          enabled: true
+          requests_per_second: 1000
+          burst: 2000
+
+        # Authentication
+        authentication:
+          enabled: true
+          type: jwt
+          jwt:
+            issuer: "https://auth.example.com"
+            audiences:
+              - "api-gateway"
+            algorithms:
+              - "RS256"
+
+        # Headers
+        headers:
+          request_add:
+            X-Gateway: "GAL-v1.2.0"
+            X-Environment: "production"
+          response_add:
+            X-Response-Time: "{{timestamp}}"
+            X-Server: "GAL-Gateway"
+
+        # CORS
+        cors:
+          enabled: true
+          allowed_origins:
+            - "https://app.example.com"
+          allowed_methods:
+            - "GET"
+            - "POST"
+            - "PUT"
+            - "DELETE"
+
+        # Body Transformation (THIS EXAMPLE)
+        body_transformation:
+          enabled: true
+          request:
+            add_fields:
+              # Distributed Tracing
+              trace_id: "{{uuid}}"
+              span_id: "{{uuid}}"
+              request_timestamp: "{{timestamp}}"
+
+              # Gateway Context
+              gateway: "gal-production"
+              gateway_version: "v1.2.0"
+              environment: "production"
+
+              # Static Metadata
+              api_version: "v1"
+              client_type: "web"
+
+            remove_fields:
+              # Security: Remove sensitive data
+              - internal_id
+              - secret_key
+              - password_hash
+              - debug_mode
+              - internal_flags
+
+            rename_fields:
+              # Legacy compatibility
+              user_id: id
+              user_name: name
+              user_email: email
+
+          response:
+            filter_fields:
+              # PII Protection
+              - password
+              - ssn
+              - credit_card
+              - api_key
+              - secret
+              - internal_notes
+              - admin_email
+              - phone_number
+
+            add_fields:
+              # Response Metadata
+              response_timestamp: "{{timestamp}}"
+              response_id: "{{uuid}}"
+              server_version: "v1.2.0"
+              server_region: "eu-west-1"
+              cache_status: "miss"
+              processing_time_ms: 50
+
+        # Circuit Breaker
+        circuit_breaker:
+          enabled: true
+          max_failures: 5
+          timeout: "30s"
+
+        # Example Complete Flow:
+        #
+        # 1. Client Request:
+        # POST /api/production/users
+        # {
+        #   "user_id": 123,
+        #   "user_name": "Alice",
+        #   "user_email": "alice@example.com",
+        #   "password": "hashed",
+        #   "internal_id": "INT123"
+        # }
+        #
+        # 2. After Request Transformation:
+        # {
+        #   "id": 123,                           # renamed from user_id
+        #   "name": "Alice",                     # renamed from user_name
+        #   "email": "alice@example.com",        # renamed from user_email
+        #   "password": "hashed",
+        #   "trace_id": "550e8400...",           # added
+        #   "span_id": "660f9500...",            # added
+        #   "request_timestamp": "2025-01-18...", # added
+        #   "gateway": "gal-production",         # added
+        #   "gateway_version": "v1.2.0",         # added
+        #   "api_version": "v1"                  # added
+        #   # internal_id removed
+        # }
+        #
+        # 3. Backend Response:
+        # {
+        #   "id": 123,
+        #   "name": "Alice",
+        #   "email": "alice@example.com",
+        #   "password": "hashed",
+        #   "ssn": "123-45-6789",
+        #   "created_at": "2025-01-01T00:00:00Z"
+        # }
+        #
+        # 4. After Response Transformation:
+        # {
+        #   "id": 123,
+        #   "name": "Alice",
+        #   "email": "alice@example.com",
+        #   "created_at": "2025-01-01T00:00:00Z",
+        #   "response_timestamp": "2025-01-18T14:30:00Z",  # added
+        #   "response_id": "770fa600...",                  # added
+        #   "server_version": "v1.2.0",                    # added
+        #   "server_region": "eu-west-1",                  # added
+        #   "processing_time_ms": 50                       # added
+        #   # password removed
+        #   # ssn removed
+        # }
