@@ -20,6 +20,15 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Verify RELEASE_NOTES.md exists
+      run: |
+        if [ ! -f RELEASE_NOTES.md ]; then
+          echo "ERROR: RELEASE_NOTES.md not found!"
+          exit 1
+        fi
+        echo "RELEASE_NOTES.md found, size: $(wc -c < RELEASE_NOTES.md) bytes"
+        echo "First line: $(head -n 1 RELEASE_NOTES.md)"
+
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
