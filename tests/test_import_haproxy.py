@@ -348,7 +348,7 @@ backend app
 
         assert config.services[0].upstream.health_check is not None
         assert config.services[0].upstream.health_check.active is not None
-        assert config.services[0].upstream.health_check.active.path == "/"
+        assert config.services[0].upstream.health_check.active.http_path == "/"
 
     def test_import_httpchk_with_path(self):
         """Test importing HTTP health check with custom path."""
@@ -362,7 +362,7 @@ backend app
 
         config = provider.parse(haproxy_cfg)
 
-        assert config.services[0].upstream.health_check.active.path == "/health"
+        assert config.services[0].upstream.health_check.active.http_path == "/health"
 
     def test_import_http_check_v2(self):
         """Test importing HAProxy 2.0+ http-check syntax."""
@@ -415,9 +415,10 @@ backend app
 
         config = provider.parse(haproxy_cfg)
 
-        assert config.services[0].headers is not None
-        assert "X-Forwarded-For" in config.services[0].headers.add
-        assert "X-Custom-Header" in config.services[0].headers.add
+        assert config.services[0].transformation is not None
+        assert config.services[0].transformation.headers is not None
+        assert "X-Forwarded-For" in config.services[0].transformation.headers.request_add
+        assert "X-Custom-Header" in config.services[0].transformation.headers.request_add
 
 
 class TestHAProxyImportRouting:
@@ -572,7 +573,8 @@ backend app_backend
         assert api_service.upstream.load_balancer.algorithm == "round_robin"
         assert len(api_service.upstream.targets) == 2
         assert api_service.upstream.health_check is not None
-        assert api_service.headers is not None
+        assert api_service.transformation is not None
+        assert api_service.transformation.headers is not None
 
         # Verify app_backend sticky sessions
         app_service = next(s for s in config.services if s.name == "app_backend")

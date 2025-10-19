@@ -21,6 +21,7 @@ from gal.config import (
     ActiveHealthCheck,
     HeaderManipulation,
     RateLimitConfig,
+    Transformation,
 )
 from gal.provider import Provider
 from gal.parsers.haproxy_parser import HAProxyConfigParser, HAProxySection, SectionType
@@ -743,7 +744,14 @@ class HAProxyProvider(Provider):
                 # HAProxy 2.0+ health check syntax
                 if not health_check:
                     health_check = HealthCheckConfig(
-                        active=ActiveHealthCheck(path="/", interval="10s", timeout="5s")
+                        active=ActiveHealthCheck(
+                            enabled=True,
+                            http_path="/",
+                            interval="10s",
+                            timeout="5s",
+                            healthy_threshold=3,
+                            unhealthy_threshold=2,
+                        )
                     )
 
             elif directive["name"] == "cookie":
@@ -756,11 +764,11 @@ class HAProxyProvider(Provider):
             elif directive["name"] == "http-request" and "set-header" in directive["value"]:
                 # Header manipulation
                 if not headers_config:
-                    headers_config = HeaderManipulation(add={})
+                    headers_config = HeaderManipulation(request_add={})
                 header_match = re.search(r'set-header\s+(\S+)\s+(.+)', directive["value"])
                 if header_match:
                     header_name, header_value = header_match.groups()
-                    headers_config.add[header_name] = header_value.strip('"')
+                    headers_config.request_add[header_name] = header_value.strip('"')
 
         # Build upstream
         upstream = Upstream(
@@ -776,13 +784,18 @@ class HAProxyProvider(Provider):
         # Find routes from frontends
         routes = self._find_routes_for_backend(name, frontends)
 
+        # Create transformation if headers are present
+        transformation = None
+        if headers_config:
+            transformation = Transformation(headers=headers_config)
+
         return Service(
             name=name,
             type="rest",  # HAProxy is HTTP-focused
             protocol="http",
             upstream=upstream,
             routes=routes if routes else [Route(path_prefix="/")],
-            headers=headers_config,
+            transformation=transformation,
         )
 
     def _parse_listen(self, listen: HAProxySection) -> Optional[Service]:
@@ -859,12 +872,16 @@ class HAProxyProvider(Provider):
 
         # Parse options (weight, check, etc.)
         weight = 1
-        for part in parts[2:]:
-            if part.startswith("weight"):
+        i = 2
+        while i < len(parts):
+            if parts[i] == "weight" and i + 1 < len(parts):
                 try:
-                    weight = int(part.split()[1])
-                except (IndexError, ValueError):
+                    weight = int(parts[i + 1])
+                except ValueError:
                     pass
+                i += 2
+            else:
+                i += 1
 
         return UpstreamTarget(host=host, port=int(port), weight=weight)
 
@@ -912,7 +929,8 @@ class HAProxyProvider(Provider):
 
         return HealthCheckConfig(
             active=ActiveHealthCheck(
-                path=path,
+                enabled=True,
+                http_path=path,
                 interval="10s",
                 timeout="5s",
                 healthy_threshold=3,
