@@ -21,17 +21,20 @@ from ..config import (
     Config,
     CORSPolicy,
     GlobalConfig,
+    GrpcTransformation,
     HeaderManipulation,
     HealthCheckConfig,
     JwtConfig,
     LoadBalancerConfig,
     PassiveHealthCheck,
+    ProtoDescriptor,
     RateLimitConfig,
     Route,
     Service,
     Upstream,
     UpstreamTarget,
 )
+from ..proto_manager import ProtoManager
 from ..provider import Provider
 
 logger = logging.getLogger(__name__)
@@ -215,6 +218,14 @@ class APISIXProvider(Provider):
                 ):
                     if "plugins" not in route_config:
                         route_config["plugins"] = {}
+
+                # Add gRPC transformation plugin if configured
+                if route.grpc_transformation and route.grpc_transformation.enabled:
+                    if "plugins" not in route_config:
+                        route_config["plugins"] = {}
+                    route_config["plugins"]["serverless-pre-function"] = self._generate_grpc_transformation_apisix(
+                        route, config
+                    )
 
                 # Add authentication plugin if configured
                 if route.authentication and route.authentication.enabled:
@@ -649,6 +660,103 @@ class APISIXProvider(Provider):
         lua_code.append("end")
 
         return "\n".join(lua_code)
+
+    def _generate_grpc_transformation_apisix(self, route: Route, config: Config) -> Dict[str, Any]:
+        """Generate APISIX serverless-pre-function plugin for gRPC transformation.
+
+        Creates plugin configuration with Lua code for gRPC message transformation
+        using lua-protobuf library.
+
+        Args:
+            route: Route with grpc_transformation configuration
+            config: Full config with proto_descriptors
+
+        Returns:
+            Dict with phase and functions keys for serverless-pre-function plugin
+        """
+        grpc_t = route.grpc_transformation
+
+        # Initialize ProtoManager and get descriptor
+        proto_manager = ProtoManager()
+        for descriptor in config.proto_descriptors:
+            proto_manager.register_descriptor(descriptor)
+
+        descriptor = proto_manager.get_descriptor(grpc_t.proto_descriptor)
+        if not descriptor:
+            logger.warning(
+                f"Proto descriptor '{grpc_t.proto_descriptor}' not found for route {route.path_prefix}"
+            )
+            return {"phase": "rewrite", "functions": ["return function(conf, ctx) end"]}
+
+        full_request_type = f"{grpc_t.package}.{grpc_t.request_type}"
+
+        # Generate Lua code
+        lua_code = []
+        lua_code.append("return function(conf, ctx)")
+        lua_code.append("  local core = require('apisix.core')")
+        lua_code.append("  local pb = require('pb')")
+        lua_code.append("")
+        lua_code.append("  -- Load proto descriptor")
+        lua_code.append(f"  local desc_file = io.open('{descriptor.path}', 'rb')")
+        lua_code.append("  if desc_file then")
+        lua_code.append("    local desc_content = desc_file:read('*all')")
+        lua_code.append("    desc_file:close()")
+        lua_code.append("    pb.load(desc_content)")
+        lua_code.append("  end")
+        lua_code.append("")
+        lua_code.append("  -- Get request body")
+        lua_code.append("  local body = core.request.get_body()")
+        lua_code.append("  if body and #body > 5 then")
+        lua_code.append("    -- Skip gRPC 5-byte header")
+        lua_code.append("    local grpc_header = body:sub(1, 5)")
+        lua_code.append("    local pb_data = body:sub(6)")
+        lua_code.append("")
+        lua_code.append("    -- Decode protobuf message")
+        lua_code.append(f"    local msg = pb.decode('{full_request_type}', pb_data)")
+        lua_code.append("    if msg then")
+
+        # Apply transformations
+        if grpc_t.request_transform:
+            transform = grpc_t.request_transform
+
+            # Add fields
+            if transform.add_fields:
+                lua_code.append("      -- Add fields")
+                for key, value in transform.add_fields.items():
+                    if value == "{{uuid}}":
+                        lua_code.append(f"      msg.{key} = core.utils.uuid()")
+                    elif value in ["{{timestamp}}", "{{now}}"]:
+                        lua_code.append(f"      msg.{key} = os.time()")
+                    elif isinstance(value, str):
+                        lua_code.append(f"      msg.{key} = '{value}'")
+                    else:
+                        lua_code.append(f"      msg.{key} = {value}")
+
+            # Remove fields
+            if transform.remove_fields:
+                lua_code.append("      -- Remove fields")
+                for field in transform.remove_fields:
+                    lua_code.append(f"      msg.{field} = nil")
+
+            # Rename fields
+            if transform.rename_fields:
+                lua_code.append("      -- Rename fields")
+                for old_name, new_name in transform.rename_fields.items():
+                    lua_code.append(f"      if msg.{old_name} ~= nil then")
+                    lua_code.append(f"        msg.{new_name} = msg.{old_name}")
+                    lua_code.append(f"        msg.{old_name} = nil")
+                    lua_code.append("      end")
+
+        lua_code.append("")
+        lua_code.append("      -- Re-encode protobuf message")
+        lua_code.append(f"      local new_pb = pb.encode('{full_request_type}', msg)")
+        lua_code.append("      local new_body = grpc_header .. new_pb")
+        lua_code.append("      ngx.req.set_body_data(new_body)")
+        lua_code.append("    end")
+        lua_code.append("  end")
+        lua_code.append("end")
+
+        return {"phase": "rewrite", "functions": ["\n".join(lua_code)]}
 
     def _generate_body_transformation_request_lua(self, request_transform) -> str:
         """Generate Lua script for request body transformation.

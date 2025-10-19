@@ -16,16 +16,19 @@ from ..config import (
     Config,
     CORSPolicy,
     GlobalConfig,
+    GrpcTransformation,
     HeaderManipulation,
     HealthCheckConfig,
     LoadBalancerConfig,
     PassiveHealthCheck,
+    ProtoDescriptor,
     RateLimitConfig,
     Route,
     Service,
     Upstream,
     UpstreamTarget,
 )
+from ..proto_manager import ProtoManager
 from ..provider import Provider
 
 logger = logging.getLogger(__name__)
@@ -439,6 +442,10 @@ class NginxProvider(Provider):
         if route.body_transformation and route.body_transformation.enabled:
             self._generate_body_transformation(route, output)
 
+        # gRPC transformation (requires OpenResty + lua-protobuf)
+        if route.grpc_transformation and route.grpc_transformation.enabled:
+            self._generate_grpc_transformation_nginx(service, route, config, output)
+
         # Proxy pass to upstream or direct backend
         self._generate_proxy_pass(service, route, output)
 
@@ -801,6 +808,171 @@ class NginxProvider(Provider):
             output.append("            }")
 
         output.append("")
+
+    def _generate_grpc_transformation_nginx(
+        self, service: Service, route: Route, config: Config, output: List[str]
+    ) -> None:
+        """Generate OpenResty Lua blocks for gRPC transformation.
+
+        Generates access_by_lua_block for request transformation and
+        body_filter_by_lua_block for response transformation using lua-protobuf.
+
+        Args:
+            service: Service configuration
+            route: Route configuration
+            config: Full configuration with proto_descriptors
+            output: Output buffer to append to
+
+        Note:
+            Requires OpenResty with lua-protobuf installed
+        """
+        grpc_t = route.grpc_transformation
+
+        # Initialize ProtoManager and get descriptor
+        proto_manager = ProtoManager()
+        for descriptor in config.proto_descriptors:
+            proto_manager.register_descriptor(descriptor)
+
+        descriptor = proto_manager.get_descriptor(grpc_t.proto_descriptor)
+        if not descriptor:
+            logger.warning(
+                f"Proto descriptor '{grpc_t.proto_descriptor}' not found for route {route.path_prefix}"
+            )
+            output.append("")
+            output.append(
+                f"            # WARNING: Proto descriptor '{grpc_t.proto_descriptor}' not found"
+            )
+            return
+
+        full_request_type = f"{grpc_t.package}.{grpc_t.request_type}"
+        full_response_type = f"{grpc_t.package}.{grpc_t.response_type}"
+
+        # Request transformation
+        if grpc_t.request_transform:
+            output.append("")
+            output.append("            # gRPC Request transformation (requires OpenResty + lua-protobuf)")
+            output.append("            access_by_lua_block {")
+            output.append("                local pb = require('pb')")
+            output.append("")
+            output.append("                -- Load proto descriptor")
+            output.append(f"                local desc_file = io.open('{descriptor.path}', 'rb')")
+            output.append("                if desc_file then")
+            output.append("                    local desc_content = desc_file:read('*all')")
+            output.append("                    desc_file:close()")
+            output.append("                    pb.load(desc_content)")
+            output.append("                end")
+            output.append("")
+            output.append("                -- Read gRPC request body")
+            output.append("                ngx.req.read_body()")
+            output.append("                local body_data = ngx.req.get_body_data()")
+            output.append("")
+            output.append("                if body_data and #body_data > 5 then")
+            output.append("                    -- Skip gRPC 5-byte header")
+            output.append("                    local grpc_header = body_data:sub(1, 5)")
+            output.append("                    local pb_data = body_data:sub(6)")
+            output.append("")
+            output.append("                    -- Decode protobuf message")
+            output.append(f"                    local msg = pb.decode('{full_request_type}', pb_data)")
+            output.append("")
+            output.append("                    if msg then")
+
+            # Generate transformation code
+            transform = grpc_t.request_transform
+
+            # Add fields
+            if transform.add_fields:
+                output.append("                        -- Add fields")
+                for key, value in transform.add_fields.items():
+                    if value == "{{uuid}}":
+                        output.append(f"                        msg.{key} = ngx.var.request_id")
+                    elif value in ["{{timestamp}}", "{{now}}"]:
+                        output.append(f"                        msg.{key} = ngx.time()")
+                    elif isinstance(value, str):
+                        output.append(f"                        msg.{key} = '{value}'")
+                    else:
+                        output.append(f"                        msg.{key} = {value}")
+
+            # Remove fields
+            if transform.remove_fields:
+                output.append("                        -- Remove fields")
+                for field in transform.remove_fields:
+                    output.append(f"                        msg.{field} = nil")
+
+            # Rename fields
+            if transform.rename_fields:
+                output.append("                        -- Rename fields")
+                for old_name, new_name in transform.rename_fields.items():
+                    output.append(f"                        if msg.{old_name} ~= nil then")
+                    output.append(f"                            msg.{new_name} = msg.{old_name}")
+                    output.append(f"                            msg.{old_name} = nil")
+                    output.append("                        end")
+
+            output.append("")
+            output.append("                        -- Re-encode protobuf message")
+            output.append(f"                        local new_pb = pb.encode('{full_request_type}', msg)")
+            output.append("                        local new_body = grpc_header .. new_pb")
+            output.append("                        ngx.req.set_body_data(new_body)")
+            output.append("                    end")
+            output.append("                end")
+            output.append("            }")
+
+        # Response transformation
+        if grpc_t.response_transform:
+            output.append("")
+            output.append("            # gRPC Response transformation (requires OpenResty + lua-protobuf)")
+            output.append("            body_filter_by_lua_block {")
+            output.append("                local pb = require('pb')")
+            output.append("")
+            output.append("                -- Load proto descriptor")
+            output.append(f"                local desc_file = io.open('{descriptor.path}', 'rb')")
+            output.append("                if desc_file then")
+            output.append("                    local desc_content = desc_file:read('*all')")
+            output.append("                    desc_file:close()")
+            output.append("                    pb.load(desc_content)")
+            output.append("                end")
+            output.append("")
+            output.append("                -- Read gRPC response body")
+            output.append("                local chunk = ngx.arg[1]")
+            output.append("")
+            output.append("                if chunk and #chunk > 5 then")
+            output.append("                    -- Skip gRPC 5-byte header")
+            output.append("                    local grpc_header = chunk:sub(1, 5)")
+            output.append("                    local pb_data = chunk:sub(6)")
+            output.append("")
+            output.append("                    -- Decode protobuf message")
+            output.append(f"                    local msg = pb.decode('{full_response_type}', pb_data)")
+            output.append("")
+            output.append("                    if msg then")
+
+            # Generate transformation code
+            transform = grpc_t.response_transform
+
+            # Filter fields
+            if transform.filter_fields:
+                output.append("                        -- Filter (remove) sensitive fields")
+                for field in transform.filter_fields:
+                    output.append(f"                        msg.{field} = nil")
+
+            # Add fields
+            if transform.add_fields:
+                output.append("                        -- Add metadata fields")
+                for key, value in transform.add_fields.items():
+                    if value == "{{uuid}}":
+                        output.append(f"                        msg.{key} = ngx.var.request_id")
+                    elif value in ["{{timestamp}}", "{{now}}"]:
+                        output.append(f"                        msg.{key} = ngx.time()")
+                    elif isinstance(value, str):
+                        output.append(f"                        msg.{key} = '{value}'")
+                    else:
+                        output.append(f"                        msg.{key} = {value}")
+
+            output.append("")
+            output.append("                        -- Re-encode protobuf message")
+            output.append(f"                        local new_pb = pb.encode('{full_response_type}', msg)")
+            output.append("                        ngx.arg[1] = grpc_header .. new_pb")
+            output.append("                    end")
+            output.append("                end")
+            output.append("            }")
 
     def _convert_template_value(self, value: str) -> str:
         """Convert GAL template variables to Nginx variables.

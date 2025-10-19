@@ -16,14 +16,17 @@ from ..config import (
     ActiveHealthCheck,
     Config,
     GlobalConfig,
+    GrpcTransformation,
     HealthCheckConfig,
     LoadBalancerConfig,
     PassiveHealthCheck,
+    ProtoDescriptor,
     Route,
     Service,
     Upstream,
     UpstreamTarget,
 )
+from ..proto_manager import ProtoManager
 from ..provider import Provider
 
 logger = logging.getLogger(__name__)
@@ -531,6 +534,21 @@ class EnvoyProvider(Provider):
             output.append("                    key: x-local-rate-limit")
             output.append("                    value: 'true'")
             output.append(f"              status_code: {first_rate_limit.response_status}")
+
+        # Add gRPC transformation filter if any route has gRPC transformation enabled
+        has_grpc_transformations = any(
+            route.grpc_transformation and route.grpc_transformation.enabled
+            for service in config.services
+            for route in service.routes
+        )
+        if has_grpc_transformations:
+            # Initialize ProtoManager and register descriptors
+            proto_manager = ProtoManager()
+            for descriptor in config.proto_descriptors:
+                proto_manager.register_descriptor(descriptor)
+
+            # Generate gRPC transformation Lua filter
+            self._generate_grpc_transformation_envoy(config, proto_manager, output)
 
         # Add body transformation filter if any route has body transformation enabled
         has_body_transformations = any(
@@ -1074,6 +1092,287 @@ class EnvoyProvider(Provider):
             output.append("              socket_address:")
             output.append(f"                address: {service.upstream.host}")
             output.append(f"                port_value: {service.upstream.port}")
+
+    def _generate_grpc_transformation_envoy(
+        self, config: Config, proto_manager: ProtoManager, output: list
+    ) -> None:
+        """Generate Envoy Lua filter for gRPC transformations.
+
+        Creates Envoy HTTP Lua filter with lua-protobuf library for decoding/encoding
+        gRPC messages and applying transformations (add/remove/rename fields).
+
+        Args:
+            config: Configuration with gRPC transformations
+            proto_manager: ProtoManager with registered descriptors
+            output: Output list to append YAML lines to
+
+        Side Effects:
+            Appends Lua filter configuration to output list
+        """
+        output.append("          - name: envoy.filters.http.lua")
+        output.append("            typed_config:")
+        output.append(
+            "              '@type': type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua"
+        )
+        output.append("              inline_code: |")
+        output.append("                -- gRPC Transformation Filter")
+        output.append("                local pb = require('pb')")
+        output.append("")
+        output.append("                -- Proto Descriptors (lazy loading)")
+        output.append("                local _proto_loaded = {}")
+        output.append("")
+
+        # Helper functions
+        output.append("                -- Load proto descriptor (cached)")
+        output.append("                function load_proto(desc_path, proto_name)")
+        output.append("                  if not _proto_loaded[proto_name] then")
+        output.append("                    local file = io.open(desc_path, 'rb')")
+        output.append("                    if file then")
+        output.append("                      local content = file:read('*all')")
+        output.append("                      file:close()")
+        output.append("                      pb.load(content)")
+        output.append("                      _proto_loaded[proto_name] = true")
+        output.append("                    end")
+        output.append("                  end")
+        output.append("                end")
+        output.append("")
+        output.append("                -- Generate UUID (Envoy request ID)")
+        output.append("                function generate_uuid(request_handle)")
+        output.append("                  return request_handle:headers():get('x-request-id') or 'unknown'")
+        output.append("                end")
+        output.append("")
+        output.append("                -- Get timestamp")
+        output.append("                function get_timestamp()")
+        output.append("                  return os.time()")
+        output.append("                end")
+        output.append("")
+
+        # Request transformation
+        output.append("                -- Request transformation")
+        output.append("                function envoy_on_request(request_handle)")
+        output.append("                  local path = request_handle:headers():get(':path')")
+        output.append("")
+
+        # Generate transformation logic per route
+        for service in config.services:
+            for route in service.routes:
+                if route.grpc_transformation and route.grpc_transformation.enabled:
+                    grpc_t = route.grpc_transformation
+
+                    # Get descriptor path
+                    descriptor = proto_manager.get_descriptor(grpc_t.proto_descriptor)
+                    if not descriptor:
+                        logger.warning(
+                            f"Proto descriptor '{grpc_t.proto_descriptor}' not found for route {route.path_prefix}"
+                        )
+                        continue
+
+                    output.append(
+                        f"                  -- gRPC transformation for {service.name} {route.path_prefix}"
+                    )
+                    output.append(f"                  if string.find(path, '{route.path_prefix}') then")
+
+                    # Load proto descriptor
+                    output.append(
+                        f"                    load_proto('{descriptor.path}', '{grpc_t.proto_descriptor}')"
+                    )
+
+                    # Get body
+                    output.append("                    local body = request_handle:body()")
+                    output.append("                    if body and body:length() > 5 then")
+                    output.append(
+                        "                      -- Skip gRPC 5-byte header (compression flag + message length)"
+                    )
+                    output.append("                      local grpc_header = body:getBytes(0, 5)")
+                    output.append("                      local pb_bytes = body:getBytes(5, body:length() - 5)")
+                    output.append("")
+
+                    # Decode message
+                    full_request_type = f"{grpc_t.package}.{grpc_t.request_type}"
+                    output.append("                      -- Decode protobuf message")
+                    output.append(
+                        f"                      local msg = pb.decode('{full_request_type}', pb_bytes)"
+                    )
+                    output.append("                      if msg then")
+
+                    # Apply transformations
+                    if grpc_t.request_transform:
+                        transform_lua = self._generate_request_transform_lua_grpc(
+                            grpc_t.request_transform
+                        )
+                        for line in transform_lua.split("\n"):
+                            output.append(f"                        {line}")
+
+                    # Re-encode
+                    output.append("")
+                    output.append("                        -- Re-encode protobuf message")
+                    output.append(
+                        f"                        local new_pb = pb.encode('{full_request_type}', msg)"
+                    )
+                    output.append(
+                        "                        local new_body = grpc_header .. new_pb"
+                    )
+                    output.append("                        request_handle:body():setBytes(new_body)")
+                    output.append("                      else")
+                    output.append(
+                        "                        request_handle:logErr('Failed to decode gRPC message')"
+                    )
+                    output.append("                      end")
+                    output.append("                    end")
+                    output.append("                  end")
+                    output.append("")
+
+        output.append("                end")
+        output.append("")
+
+        # Response transformation
+        output.append("                -- Response transformation")
+        output.append("                function envoy_on_response(response_handle)")
+        output.append("                  local path = response_handle:headers():get(':path')")
+        output.append("")
+
+        # Generate response transformation logic per route
+        for service in config.services:
+            for route in service.routes:
+                if route.grpc_transformation and route.grpc_transformation.enabled:
+                    grpc_t = route.grpc_transformation
+
+                    descriptor = proto_manager.get_descriptor(grpc_t.proto_descriptor)
+                    if not descriptor:
+                        continue
+
+                    if grpc_t.response_transform:
+                        output.append(
+                            f"                  -- gRPC response transformation for {service.name} {route.path_prefix}"
+                        )
+                        output.append(
+                            f"                  if string.find(path, '{route.path_prefix}') then"
+                        )
+
+                        # Load proto
+                        output.append(
+                            f"                    load_proto('{descriptor.path}', '{grpc_t.proto_descriptor}')"
+                        )
+
+                        # Get body
+                        output.append("                    local body = response_handle:body()")
+                        output.append("                    if body and body:length() > 5 then")
+                        output.append("                      local grpc_header = body:getBytes(0, 5)")
+                        output.append(
+                            "                      local pb_bytes = body:getBytes(5, body:length() - 5)"
+                        )
+
+                        # Decode
+                        full_response_type = f"{grpc_t.package}.{grpc_t.response_type}"
+                        output.append(
+                            f"                      local msg = pb.decode('{full_response_type}', pb_bytes)"
+                        )
+                        output.append("                      if msg then")
+
+                        # Apply transformations
+                        transform_lua = self._generate_response_transform_lua_grpc(
+                            grpc_t.response_transform
+                        )
+                        for line in transform_lua.split("\n"):
+                            output.append(f"                        {line}")
+
+                        # Re-encode
+                        output.append("")
+                        output.append(
+                            f"                        local new_pb = pb.encode('{full_response_type}', msg)"
+                        )
+                        output.append(
+                            "                        local new_body = grpc_header .. new_pb"
+                        )
+                        output.append("                        response_handle:body():setBytes(new_body)")
+                        output.append("                      end")
+                        output.append("                    end")
+                        output.append("                  end")
+                        output.append("")
+
+        output.append("                end")
+
+    def _generate_request_transform_lua_grpc(self, transform) -> str:
+        """Generate Lua code for gRPC request transformations.
+
+        Args:
+            transform: RequestBodyTransformation config
+
+        Returns:
+            Lua code string for transforming protobuf messages
+        """
+        lua_lines = []
+
+        # Add fields
+        if transform.add_fields:
+            lua_lines.append("-- Add fields")
+            for key, value in transform.add_fields.items():
+                if value == "{{uuid}}":
+                    lua_lines.append(f"msg['{key}'] = generate_uuid(request_handle)")
+                elif value in ["{{timestamp}}", "{{now}}"]:
+                    lua_lines.append(f"msg['{key}'] = get_timestamp()")
+                else:
+                    # Static value
+                    if isinstance(value, str):
+                        lua_lines.append(f"msg['{key}'] = '{value}'")
+                    else:
+                        lua_lines.append(f"msg['{key}'] = {value}")
+
+        # Remove fields
+        if transform.remove_fields:
+            if lua_lines:
+                lua_lines.append("")
+            lua_lines.append("-- Remove fields")
+            for field in transform.remove_fields:
+                lua_lines.append(f"msg['{field}'] = nil")
+
+        # Rename fields
+        if transform.rename_fields:
+            if lua_lines:
+                lua_lines.append("")
+            lua_lines.append("-- Rename fields")
+            for old_name, new_name in transform.rename_fields.items():
+                lua_lines.append(f"if msg['{old_name}'] ~= nil then")
+                lua_lines.append(f"  msg['{new_name}'] = msg['{old_name}']")
+                lua_lines.append(f"  msg['{old_name}'] = nil")
+                lua_lines.append("end")
+
+        return "\n".join(lua_lines)
+
+    def _generate_response_transform_lua_grpc(self, transform) -> str:
+        """Generate Lua code for gRPC response transformations.
+
+        Args:
+            transform: ResponseBodyTransformation config
+
+        Returns:
+            Lua code string for transforming protobuf messages
+        """
+        lua_lines = []
+
+        # Filter (remove) fields
+        if transform.filter_fields:
+            lua_lines.append("-- Filter (remove) sensitive fields")
+            for field in transform.filter_fields:
+                lua_lines.append(f"msg['{field}'] = nil")
+
+        # Add fields
+        if transform.add_fields:
+            if lua_lines:
+                lua_lines.append("")
+            lua_lines.append("-- Add metadata fields")
+            for key, value in transform.add_fields.items():
+                if value == "{{uuid}}":
+                    lua_lines.append(f"msg['{key}'] = generate_uuid(response_handle)")
+                elif value in ["{{timestamp}}", "{{now}}"]:
+                    lua_lines.append(f"msg['{key}'] = get_timestamp()")
+                else:
+                    if isinstance(value, str):
+                        lua_lines.append(f"msg['{key}'] = '{value}'")
+                    else:
+                        lua_lines.append(f"msg['{key}'] = {value}")
+
+        return "\n".join(lua_lines)
 
     def deploy(
         self, config: Config, output_file: Optional[str] = None, admin_url: Optional[str] = None
