@@ -1208,9 +1208,9 @@ end
 ## Weitere Ressourcen
 
 - **Technische Spezifikation**: [docs/v1.4.0-GRPC-SPEC.md](../v1.4.0-GRPC-SPEC.md)
-- **API Referenz**: [gal/proto_manager.py](../../gal/proto_manager.py)
-- **Beispiele**: [examples/grpc-transformation-example.yaml](../../examples/grpc-transformation-example.yaml)
-- **Tests**: [tests/test_grpc_*.py](../../tests/)
+- **API Referenz**: [gal/proto_manager.py](https://github.com/pt9912/x-gal/blob/main/gal/proto_manager.py)
+- **Beispiele**: [examples/grpc-transformation-example.yaml](https://github.com/pt9912/x-gal/blob/main/examples/grpc-transformation-example.yaml)
+- **Tests**: [tests/test_grpc_*.py](https://github.com/pt9912/x-gal/tree/main/tests)
 
 **Protocol Buffers:**
 - Official Docs: https://protobuf.dev/
