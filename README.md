@@ -158,42 +158,49 @@ Jeder mit Transformationsregeln für:
 
 ## Unterstützte Provider
 
-| Provider | Status | Features |
-|----------|--------|----------|
-| Envoy | ✅ | Vollständige Unterstützung mit Wasm/Lua |
-| Kong | ✅ | Lua Plugins |
-| APISIX | ✅ | Lua Scripts |
-| Traefik | ✅ | Middleware |
-| Nginx | ✅ | Open Source (ngx_http-Module) |
-| HAProxy | ✅ | Erweiterte Load Balancing & ACLs |
+GAL unterstützt **7 API Gateway Provider**:
+
+- **Nginx** - nginx.conf mit Lua/njs Transformations
+- **Envoy** - YAML mit Lua Filters
+- **Kong** - YAML mit Plugins
+- **APISIX** - JSON/YAML mit Lua Serverless
+- **Traefik** - YAML/TOML mit Middleware
+- **HAProxy** - haproxy.cfg mit Lua
+- **Azure APIM** - ARM/JSON mit Policy XML (Cloud)
+
+➡️ **Detaillierte Provider-Übersicht**: Siehe [Dokumentation](docs/index.md#unterstützte-provider) für vollständige Feature-Matrix mit Output-Formaten, Transformations, Import/Export-Support und Deployment-Optionen.
 
 ## Projektstruktur
 
 ```
 x-gal/
-├── gal/
-│   ├── __init__.py
-│   ├── config.py              # Konfigurationsmodelle
+├── gal/                       # Core Library
+│   ├── config.py              # Konfigurationsmodelle (ProtoDescriptor, GrpcTransformation, etc.)
 │   ├── manager.py             # Haupt-Orchestrator
 │   ├── provider.py            # Provider-Interface
-│   ├── providers/
-│   │   ├── __init__.py
-│   │   ├── envoy.py
-│   │   ├── kong.py
-│   │   ├── apisix.py
-│   │   ├── traefik.py
-│   │   ├── nginx.py
-│   │   └── haproxy.py
-│   └── transformation/
-│       ├── __init__.py
-│       ├── engine.py
-│       └── generators.py
-├── gal-cli.py                 # CLI-Tool
-├── examples/
-│   └── gateway-config.yaml
-├── tests/
-└── docs/
+│   ├── proto_manager.py       # Proto Descriptor Manager (gRPC Transformations)
+│   ├── compatibility.py       # Provider Compatibility Checker
+│   ├── providers/             # 7 Gateway Provider Implementierungen
+│   │   ├── envoy.py           # Envoy Proxy (YAML + Lua Filters)
+│   │   ├── kong.py            # Kong Gateway (YAML + Plugins)
+│   │   ├── apisix.py          # Apache APISIX (JSON/YAML + Lua)
+│   │   ├── traefik.py         # Traefik (YAML/TOML + Middleware)
+│   │   ├── nginx.py           # Nginx/OpenResty (nginx.conf + Lua/njs)
+│   │   ├── haproxy.py         # HAProxy (haproxy.cfg + Lua)
+│   │   └── azure_apim.py      # Azure API Management (ARM/JSON + Policy XML)
+│   └── parsers/               # Config Import Parsers
+│       ├── haproxy_parser.py  # HAProxy Config Parser
+│       └── ...                # Other provider parsers
+├── gal-cli.py                 # CLI-Tool (generate, validate, import, migrate)
+├── examples/                  # YAML-Beispiele
+│   ├── gateway-config.yaml
+│   ├── azure-apim-example.yaml
+│   └── grpc-transformation-example.yaml
+├── tests/                     # 535 Tests (89% Coverage)
+└── docs/                      # Umfassende Dokumentation
 ```
+
+➡️ **Vollständige Architektur-Dokumentation**: Siehe [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) für detaillierte System-Design-Informationen.
 
 ## CLI-Befehle
 
