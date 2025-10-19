@@ -4,13 +4,14 @@ Parses HAProxy haproxy.cfg files into structured sections
 for conversion to GAL.
 """
 
-from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class SectionType(Enum):
     """HAProxy configuration section types."""
+
     GLOBAL = "global"
     DEFAULTS = "defaults"
     FRONTEND = "frontend"
@@ -21,6 +22,7 @@ class SectionType(Enum):
 @dataclass
 class HAProxySection:
     """Represents a HAProxy configuration section."""
+
     type: SectionType
     name: Optional[str]  # None for global/defaults
     directives: List[Dict[str, Any]] = field(default_factory=list)
@@ -77,20 +79,14 @@ class HAProxyConfigParser:
             if line.startswith("global"):
                 if current_section:
                     sections.append(current_section)
-                current_section = HAProxySection(
-                    type=SectionType.GLOBAL,
-                    name=None,
-                    directives=[]
-                )
+                current_section = HAProxySection(type=SectionType.GLOBAL, name=None, directives=[])
                 self.pos += 1
 
             elif line.startswith("defaults"):
                 if current_section:
                     sections.append(current_section)
                 current_section = HAProxySection(
-                    type=SectionType.DEFAULTS,
-                    name=None,
-                    directives=[]
+                    type=SectionType.DEFAULTS, name=None, directives=[]
                 )
                 self.pos += 1
 
@@ -100,9 +96,7 @@ class HAProxyConfigParser:
                 parts = line.split(maxsplit=1)
                 name = parts[1] if len(parts) > 1 else "unnamed"
                 current_section = HAProxySection(
-                    type=SectionType.FRONTEND,
-                    name=name,
-                    directives=[]
+                    type=SectionType.FRONTEND, name=name, directives=[]
                 )
                 self.pos += 1
 
@@ -111,11 +105,7 @@ class HAProxyConfigParser:
                     sections.append(current_section)
                 parts = line.split(maxsplit=1)
                 name = parts[1] if len(parts) > 1 else "unnamed"
-                current_section = HAProxySection(
-                    type=SectionType.BACKEND,
-                    name=name,
-                    directives=[]
-                )
+                current_section = HAProxySection(type=SectionType.BACKEND, name=name, directives=[])
                 self.pos += 1
 
             elif line.startswith("listen"):
@@ -123,11 +113,7 @@ class HAProxyConfigParser:
                     sections.append(current_section)
                 parts = line.split(maxsplit=1)
                 name = parts[1] if len(parts) > 1 else "unnamed"
-                current_section = HAProxySection(
-                    type=SectionType.LISTEN,
-                    name=name,
-                    directives=[]
-                )
+                current_section = HAProxySection(type=SectionType.LISTEN, name=name, directives=[])
                 self.pos += 1
 
             else:
@@ -155,15 +141,15 @@ class HAProxyConfigParser:
         """
         lines = []
 
-        for line in config_text.split('\n'):
+        for line in config_text.split("\n"):
             # Remove comments
-            if '#' in line:
-                line = line[:line.index('#')]
+            if "#" in line:
+                line = line[: line.index("#")]
 
             line = line.strip()
 
             # Handle line continuation (backslash at end)
-            if line.endswith('\\'):
+            if line.endswith("\\"):
                 # Multi-line directive - combine with next line
                 # For simplicity, we'll strip the backslash
                 line = line[:-1].strip()
@@ -190,12 +176,11 @@ class HAProxyConfigParser:
         directive_name = parts[0]
         directive_value = parts[1] if len(parts) > 1 else ""
 
-        return {
-            "name": directive_name,
-            "value": directive_value
-        }
+        return {"name": directive_name, "value": directive_value}
 
-    def get_sections_by_type(self, sections: List[HAProxySection], section_type: SectionType) -> List[HAProxySection]:
+    def get_sections_by_type(
+        self, sections: List[HAProxySection], section_type: SectionType
+    ) -> List[HAProxySection]:
         """Get all sections of a specific type.
 
         Args:
@@ -207,7 +192,9 @@ class HAProxyConfigParser:
         """
         return [s for s in sections if s.type == section_type]
 
-    def find_directive(self, section: HAProxySection, directive_name: str) -> Optional[Dict[str, Any]]:
+    def find_directive(
+        self, section: HAProxySection, directive_name: str
+    ) -> Optional[Dict[str, Any]]:
         """Find first directive with given name in section.
 
         Args:
@@ -222,7 +209,9 @@ class HAProxyConfigParser:
                 return directive
         return None
 
-    def find_all_directives(self, section: HAProxySection, directive_name: str) -> List[Dict[str, Any]]:
+    def find_all_directives(
+        self, section: HAProxySection, directive_name: str
+    ) -> List[Dict[str, Any]]:
         """Find all directives with given name in section.
 
         Args:

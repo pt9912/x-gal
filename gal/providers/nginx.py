@@ -883,14 +883,14 @@ class NginxProvider(Provider):
             if "#" in line:
                 # Simple approach: remove # and everything after if not in quotes
                 # This is simplified - full parser would handle quoted strings
-                line = re.sub(r'#.*$', '', line)
+                line = re.sub(r"#.*$", "", line)
             lines.append(line)
         return "\n".join(lines)
 
     def _extract_http_block(self, config_text: str) -> Optional[str]:
         """Extract http {} block from nginx config."""
         # Find http block
-        match = re.search(r'http\s*\{', config_text, re.MULTILINE)
+        match = re.search(r"http\s*\{", config_text, re.MULTILINE)
         if not match:
             return None
 
@@ -900,14 +900,14 @@ class NginxProvider(Provider):
         pos = start
 
         while pos < len(config_text) and depth > 0:
-            if config_text[pos] == '{':
+            if config_text[pos] == "{":
                 depth += 1
-            elif config_text[pos] == '}':
+            elif config_text[pos] == "}":
                 depth -= 1
             pos += 1
 
         if depth == 0:
-            return config_text[start:pos-1]
+            return config_text[start : pos - 1]
         return None
 
     def _parse_upstreams(self, http_block: str) -> Dict[str, Dict[str, Any]]:
@@ -915,27 +915,29 @@ class NginxProvider(Provider):
         upstreams = {}
 
         # Find all upstream blocks
-        for match in re.finditer(r'upstream\s+(\w+)\s*\{([^}]+)\}', http_block, re.MULTILINE | re.DOTALL):
+        for match in re.finditer(
+            r"upstream\s+(\w+)\s*\{([^}]+)\}", http_block, re.MULTILINE | re.DOTALL
+        ):
             upstream_name = match.group(1)
             upstream_body = match.group(2)
 
             # Parse upstream configuration
             upstream_config = {
-                'name': upstream_name,
-                'targets': [],
-                'algorithm': 'round_robin',  # Default
+                "name": upstream_name,
+                "targets": [],
+                "algorithm": "round_robin",  # Default
             }
 
             # Check for load balancing algorithm
-            if re.search(r'\bleast_conn\s*;', upstream_body):
-                upstream_config['algorithm'] = 'least_conn'
-            elif re.search(r'\bip_hash\s*;', upstream_body):
-                upstream_config['algorithm'] = 'ip_hash'
+            if re.search(r"\bleast_conn\s*;", upstream_body):
+                upstream_config["algorithm"] = "least_conn"
+            elif re.search(r"\bip_hash\s*;", upstream_body):
+                upstream_config["algorithm"] = "ip_hash"
 
             # Parse server directives
             for server_match in re.finditer(
-                r'server\s+([\w\.\-]+):(\d+)(?:\s+weight=(\d+))?(?:\s+max_fails=(\d+))?(?:\s+fail_timeout=(\w+))?',
-                upstream_body
+                r"server\s+([\w\.\-]+):(\d+)(?:\s+weight=(\d+))?(?:\s+max_fails=(\d+))?(?:\s+fail_timeout=(\w+))?",
+                upstream_body,
             ):
                 host = server_match.group(1)
                 port = int(server_match.group(2))
@@ -943,13 +945,15 @@ class NginxProvider(Provider):
                 max_fails = int(server_match.group(4)) if server_match.group(4) else None
                 fail_timeout = server_match.group(5) if server_match.group(5) else None
 
-                upstream_config['targets'].append({
-                    'host': host,
-                    'port': port,
-                    'weight': weight,
-                    'max_fails': max_fails,
-                    'fail_timeout': fail_timeout,
-                })
+                upstream_config["targets"].append(
+                    {
+                        "host": host,
+                        "port": port,
+                        "weight": weight,
+                        "max_fails": max_fails,
+                        "fail_timeout": fail_timeout,
+                    }
+                )
 
             upstreams[upstream_name] = upstream_config
 
@@ -961,29 +965,28 @@ class NginxProvider(Provider):
 
         # Pattern: limit_req_zone $binary_remote_addr zone=myzone:10m rate=10r/s;
         for match in re.finditer(
-            r'limit_req_zone\s+\$[\w_]+\s+zone=(\w+):[\w]+\s+rate=(\d+)r/([smhd])',
-            http_block
+            r"limit_req_zone\s+\$[\w_]+\s+zone=(\w+):[\w]+\s+rate=(\d+)r/([smhd])", http_block
         ):
             zone_name = match.group(1)
             rate = int(match.group(2))
             unit = match.group(3)
 
             # Convert to requests per second
-            if unit == 's':
+            if unit == "s":
                 requests_per_second = rate
-            elif unit == 'm':
+            elif unit == "m":
                 requests_per_second = rate / 60
-            elif unit == 'h':
+            elif unit == "h":
                 requests_per_second = rate / 3600
-            elif unit == 'd':
+            elif unit == "d":
                 requests_per_second = rate / 86400
             else:
                 requests_per_second = rate
 
             zones[zone_name] = {
-                'requests_per_second': requests_per_second,
-                'rate': rate,
-                'unit': unit,
+                "requests_per_second": requests_per_second,
+                "rate": rate,
+                "unit": unit,
             }
 
         return zones
@@ -992,13 +995,13 @@ class NginxProvider(Provider):
         self,
         http_block: str,
         upstreams: Dict[str, Dict[str, Any]],
-        rate_limit_zones: Dict[str, Dict[str, Any]]
+        rate_limit_zones: Dict[str, Dict[str, Any]],
     ) -> List[Service]:
         """Parse server blocks and create GAL services."""
         services = []
 
         # Find all server blocks using brace counting
-        server_blocks = self._extract_blocks(http_block, 'server')
+        server_blocks = self._extract_blocks(http_block, "server")
 
         for server_body in server_blocks:
             # Parse locations in this server
@@ -1011,7 +1014,7 @@ class NginxProvider(Provider):
     def _extract_blocks(self, text: str, block_name: str) -> List[str]:
         """Extract all blocks of a given type using brace counting."""
         blocks = []
-        pattern = rf'{block_name}\s+[^{{]*\{{'
+        pattern = rf"{block_name}\s+[^{{]*\{{"
 
         pos = 0
         while True:
@@ -1025,14 +1028,14 @@ class NginxProvider(Provider):
             curr_pos = start
 
             while curr_pos < len(text) and depth > 0:
-                if text[curr_pos] == '{':
+                if text[curr_pos] == "{":
                     depth += 1
-                elif text[curr_pos] == '}':
+                elif text[curr_pos] == "}":
                     depth -= 1
                 curr_pos += 1
 
             if depth == 0:
-                blocks.append(text[start:curr_pos-1])
+                blocks.append(text[start : curr_pos - 1])
 
             pos = curr_pos
 
@@ -1042,7 +1045,7 @@ class NginxProvider(Provider):
         self,
         server_body: str,
         upstreams: Dict[str, Dict[str, Any]],
-        rate_limit_zones: Dict[str, Dict[str, Any]]
+        rate_limit_zones: Dict[str, Dict[str, Any]],
     ) -> Optional[Service]:
         """Parse a single server block."""
         routes = []
@@ -1061,7 +1064,7 @@ class NginxProvider(Provider):
         # Extract proxy_pass to determine upstream (check all locations)
         upstream_name = None
         for _, location_body in location_blocks:
-            proxy_pass_match = re.search(r'proxy_pass\s+http://([\w_]+)', location_body)
+            proxy_pass_match = re.search(r"proxy_pass\s+http://([\w_]+)", location_body)
             if proxy_pass_match:
                 upstream_name = proxy_pass_match.group(1)
                 break
@@ -1075,34 +1078,33 @@ class NginxProvider(Provider):
             # No upstream found, create simple service
             service_name = "default_service"
         else:
-            service_name = upstream_config['name'].replace('upstream_', '')
+            service_name = upstream_config["name"].replace("upstream_", "")
 
             # Build upstream
             targets = []
-            for target_info in upstream_config['targets']:
-                targets.append(UpstreamTarget(
-                    host=target_info['host'],
-                    port=target_info['port'],
-                    weight=target_info.get('weight', 1)
-                ))
+            for target_info in upstream_config["targets"]:
+                targets.append(
+                    UpstreamTarget(
+                        host=target_info["host"],
+                        port=target_info["port"],
+                        weight=target_info.get("weight", 1),
+                    )
+                )
 
             # Health check (passive only for nginx OSS)
             health_check = None
-            if any(t.get('max_fails') for t in upstream_config['targets']):
-                max_fails = upstream_config['targets'][0].get('max_fails', 3)
+            if any(t.get("max_fails") for t in upstream_config["targets"]):
+                max_fails = upstream_config["targets"][0].get("max_fails", 3)
                 health_check = HealthCheckConfig(
-                    passive=PassiveHealthCheck(
-                        enabled=True,
-                        max_failures=max_fails
-                    )
+                    passive=PassiveHealthCheck(enabled=True, max_failures=max_fails)
                 )
 
             upstream = Upstream(
                 targets=targets,
                 load_balancer=LoadBalancerConfig(
-                    algorithm=upstream_config.get('algorithm', 'round_robin')
+                    algorithm=upstream_config.get("algorithm", "round_robin")
                 ),
-                health_check=health_check
+                health_check=health_check,
             )
 
         return Service(
@@ -1110,19 +1112,16 @@ class NginxProvider(Provider):
             type="rest",
             protocol="http",
             upstream=upstream if upstream_config else None,
-            routes=routes
+            routes=routes,
         )
 
     def _parse_location_block(
-        self,
-        path_prefix: str,
-        location_body: str,
-        rate_limit_zones: Dict[str, Dict[str, Any]]
+        self, path_prefix: str, location_body: str, rate_limit_zones: Dict[str, Dict[str, Any]]
     ) -> Optional[Route]:
         """Parse a single location block."""
         # Rate limiting
         rate_limit = None
-        limit_req_match = re.search(r'limit_req\s+zone=(\w+)(?:\s+burst=(\d+))?', location_body)
+        limit_req_match = re.search(r"limit_req\s+zone=(\w+)(?:\s+burst=(\d+))?", location_body)
         if limit_req_match:
             zone_name = limit_req_match.group(1)
             burst = int(limit_req_match.group(2)) if limit_req_match.group(2) else None
@@ -1131,9 +1130,9 @@ class NginxProvider(Provider):
             if zone_config:
                 rate_limit = RateLimitConfig(
                     enabled=True,
-                    requests_per_second=zone_config['requests_per_second'],
+                    requests_per_second=zone_config["requests_per_second"],
                     burst=burst,
-                    key_type="ip_address"
+                    key_type="ip_address",
                 )
 
         # Authentication (Basic Auth)
@@ -1143,9 +1142,7 @@ class NginxProvider(Provider):
                 f"Basic auth detected for {path_prefix} - htpasswd file not imported"
             )
             authentication = AuthenticationConfig(
-                enabled=True,
-                type="basic",
-                basic_auth=BasicAuthConfig(users={}, realm="Protected")
+                enabled=True, type="basic", basic_auth=BasicAuthConfig(users={}, realm="Protected")
             )
 
         # Headers
@@ -1159,7 +1156,7 @@ class NginxProvider(Provider):
             rate_limit=rate_limit,
             authentication=authentication,
             headers=headers,
-            cors=cors
+            cors=cors,
         )
 
     def _parse_headers(self, location_body: str) -> Optional[HeaderManipulation]:
@@ -1184,12 +1181,10 @@ class NginxProvider(Provider):
 
         return HeaderManipulation(
             request_add=request_add if request_add else None,
-            response_add=response_add if response_add else None
+            response_add=response_add if response_add else None,
         )
 
-    def _extract_cors_from_headers(
-        self, headers: HeaderManipulation
-    ) -> Optional[CORSPolicy]:
+    def _extract_cors_from_headers(self, headers: HeaderManipulation) -> Optional[CORSPolicy]:
         """Extract CORS config from response headers."""
         if not headers or not headers.response_add:
             return None
@@ -1204,11 +1199,7 @@ class NginxProvider(Provider):
 
         # Build CORS config
         allowed_origins_str = cors_headers.get("Access-Control-Allow-Origin", "*")
-        allowed_origins = (
-            [allowed_origins_str]
-            if allowed_origins_str != "*"
-            else ["*"]
-        )
+        allowed_origins = [allowed_origins_str] if allowed_origins_str != "*" else ["*"]
 
         allowed_methods_str = cors_headers.get(
             "Access-Control-Allow-Methods", "GET,POST,PUT,DELETE"
@@ -1217,14 +1208,10 @@ class NginxProvider(Provider):
 
         allowed_headers_str = cors_headers.get("Access-Control-Allow-Headers")
         allowed_headers = (
-            [h.strip() for h in allowed_headers_str.split(",")]
-            if allowed_headers_str
-            else None
+            [h.strip() for h in allowed_headers_str.split(",")] if allowed_headers_str else None
         )
 
-        allow_credentials = (
-            cors_headers.get("Access-Control-Allow-Credentials") == "true"
-        )
+        allow_credentials = cors_headers.get("Access-Control-Allow-Credentials") == "true"
 
         max_age = cors_headers.get("Access-Control-Max-Age", "86400")
 
@@ -1245,7 +1232,7 @@ class NginxProvider(Provider):
     def _extract_location_blocks(self, server_body: str) -> List[tuple]:
         """Extract location blocks with their paths."""
         locations = []
-        pattern = r'location\s+([\w/\-\.]+)\s*\{'
+        pattern = r"location\s+([\w/\-\.]+)\s*\{"
 
         pos = 0
         while True:
@@ -1261,14 +1248,14 @@ class NginxProvider(Provider):
             curr_pos = start
 
             while curr_pos < len(server_body) and depth > 0:
-                if server_body[curr_pos] == '{':
+                if server_body[curr_pos] == "{":
                     depth += 1
-                elif server_body[curr_pos] == '}':
+                elif server_body[curr_pos] == "}":
                     depth -= 1
                 curr_pos += 1
 
             if depth == 0:
-                location_body = server_body[start:curr_pos-1]
+                location_body = server_body[start : curr_pos - 1]
                 locations.append((path_prefix, location_body))
 
             pos = curr_pos

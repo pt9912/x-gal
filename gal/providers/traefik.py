@@ -780,9 +780,7 @@ class TraefikProvider(Provider):
         routes = []
         for router_name, router_config in traefik_routers.items():
             if router_config.get("service") == service_name:
-                route = self._parse_router(
-                    router_name, router_config, traefik_middlewares
-                )
+                route = self._parse_router(router_name, router_config, traefik_middlewares)
                 if route:
                     routes.append(route)
 
@@ -839,13 +837,9 @@ class TraefikProvider(Provider):
             middleware_config = traefik_middlewares[middleware_name]
 
             if "rateLimit" in middleware_config:
-                rate_limit = self._parse_rate_limit_middleware(
-                    middleware_config["rateLimit"]
-                )
+                rate_limit = self._parse_rate_limit_middleware(middleware_config["rateLimit"])
             elif "basicAuth" in middleware_config:
-                authentication = self._parse_basic_auth_middleware(
-                    middleware_config["basicAuth"]
-                )
+                authentication = self._parse_basic_auth_middleware(middleware_config["basicAuth"])
             elif "headers" in middleware_config:
                 headers = self._parse_headers_middleware(middleware_config["headers"])
             elif "addPrefix" in middleware_config or "stripPrefix" in middleware_config:
@@ -903,9 +897,7 @@ class TraefikProvider(Provider):
     def _parse_basic_auth_middleware(self, config: dict) -> AuthenticationConfig:
         """Parse Traefik basicAuth middleware."""
         # Users are hashed in Traefik, cannot import plaintext
-        self._import_warnings.append(
-            "Basic auth users are hashed - configure manually in GAL"
-        )
+        self._import_warnings.append("Basic auth users are hashed - configure manually in GAL")
 
         return AuthenticationConfig(
             enabled=True, type="basic", basic_auth=BasicAuthConfig(users={}, realm="Protected")
@@ -921,9 +913,7 @@ class TraefikProvider(Provider):
 
         return HeaderManipulation(request_add=request_add, response_add=response_add)
 
-    def _extract_cors_from_headers(
-        self, headers: HeaderManipulation
-    ) -> Optional[CORSPolicy]:
+    def _extract_cors_from_headers(self, headers: HeaderManipulation) -> Optional[CORSPolicy]:
         """Extract CORS config from response headers."""
         if not headers.response_add:
             return None
@@ -938,11 +928,7 @@ class TraefikProvider(Provider):
 
         # Build CORS config
         allowed_origins_str = cors_headers.get("Access-Control-Allow-Origin", "*")
-        allowed_origins = (
-            [allowed_origins_str]
-            if allowed_origins_str != "*"
-            else ["*"]
-        )
+        allowed_origins = [allowed_origins_str] if allowed_origins_str != "*" else ["*"]
 
         allowed_methods_str = cors_headers.get(
             "Access-Control-Allow-Methods", "GET,POST,PUT,DELETE"
@@ -952,9 +938,7 @@ class TraefikProvider(Provider):
         allowed_headers_str = cors_headers.get("Access-Control-Allow-Headers")
         allowed_headers = allowed_headers_str.split(",") if allowed_headers_str else None
 
-        allow_credentials = (
-            cors_headers.get("Access-Control-Allow-Credentials") == "true"
-        )
+        allow_credentials = cors_headers.get("Access-Control-Allow-Credentials") == "true"
 
         max_age = cors_headers.get("Access-Control-Max-Age", "86400")
 

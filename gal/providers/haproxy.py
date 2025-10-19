@@ -10,21 +10,21 @@ import re
 from typing import Any, Dict, List, Optional
 
 from gal.config import (
+    ActiveHealthCheck,
     Config,
     GlobalConfig,
+    HeaderManipulation,
+    HealthCheckConfig,
+    LoadBalancerConfig,
+    RateLimitConfig,
     Route,
     Service,
+    Transformation,
     Upstream,
     UpstreamTarget,
-    LoadBalancerConfig,
-    HealthCheckConfig,
-    ActiveHealthCheck,
-    HeaderManipulation,
-    RateLimitConfig,
-    Transformation,
 )
-from gal.provider import Provider
 from gal.parsers.haproxy_parser import HAProxyConfigParser, HAProxySection, SectionType
+from gal.provider import Provider
 
 logger = logging.getLogger(__name__)
 
@@ -658,7 +658,7 @@ class HAProxyProvider(Provider):
                 if directive["name"] == "bind":
                     # Parse bind directive: "bind *:80" or "bind 0.0.0.0:8080"
                     bind_value = directive["value"]
-                    match = re.match(r'([^:]+):(\d+)', bind_value)
+                    match = re.match(r"([^:]+):(\d+)", bind_value)
                     if match:
                         bind_host, bind_port = match.groups()
                         if bind_host != "*":
@@ -765,7 +765,7 @@ class HAProxyProvider(Provider):
                 # Header manipulation
                 if not headers_config:
                     headers_config = HeaderManipulation(request_add={})
-                header_match = re.search(r'set-header\s+(\S+)\s+(.+)', directive["value"])
+                header_match = re.search(r"set-header\s+(\S+)\s+(.+)", directive["value"])
                 if header_match:
                     header_name, header_value = header_match.groups()
                     headers_config.request_add[header_name] = header_value.strip('"')
@@ -773,11 +773,15 @@ class HAProxyProvider(Provider):
         # Build upstream
         upstream = Upstream(
             targets=targets,
-            load_balancer=LoadBalancerConfig(
-                algorithm=lb_algorithm,
-                sticky_sessions=sticky_sessions,
-                cookie_name=cookie_name,
-            ) if targets else None,
+            load_balancer=(
+                LoadBalancerConfig(
+                    algorithm=lb_algorithm,
+                    sticky_sessions=sticky_sessions,
+                    cookie_name=cookie_name,
+                )
+                if targets
+                else None
+            ),
             health_check=health_check,
         )
 
@@ -827,7 +831,7 @@ class HAProxyProvider(Provider):
             elif directive["name"] == "bind":
                 # Extract port from bind
                 bind_value = directive["value"]
-                match = re.match(r'[^:]+:(\d+)', bind_value)
+                match = re.match(r"[^:]+:(\d+)", bind_value)
                 if match:
                     bind_port = int(match.group(1))
 
@@ -864,7 +868,7 @@ class HAProxyProvider(Provider):
         address = parts[1]
 
         # Parse host:port
-        match = re.match(r'([^:]+):(\d+)', address)
+        match = re.match(r"([^:]+):(\d+)", address)
         if not match:
             return None
 
@@ -996,12 +1000,12 @@ class HAProxyProvider(Provider):
         """
         # Simple path extraction from ACL
         # Example: "backend_api if { path_beg /api }"
-        path_match = re.search(r'path_beg\s+(/\S+)', value)
+        path_match = re.search(r"path_beg\s+(/\S+)", value)
         if path_match:
             return Route(path_prefix=path_match.group(1))
 
         # Example: "backend_api if { path /api }"
-        path_match = re.search(r'path\s+(/\S+)', value)
+        path_match = re.search(r"path\s+(/\S+)", value)
         if path_match:
             return Route(path_prefix=path_match.group(1))
 

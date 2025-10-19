@@ -1,6 +1,7 @@
 """Tests for compatibility checking functionality."""
 
 import pytest
+
 from gal.compatibility import (
     CompatibilityChecker,
     CompatibilityReport,
@@ -8,22 +9,22 @@ from gal.compatibility import (
     FeatureSupport,
 )
 from gal.config import (
-    Config,
-    GlobalConfig,
-    Service,
-    Route,
-    Upstream,
-    LoadBalancerConfig,
-    HealthCheckConfig,
     ActiveHealthCheck,
-    PassiveHealthCheck,
-    RateLimitConfig,
+    ApiKeyConfig,
     AuthenticationConfig,
     BasicAuthConfig,
-    ApiKeyConfig,
-    JwtConfig,
-    CORSPolicy,
     CircuitBreakerConfig,
+    Config,
+    CORSPolicy,
+    GlobalConfig,
+    HealthCheckConfig,
+    JwtConfig,
+    LoadBalancerConfig,
+    PassiveHealthCheck,
+    RateLimitConfig,
+    Route,
+    Service,
+    Upstream,
 )
 
 
@@ -55,9 +56,7 @@ class TestFeatureCheck:
 
     def test_feature_check_defaults(self):
         """Test FeatureCheck with default values."""
-        check = FeatureCheck(
-            feature_name="test_feature", support=FeatureSupport.UNSUPPORTED
-        )
+        check = FeatureCheck(feature_name="test_feature", support=FeatureSupport.UNSUPPORTED)
         assert check.message == ""
         assert check.recommendation == ""
 

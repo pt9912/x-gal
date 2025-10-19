@@ -8,8 +8,8 @@ health checks, sticky sessions, and header manipulation.
 
 import pytest
 
-from gal.providers.haproxy import HAProxyProvider
 from gal.parsers.haproxy_parser import HAProxyConfigParser, SectionType
+from gal.providers.haproxy import HAProxyProvider
 
 
 class TestHAProxyParserBasic:

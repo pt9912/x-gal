@@ -5,6 +5,7 @@ Tests for Migration Assistant (gal migrate command)
 import os
 import sys
 from pathlib import Path
+
 import pytest
 from click.testing import CliRunner
 
@@ -583,7 +584,9 @@ services:
         assert result.exit_code == 0
         # Should complete even if not 100% compatible
 
-    def test_migrate_includes_compatibility_in_report(self, runner, kong_config_with_features, tmp_path):
+    def test_migrate_includes_compatibility_in_report(
+        self, runner, kong_config_with_features, tmp_path
+    ):
         """Test that compatibility info is in migration report"""
         output_dir = tmp_path / "migration"
 
@@ -609,7 +612,9 @@ services:
         assert "Compatibility:" in content
         assert "## Features Status" in content
 
-    def test_migrate_shows_warnings_for_partial_support(self, runner, kong_config_with_features, tmp_path):
+    def test_migrate_shows_warnings_for_partial_support(
+        self, runner, kong_config_with_features, tmp_path
+    ):
         """Test that migration shows warnings for partial support"""
         output_dir = tmp_path / "migration"
 
@@ -633,7 +638,7 @@ services:
         content = report_path.read_text()
 
         # Check report contains warning section
-        assert ("## Features Status" in content or "Warnings:" in content)
+        assert "## Features Status" in content or "Warnings:" in content
 
 
 class TestMigrateEdgeCases:

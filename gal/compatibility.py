@@ -6,14 +6,15 @@ compatibility across multiple providers.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
-from gal.config import Config, Service, Route
+from gal.config import Config, Route, Service
 
 
 class FeatureSupport(Enum):
     """Level of support for a feature."""
+
     FULL = "full"  # ✅ Fully supported
     PARTIAL = "partial"  # ⚠️ Partially supported / requires workarounds
     UNSUPPORTED = "unsupported"  # ❌ Not supported
@@ -22,6 +23,7 @@ class FeatureSupport(Enum):
 @dataclass
 class FeatureCheck:
     """Result of checking a single feature."""
+
     feature_name: str
     support: FeatureSupport
     message: str = ""
@@ -31,6 +33,7 @@ class FeatureCheck:
 @dataclass
 class CompatibilityReport:
     """Detailed compatibility report for a provider."""
+
     provider: str
     compatible: bool
     compatibility_score: float  # 0.0 to 1.0
@@ -237,7 +240,9 @@ class CompatibilityChecker:
                 compatible=False,
                 compatibility_score=0.0,
                 features_checked=0,
-                warnings=[f"Unknown provider: {provider_name}. Valid providers: {', '.join(valid_providers)}"],
+                warnings=[
+                    f"Unknown provider: {provider_name}. Valid providers: {', '.join(valid_providers)}"
+                ],
             )
 
         features_supported = []
@@ -260,7 +265,9 @@ class CompatibilityChecker:
                 check.message = f"✅ {self._get_feature_display_name(feature_name)} fully supported"
                 features_supported.append(check)
             elif support == FeatureSupport.PARTIAL:
-                check.message = f"⚠️ {self._get_feature_display_name(feature_name)} partially supported"
+                check.message = (
+                    f"⚠️ {self._get_feature_display_name(feature_name)} partially supported"
+                )
                 check.recommendation = self._get_feature_recommendation(feature_name, provider_name)
                 features_partial.append(check)
                 warnings.append(check.message)
@@ -281,9 +288,9 @@ class CompatibilityChecker:
         else:
             # Full support = 1.0, partial = 0.5, unsupported = 0.0
             score = (
-                len(features_supported) * 1.0 +
-                len(features_partial) * 0.5 +
-                len(features_unsupported) * 0.0
+                len(features_supported) * 1.0
+                + len(features_partial) * 0.5
+                + len(features_unsupported) * 0.0
             ) / total
             compatibility_score = score
 
@@ -302,9 +309,7 @@ class CompatibilityChecker:
             recommendations=recommendations,
         )
 
-    def compare_providers(
-        self, config: Config, providers: List[str]
-    ) -> List[CompatibilityReport]:
+    def compare_providers(self, config: Config, providers: List[str]) -> List[CompatibilityReport]:
         """Compare config compatibility across multiple providers.
 
         Args:
@@ -333,16 +338,26 @@ class CompatibilityChecker:
                 # Rate limiting
                 if route.rate_limit:
                     rl = route.rate_limit
-                    enabled = rl.get("enabled") if isinstance(rl, dict) else getattr(rl, "enabled", False)
+                    enabled = (
+                        rl.get("enabled") if isinstance(rl, dict) else getattr(rl, "enabled", False)
+                    )
                     if enabled:
                         features.add("rate_limiting")
 
                 # Authentication
                 if route.authentication:
                     auth = route.authentication
-                    enabled = auth.get("enabled") if isinstance(auth, dict) else getattr(auth, "enabled", False)
+                    enabled = (
+                        auth.get("enabled")
+                        if isinstance(auth, dict)
+                        else getattr(auth, "enabled", False)
+                    )
                     if enabled:
-                        auth_type = auth.get("type") if isinstance(auth, dict) else getattr(auth, "type", None)
+                        auth_type = (
+                            auth.get("type")
+                            if isinstance(auth, dict)
+                            else getattr(auth, "type", None)
+                        )
                         if auth_type == "basic":
                             features.add("authentication_basic")
                         elif auth_type == "api_key":
@@ -353,14 +368,20 @@ class CompatibilityChecker:
                 # CORS
                 if route.cors:
                     cors = route.cors
-                    enabled = cors.get("enabled") if isinstance(cors, dict) else getattr(cors, "enabled", False)
+                    enabled = (
+                        cors.get("enabled")
+                        if isinstance(cors, dict)
+                        else getattr(cors, "enabled", False)
+                    )
                     if enabled:
                         features.add("cors")
 
                 # Circuit breaker
                 if route.circuit_breaker:
                     cb = route.circuit_breaker
-                    enabled = cb.get("enabled") if isinstance(cb, dict) else getattr(cb, "enabled", False)
+                    enabled = (
+                        cb.get("enabled") if isinstance(cb, dict) else getattr(cb, "enabled", False)
+                    )
                     if enabled:
                         features.add("circuit_breaker")
 
@@ -380,7 +401,11 @@ class CompatibilityChecker:
                 if upstream.load_balancer:
                     lb = upstream.load_balancer
                     # Handle both dict and object forms
-                    algorithm = lb.get("algorithm") if isinstance(lb, dict) else getattr(lb, "algorithm", None)
+                    algorithm = (
+                        lb.get("algorithm")
+                        if isinstance(lb, dict)
+                        else getattr(lb, "algorithm", None)
+                    )
                     if algorithm == "round_robin":
                         features.add("load_balancing_round_robin")
                     elif algorithm == "least_conn":
@@ -389,7 +414,11 @@ class CompatibilityChecker:
                         features.add("load_balancing_ip_hash")
 
                     # Sticky sessions
-                    sticky = lb.get("sticky_sessions") if isinstance(lb, dict) else getattr(lb, "sticky_sessions", False)
+                    sticky = (
+                        lb.get("sticky_sessions")
+                        if isinstance(lb, dict)
+                        else getattr(lb, "sticky_sessions", False)
+                    )
                     if sticky:
                         features.add("sticky_sessions")
 
@@ -453,20 +482,65 @@ class CompatibilityChecker:
     def _get_feature_recommendation(self, feature_name: str, provider: str) -> str:
         """Get recommendation for unsupported/partial features."""
         recommendations = {
-            ("health_check_active", "traefik"): "Traefik OSS only supports passive health checks. Consider Traefik Enterprise or use passive checks.",
-            ("health_check_active", "nginx"): "Nginx OSS only supports passive health checks (max_fails/fail_timeout). Consider Nginx Plus or use passive checks.",
-            ("rate_limiting", "envoy"): "Envoy OSS rate limiting is global. For per-route limits, use external rate limit service.",
-            ("authentication_basic", "envoy"): "Basic auth requires Lua filter. Consider using external auth service (ext_authz).",
-            ("authentication_api_key", "envoy"): "API key auth requires Lua filter. Consider using external auth service (ext_authz).",
-            ("authentication_api_key", "traefik"): "API key auth requires forwardAuth middleware with external validator.",
-            ("authentication_api_key", "nginx"): "API key auth requires OpenResty with Lua scripting.",
-            ("authentication_jwt", "traefik"): "JWT auth requires forwardAuth middleware with external JWT validator.",
-            ("authentication_jwt", "nginx"): "JWT auth requires OpenResty with lua-resty-jwt library.",
-            ("authentication_jwt", "haproxy"): "JWT auth requires Lua scripting or external auth service.",
-            ("circuit_breaker", "kong"): "Circuit breaker requires third-party plugin (kong-circuit-breaker).",
-            ("circuit_breaker", "nginx"): "Circuit breaker not natively supported. Consider custom Lua implementation.",
-            ("circuit_breaker", "haproxy"): "Circuit breaker has limited support via 'observe layer7'. Consider using Envoy or APISIX.",
-            ("retry_policy", "nginx"): "Retry policy requires custom Lua implementation (OpenResty).",
-            ("load_balancing_ip_hash", "traefik"): "IP hash via sticky sessions with cookie. May not be true consistent hashing.",
+            (
+                "health_check_active",
+                "traefik",
+            ): "Traefik OSS only supports passive health checks. Consider Traefik Enterprise or use passive checks.",
+            (
+                "health_check_active",
+                "nginx",
+            ): "Nginx OSS only supports passive health checks (max_fails/fail_timeout). Consider Nginx Plus or use passive checks.",
+            (
+                "rate_limiting",
+                "envoy",
+            ): "Envoy OSS rate limiting is global. For per-route limits, use external rate limit service.",
+            (
+                "authentication_basic",
+                "envoy",
+            ): "Basic auth requires Lua filter. Consider using external auth service (ext_authz).",
+            (
+                "authentication_api_key",
+                "envoy",
+            ): "API key auth requires Lua filter. Consider using external auth service (ext_authz).",
+            (
+                "authentication_api_key",
+                "traefik",
+            ): "API key auth requires forwardAuth middleware with external validator.",
+            (
+                "authentication_api_key",
+                "nginx",
+            ): "API key auth requires OpenResty with Lua scripting.",
+            (
+                "authentication_jwt",
+                "traefik",
+            ): "JWT auth requires forwardAuth middleware with external JWT validator.",
+            (
+                "authentication_jwt",
+                "nginx",
+            ): "JWT auth requires OpenResty with lua-resty-jwt library.",
+            (
+                "authentication_jwt",
+                "haproxy",
+            ): "JWT auth requires Lua scripting or external auth service.",
+            (
+                "circuit_breaker",
+                "kong",
+            ): "Circuit breaker requires third-party plugin (kong-circuit-breaker).",
+            (
+                "circuit_breaker",
+                "nginx",
+            ): "Circuit breaker not natively supported. Consider custom Lua implementation.",
+            (
+                "circuit_breaker",
+                "haproxy",
+            ): "Circuit breaker has limited support via 'observe layer7'. Consider using Envoy or APISIX.",
+            (
+                "retry_policy",
+                "nginx",
+            ): "Retry policy requires custom Lua implementation (OpenResty).",
+            (
+                "load_balancing_ip_hash",
+                "traefik",
+            ): "IP hash via sticky sessions with cookie. May not be true consistent hashing.",
         }
         return recommendations.get((feature_name, provider), "")

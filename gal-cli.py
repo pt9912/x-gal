@@ -591,8 +591,9 @@ def _display_comparison_table(reports):
 def migrate(source_provider, source_config, target_provider, output_dir, yes):
     """Interactive migration assistant to migrate between providers"""
     try:
-        import yaml
         from datetime import datetime
+
+        import yaml
 
         # Display welcome message
         click.echo("=" * 80)
@@ -605,32 +606,25 @@ def migrate(source_provider, source_config, target_provider, output_dir, yes):
             source_provider = click.prompt(
                 "Source Provider",
                 type=click.Choice(
-                    ["envoy", "kong", "apisix", "traefik", "nginx", "haproxy"],
-                    case_sensitive=False
-                )
+                    ["envoy", "kong", "apisix", "traefik", "nginx", "haproxy"], case_sensitive=False
+                ),
             )
 
         if not source_config:
             source_config = click.prompt(
-                "Source Configuration File",
-                type=click.Path(exists=True, dir_okay=False)
+                "Source Configuration File", type=click.Path(exists=True, dir_okay=False)
             )
 
         if not target_provider:
             target_provider = click.prompt(
                 "Target Provider",
                 type=click.Choice(
-                    ["envoy", "kong", "apisix", "traefik", "nginx", "haproxy"],
-                    case_sensitive=False
-                )
+                    ["envoy", "kong", "apisix", "traefik", "nginx", "haproxy"], case_sensitive=False
+                ),
             )
 
         if not output_dir:
-            output_dir = click.prompt(
-                "Output Directory",
-                default="./migration",
-                type=click.Path()
-            )
+            output_dir = click.prompt("Output Directory", default="./migration", type=click.Path())
 
         # Create output directory
         output_path = Path(output_dir)
@@ -758,7 +752,9 @@ def migrate(source_provider, source_config, target_provider, output_dir, yes):
         compat_report = checker.check_provider(gal_config, target_provider)
 
         score_percent = compat_report.compatibility_score * 100
-        click.echo(f"   ✓ Compatibility: {score_percent:.1f}% ({len(compat_report.features_supported)}/{compat_report.features_checked} features)")
+        click.echo(
+            f"   ✓ Compatibility: {score_percent:.1f}% ({len(compat_report.features_supported)}/{compat_report.features_checked} features)"
+        )
 
         if compat_report.features_partial:
             click.echo(f"   ⚠️  {len(compat_report.features_partial)} partially supported features")
@@ -821,7 +817,9 @@ def migrate(source_provider, source_config, target_provider, output_dir, yes):
         click.echo(f"  📄 {target_config_path} ({target_provider.title()} config)")
         click.echo(f"  📄 {report_path} (Migration report)")
         click.echo()
-        click.echo(f"Compatibility: {score_percent:.1f}% ({len(compat_report.features_supported)}/{compat_report.features_checked} features)")
+        click.echo(
+            f"Compatibility: {score_percent:.1f}% ({len(compat_report.features_supported)}/{compat_report.features_checked} features)"
+        )
 
         if compat_report.warnings:
             click.echo(f"Warnings: {len(compat_report.warnings)}")
@@ -840,6 +838,7 @@ def migrate(source_provider, source_config, target_provider, output_dir, yes):
     except Exception as e:
         click.echo(f"❌ Migration failed: {e}", err=True)
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 
@@ -862,7 +861,9 @@ def _generate_migration_report(
     report.append("## Summary")
     report.append("")
     score_percent = compat_report.compatibility_score * 100
-    report.append(f"- **Compatibility:** {score_percent:.1f}% ({len(compat_report.features_supported)}/{compat_report.features_checked} features)")
+    report.append(
+        f"- **Compatibility:** {score_percent:.1f}% ({len(compat_report.features_supported)}/{compat_report.features_checked} features)"
+    )
     report.append(f"- **Services Migrated:** {len(gal_config.services)}")
     report.append(f"- **Routes Migrated:** {total_routes}")
     report.append(f"- **Warnings:** {len(compat_report.warnings)}")

@@ -814,6 +814,7 @@ class LoggingConfig:
         exclude_paths: Paths to exclude from logging (e.g., health checks)
         custom_fields: Additional custom fields to add to logs
     """
+
     enabled: bool = True
     format: str = "json"  # json, text, custom
     level: str = "info"  # debug, info, warning, error
@@ -841,6 +842,7 @@ class MetricsConfig:
         include_counters: Include request/error counters (default: True)
         custom_labels: Additional labels for metrics
     """
+
     enabled: bool = True
     exporter: str = "prometheus"  # prometheus, opentelemetry, both
     prometheus_port: int = 9090

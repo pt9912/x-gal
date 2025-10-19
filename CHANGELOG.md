@@ -7,9 +7,11 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2025-10-19
+
 ### Hinzugefügt
 
-#### Config Import & Migration Features (v1.3.0)
+#### Config Import & Migration Features
 
 - **HAProxy Config Import** (Feature 6)
   - Import von haproxy.cfg zu GAL YAML
