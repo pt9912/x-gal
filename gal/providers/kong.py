@@ -61,7 +61,22 @@ class KongProvider(Provider):
         Native support via protocol: grpc in service definitions.
         Automatic HTTP/2 handling by Kong.
 
+    gRPC Transformations:
+        ⚠️  GAL's gRPC protobuf transformations are NOT directly supported.
+
+        Alternatives:
+        1. Use Kong's grpc-gateway plugin (gRPC → JSON → gRPC)
+        2. Develop custom Kong plugin with lua-protobuf
+        3. Use grpc-web plugin for browser clients
+        4. Switch to Envoy/Nginx/APISIX for native protobuf support
+
+        For gRPC message transformation, we recommend:
+        - Envoy (lua-protobuf in Lua filter)
+        - Nginx/OpenResty (lua-protobuf in access_by_lua)
+        - APISIX (serverless-pre-function with lua-protobuf)
+
     Limitations:
+        - gRPC protobuf transformations not supported (see above)
         - Computed fields require custom plugins
         - Defaults added as headers, not body fields
         - Advanced transformations need Lua plugins

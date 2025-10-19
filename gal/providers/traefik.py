@@ -58,7 +58,27 @@ class TraefikProvider(Provider):
         Traefik supports gRPC via HTTP/2 automatically.
         Routes are configured the same as REST services.
 
+    gRPC Transformations:
+        ❌ GAL's gRPC protobuf transformations are NOT supported by Traefik.
+
+        Traefik does not provide Lua scripting or built-in protobuf support.
+
+        Alternatives:
+        1. Use ForwardAuth middleware to external transformation service
+        2. Develop custom Traefik middleware plugin in Go (complex)
+        3. Switch to Envoy/Nginx/APISIX for native protobuf support
+
+        Recommended approach:
+        For gRPC message transformation, we strongly recommend:
+        - Envoy (production-grade, lua-protobuf)
+        - Nginx/OpenResty (high-performance, lua-protobuf)
+        - APISIX (cloud-native, serverless plugin)
+
+        Traefik excels at routing and service discovery, but lacks
+        payload manipulation capabilities.
+
     Limitations:
+        - gRPC protobuf transformations NOT supported (see above)
         - Middleware plugins require Go development
         - No native computed field support
         - Transformations need custom middleware implementation

@@ -45,7 +45,27 @@ class HAProxyProvider(Provider):
     - Sticky Sessions (cookie, source-based)
     - Connection Pooling
 
+    gRPC Transformations:
+        ⚠️  GAL's gRPC protobuf transformations are NOT directly supported.
+
+        For gRPC transformation with HAProxy, you must:
+        1. Write external Lua script with lua-protobuf
+        2. Configure HAProxy to load the script:
+           global
+               lua-load /etc/haproxy/grpc-transform.lua
+        3. Call Lua functions in frontend/backend:
+           http-request lua.transform_grpc_request
+           http-response lua.transform_grpc_response
+
+        We recommend switching to providers with native support:
+        - Envoy (built-in Lua filter)
+        - Nginx/OpenResty (access_by_lua_block)
+        - APISIX (serverless-pre-function plugin)
+
+        See: https://www.haproxy.com/documentation/hapee/latest/api/lua/
+
     Limitations:
+    - gRPC protobuf transformations require external Lua scripts (see above)
     - JWT Auth requires Lua scripting
     - CORS requires custom header configuration
     """
