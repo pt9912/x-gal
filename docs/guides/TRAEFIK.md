@@ -4,7 +4,7 @@ Umfassende Dokumentation für die Verwendung von Traefik mit GAL.
 
 ## Inhaltsverzeichnis
 
-1. [Übersicht](#übersicht)
+1. [Übersicht](#ubersicht)
 2. [Schnellstart](#schnellstart)
 3. [Installation und Setup](#installation-und-setup)
 4. [Konfigurationsoptionen](#konfigurationsoptionen)
@@ -1612,7 +1612,7 @@ open http://localhost:8080/dashboard/
 ---
 
 **Navigation**:
-- [← Zurück zur Übersicht](README.md)
+- [← Zurück zur Übersicht](https://github.com/pt9912/x-gal#readme)
 - [Envoy Provider Guide](ENVOY.md)
 - [Kong Provider Guide](KONG.md)
 - [APISIX Provider Guide](APISIX.md)

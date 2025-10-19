@@ -4,12 +4,12 @@
 
 ## Inhaltsverzeichnis
 
-1. [Übersicht](#übersicht)
+1. [Übersicht](#ubersicht)
 2. [Schnellstart](#schnellstart)
 3. [Konfigurationsoptionen](#konfigurationsoptionen)
 4. [Provider-Implementierung](#provider-implementierung)
 5. [Load Balancing Algorithmen](#load-balancing-algorithmen)
-6. [Häufige Anwendungsfälle](#häufige-anwendungsfälle)
+6. [Häufige Anwendungsfälle](#haufige-anwendungsfalle)
 7. [Best Practices](#best-practices)
 8. [Troubleshooting](#troubleshooting)
 

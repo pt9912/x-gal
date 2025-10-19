@@ -426,7 +426,7 @@ routes:
 ## Weiterführende Ressourcen
 
 - [v1.1.0 Implementierungsplan](../v1.1.0-PLAN.md)
-- [Roadmap](../../ROADMAP.md)
+- [Roadmap](https://github.com/pt9912/x-gal/blob/main/ROADMAP.md)
 - [Provider-Dokumentation](PROVIDERS.md)
 
 ### Provider-spezifische Dokumentation

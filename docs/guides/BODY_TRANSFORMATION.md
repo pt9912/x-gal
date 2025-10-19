@@ -4,11 +4,11 @@
 
 ## Inhaltsverzeichnis
 
-- [Übersicht](#übersicht)
+- [Übersicht](#ubersicht)
 - [Schnellstart](#schnellstart)
 - [Konfigurationsoptionen](#konfigurationsoptionen)
 - [Provider-Implementierungen](#provider-implementierungen)
-- [Häufige Anwendungsfälle](#häufige-anwendungsfälle)
+- [Häufige Anwendungsfälle](#haufige-anwendungsfalle)
 - [Best Practices](#best-practices)
 - [Troubleshooting](#troubleshooting)
 - [Provider-Vergleich](#provider-vergleich)
@@ -1013,7 +1013,7 @@ Traefik unterstützt Body Transformation nicht nativ. Optionen:
 2. **Custom Traefik Plugin (Go)**
 3. **Alternative Provider (Envoy, Kong, etc.)**
 
-Siehe [Traefik-Implementierung](#4-traefik---nicht-unterstützt-0-support).
+Siehe [Traefik-Implementierung](#4-traefik-nicht-unterstutzt-0-support).
 
 ### Problem 6: HAProxy Lua-Script nicht gefunden
 
@@ -1126,7 +1126,7 @@ systemctl restart haproxy
 - **HAProxy**: ⚠️ Nur mit Manual Lua
 
 ### 🔗 Weitere Ressourcen:
-- [Body Transformation Examples](../../examples/body-transformation-example.yaml)
+- [Body Transformation Examples](https://github.com/pt9912/x-gal/blob/main/examples/body-transformation-example.yaml)
 - [Provider Documentation](PROVIDERS.md)
 - [v1.2.0 Plan](../v1.2.0-PLAN.md)
 

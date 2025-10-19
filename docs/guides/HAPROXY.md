@@ -8,8 +8,8 @@ HAProxy ist der de-facto Standard für High-Performance Load Balancing und wird 
 
 ## 📋 Inhaltsverzeichnis
 
-1. [Übersicht](#übersicht)
-2. [Installation & Setup](#installation--setup)
+1. [Übersicht](#ubersicht)
+2. [Installation & Setup](#installation-setup)
 3. [Schnellstart](#schnellstart)
 4. [Konfigurationsoptionen](#konfigurationsoptionen)
 5. [Feature-Implementierungen](#feature-implementierungen)
@@ -1566,14 +1566,14 @@ backend backend_api
 
 ### GAL Dokumentation
 
-- **Hauptdokumentation**: [README.md](../../README.md)
+- **Hauptdokumentation**: [README.md](https://github.com/pt9912/x-gal#readme)
 - **Rate Limiting Guide**: [RATE_LIMITING.md](RATE_LIMITING.md)
 - **Health Checks Guide**: [HEALTH_CHECKS.md](HEALTH_CHECKS.md)
 - **Authentication Guide**: [AUTHENTICATION.md](AUTHENTICATION.md)
 
 ### Beispiele
 
-- **HAProxy Examples**: [examples/haproxy-example.yaml](../../examples/haproxy-example.yaml)
+- **HAProxy Examples**: [examples/haproxy-example.yaml](https://github.com/pt9912/x-gal/blob/main/examples/haproxy-example.yaml)
 - **Alle Provider**: [examples/](../../examples/)
 
 ---

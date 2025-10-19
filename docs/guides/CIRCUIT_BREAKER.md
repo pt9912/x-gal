@@ -4,11 +4,11 @@
 
 ## Inhaltsverzeichnis
 
-1. [Übersicht](#übersicht)
+1. [Übersicht](#ubersicht)
 2. [Schnellstart](#schnellstart)
 3. [Konfigurationsoptionen](#konfigurationsoptionen)
 4. [Provider-Implementierung](#provider-implementierung)
-5. [Häufige Anwendungsfälle](#häufige-anwendungsfälle)
+5. [Häufige Anwendungsfälle](#haufige-anwendungsfalle)
 6. [Best Practices](#best-practices)
 7. [Circuit Breaker Testen](#circuit-breaker-testen)
 8. [Troubleshooting](#troubleshooting)
@@ -1051,7 +1051,7 @@ Circuit Breaker in GAL ermöglicht:
 
 **Nächste Schritte**:
 - Siehe [RATE_LIMITING.md](RATE_LIMITING.md) für Traffic-Schutz
-- Siehe [examples/circuit-breaker-example.yaml](../../examples/circuit-breaker-example.yaml) für vollständige Beispiele
+- Siehe [examples/circuit-breaker-example.yaml](https://github.com/pt9912/x-gal/blob/main/examples/circuit-breaker-example.yaml) für vollständige Beispiele
 - Siehe [PROVIDERS.md](PROVIDERS.md) für Provider-Details
 
 **Hilfe benötigt?**

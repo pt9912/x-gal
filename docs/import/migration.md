@@ -363,7 +363,7 @@ class MigrationAssistant:
         report.append("## References\n\n")
         report.append(f"- [GAL Documentation](https://github.com/pt9912/x-gal)\n")
         report.append(f"- [{target_provider.title()} Documentation](#{target_provider}-docs)\n")
-        report.append(f"- [Migration Guide](docs/guides/MIGRATION.md)\n")
+        report.append(f"- [Migration Guide](guides/MIGRATION.md)\n")
 
         return "".join(report)
 
@@ -604,8 +604,7 @@ systemctl restart nginx
 ## References
 
 - [GAL Documentation](https://github.com/pt9912/x-gal)
-- [HAProxy Documentation](#haproxy-docs)
-- [Migration Guide](docs/guides/MIGRATION.md)
+- [HAProxy Documentation](../guides/HAPROXY.md)
 ```
 
 ## Test Cases

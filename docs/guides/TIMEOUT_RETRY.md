@@ -4,11 +4,11 @@ Dieser Leitfaden beschreibt, wie man Timeout- und Retry-Richtlinien in GAL (Gate
 
 ## Inhaltsverzeichnis
 
-1. [Übersicht](#übersicht)
+1. [Übersicht](#ubersicht)
 2. [Schnellstart](#schnellstart)
 3. [Konfigurationsoptionen](#konfigurationsoptionen)
 4. [Provider-Implementierungen](#provider-implementierungen)
-5. [Häufige Anwendungsfälle](#häufige-anwendungsfälle)
+5. [Häufige Anwendungsfälle](#haufige-anwendungsfalle)
 6. [Best Practices](#best-practices)
 7. [Troubleshooting](#troubleshooting)
 8. [Provider-Vergleich](#provider-vergleich)

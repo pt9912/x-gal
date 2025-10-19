@@ -4,11 +4,11 @@
 
 ## Inhaltsverzeichnis
 
-1. [Übersicht](#übersicht)
+1. [Übersicht](#ubersicht)
 2. [Schnellstart](#schnellstart)
 3. [Konfigurationsoptionen](#konfigurationsoptionen)
 4. [Provider-Implementierung](#provider-implementierung)
-5. [Häufige Anwendungsfälle](#häufige-anwendungsfälle)
+5. [Häufige Anwendungsfälle](#haufige-anwendungsfalle)
 6. [Sicherheits-Best-Practices](#sicherheits-best-practices)
 7. [CORS Testen](#cors-testen)
 8. [Troubleshooting](#troubleshooting)
@@ -896,7 +896,7 @@ CORS in GAL ermöglicht:
 **Nächste Schritte**:
 - Siehe [AUTHENTICATION.md](AUTHENTICATION.md) für CORS + Auth
 - Siehe [HEADERS.md](HEADERS.md) für zusätzliche Header-Manipulation
-- Siehe [examples/cors-example.yaml](../../examples/cors-example.yaml) für vollständige Beispiele
+- Siehe [examples/cors-example.yaml](https://github.com/pt9912/x-gal/blob/main/examples/cors-example.yaml) für vollständige Beispiele
 
 **Hilfe benötigt?**
 - Probleme melden: https://github.com/pt9912/x-gal/issues

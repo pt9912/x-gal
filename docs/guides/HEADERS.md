@@ -755,7 +755,7 @@ Header manipulation is a powerful feature that enables:
 **Next Steps**:
 - Review [AUTHENTICATION.md](AUTHENTICATION.md) for combining headers with auth
 - Check [RATE_LIMITING.md](RATE_LIMITING.md) for rate limiting integration
-- Explore [examples/headers-test.yaml](../../examples/headers-test.yaml) for complete examples
+- Explore [examples/headers-test.yaml](https://github.com/pt9912/x-gal/blob/main/examples/headers-test.yaml) for complete examples
 
 **Need Help?**
 - Report issues: https://github.com/anthropics/gal/issues

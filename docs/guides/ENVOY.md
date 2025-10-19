@@ -4,7 +4,7 @@
 
 ## Inhaltsverzeichnis
 
-1. [Übersicht](#übersicht)
+1. [Übersicht](#ubersicht)
 2. [Schnellstart](#schnellstart)
 3. [Installation und Setup](#installation-und-setup)
 4. [Konfigurationsoptionen](#konfigurationsoptionen)

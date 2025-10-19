@@ -4,7 +4,7 @@ GAL v1.1.0 führt umfassende Authentication-Unterstützung für alle Gateway-Pro
 
 ## Inhaltsverzeichnis
 
-- [Übersicht](#übersicht)
+- [Übersicht](#ubersicht)
 - [Schnellstart](#schnellstart)
 - [Authentication-Typen](#authentication-typen)
   - [Basic Authentication](#basic-authentication)
