@@ -30,7 +30,7 @@ Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong
 - ✅ **Body-Transformation** - Request/Response Body-Manipulation mit dynamischen Feldern
 - ✅ **Timeout & Retry** - Verbindungs-/Lese-/Sende-Timeouts, automatische Wiederholungen mit exponentiellem Backoff
 - ✅ **Logging & Observability** - Strukturiertes Logging (JSON), Prometheus/OpenTelemetry-Metriken, Log-Sampling, benutzerdefinierte Felder
-- ✅ **Config-Import** (v1.3.0) - Importiere bestehende Envoy, Kong, APISIX, Traefik, Nginx Configs ins GAL-Format (`gal import-config`)
+- ✅ **Config-Import** (v1.3.0) - Importiere bestehende Envoy, Kong, APISIX, Traefik, Nginx, HAProxy Configs ins GAL-Format (`gal import-config`)
 
 ## Installation
 
@@ -207,6 +207,9 @@ python gal-cli.py generate-all --config CONFIG --output-dir OUTPUT
 python gal-cli.py import-config --provider envoy --input envoy.yaml --output gal-config.yaml
 python gal-cli.py import-config --provider kong --input kong.yaml --output gal-config.yaml
 python gal-cli.py import-config --provider apisix --input apisix.yaml --output gal-config.yaml
+python gal-cli.py import-config --provider traefik --input traefik.yaml --output gal-config.yaml
+python gal-cli.py import-config --provider nginx --input nginx.conf --output gal-config.yaml
+python gal-cli.py import-config --provider haproxy --input haproxy.cfg --output gal-config.yaml
 
 # Konfigurationsinformationen anzeigen
 python gal-cli.py info --config CONFIG

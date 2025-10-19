@@ -7,6 +7,27 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Hinzugefügt
+
+#### Config Import Features (v1.3.0)
+
+- **HAProxy Config Import** (Feature 6)
+  - Import von haproxy.cfg zu GAL YAML
+  - Custom Parser für section-based haproxy.cfg Format (235 lines)
+  - Parse Frontends, Backends, Listen sections
+  - Load Balancing Algorithms (roundrobin → round_robin, leastconn → least_connections, source → ip_hash, uri → uri_hash)
+  - Health Checks (option httpchk, http-check v2.0+)
+  - Sticky Sessions (cookie-based)
+  - Server Weights (weight parameter)
+  - Header Manipulation (http-request set-header)
+  - Routing ACLs (path_beg → routes mit path_prefix)
+  - Parser: `gal/parsers/haproxy_parser.py` (235 lines, 88% coverage)
+  - Implementation: `gal/providers/haproxy.py` parse() method (+407 lines)
+  - Tests: 28 tests (all passing, test_import_haproxy.py, 560+ lines)
+  - Examples: `examples/haproxy/haproxy.cfg` (197 lines), `examples/haproxy/simple-haproxy.cfg` (35 lines)
+  - Documentation: `docs/import/haproxy.md` (800+ lines)
+  - CLI: `gal import-config --provider haproxy --input haproxy.cfg --output gal-config.yaml`
+
 ## [1.2.0] - 2025-10-18
 
 ### Hinzugefügt

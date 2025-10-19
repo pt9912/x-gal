@@ -69,6 +69,15 @@ nav:
     - Body Transformation: guides/BODY_TRANSFORMATION.md
     - WebSocket: guides/WEBSOCKET.md
     - Timeout & Retry: guides/TIMEOUT_RETRY.md
+  - Config Import & Migration:
+    - Übersicht: import/migration.md
+    - Envoy Import: import/envoy.md
+    - Kong Import: import/kong.md
+    - APISIX Import: import/apisix.md
+    - Traefik Import: import/traefik.md
+    - Nginx Import: import/nginx.md
+    - HAProxy Import: import/haproxy.md
+    - Compatibility: import/compatibility.md
   - API-Referenz:
     - CLI: api/CLI_REFERENCE.md
     - Konfiguration: api/CONFIGURATION.md
