@@ -47,6 +47,7 @@ jobs:
         run: mkdocs build --strict --verbose
 
       - name: Deploy to GitHub Pages
-        run: mkdocs gh-deploy --force --message "docs: Update documentation [skip ci]"
+        run: |
+          mkdocs gh-deploy --force --message 'docs: Update documentation [skip ci]'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
