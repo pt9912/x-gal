@@ -43,20 +43,22 @@ CLOSED (Normal) → OPEN (Broken) → HALF_OPEN (Testing) → CLOSED
 
 ### Provider-Unterstützung
 
-| Feature | Kong | APISIX | Traefik | Envoy | Implementierung |
-|---------|------|--------|---------|-------|-----------------|
-| **Circuit Breaker** | ⚠️ | ✅ | ✅ | ✅ | Kong: Third-party only |
-| **Max Failures** | - | ✅ | ✅ | ✅ | Fehler-Schwellwert |
-| **Timeout** | - | ✅ | ✅ | ✅ | Erholungszeit |
-| **Half-Open Requests** | - | ✅ | - | ✅ | Test-Requests |
-| **Status Code Detection** | - | ✅ | ✅ | ✅ | Welche Codes = Fehler |
+| Feature | Envoy | Kong | APISIX | Traefik | Nginx | HAProxy | Implementierung |
+|---------|-------|------|--------|---------|-------|---------|-----------------|
+| **Circuit Breaker** | ✅ | ⚠️ | ✅ | ✅ | ❌ | ⚠️ | Native vs Third-party |
+| **Max Failures** | ✅ | - | ✅ | ✅ | - | ⚠️ | Fehler-Schwellwert |
+| **Timeout** | ✅ | - | ✅ | ✅ | - | ⚠️ | Erholungszeit |
+| **Half-Open Requests** | ✅ | - | ✅ | - | - | - | Test-Requests |
+| **Status Code Detection** | ✅ | - | ✅ | ✅ | - | ⚠️ | Welche Codes = Fehler |
 
-**Coverage**: 75% (3 von 4 Providern haben native Unterstützung)
+**Coverage**: 50% (3 von 6 Providern haben native Unterstützung)
 
+- **Envoy**: Native `Outlier Detection` ✅
 - **APISIX**: Native `api-breaker` Plugin ✅
 - **Traefik**: Native `CircuitBreaker` Middleware ✅
-- **Envoy**: Native `Outlier Detection` ✅
 - **Kong**: Nur Third-Party Plugin (kong-circuit-breaker) ⚠️
+- **Nginx**: Keine native Unterstützung (Lua Custom Implementation möglich) ❌
+- **HAProxy**: Begrenzte Unterstützung via `observe layer7` ⚠️
 
 ---
 

@@ -5,10 +5,12 @@
 Rate Limiting ist ein essenzielles Feature zur Kontrolle der Anzahl von Anfragen, die ein Client an Ihre API senden kann. Es hilft, Ihre Backend-Services vor Überlastung zu schützen und stellt sicher, dass alle Clients fair auf Ressourcen zugreifen können.
 
 GAL v1.1.0 bietet native Rate Limiting Unterstützung für alle unterstützten Gateway-Provider:
+- **Envoy**: local_ratelimit Filter
 - **Kong**: rate-limiting Plugin
 - **APISIX**: limit-count Plugin
 - **Traefik**: rateLimit Middleware
-- **Envoy**: local_ratelimit Filter
+- **Nginx**: ngx_http_limit_req_module
+- **HAProxy**: Stick Tables
 
 ## Quick Start
 
@@ -273,6 +275,60 @@ http_filters:
 
 **Hinweis:** Die aktuelle Envoy-Implementierung verwendet eine globale Rate Limiting Konfiguration. Für per-route Konfigurationen sollte der externe Rate Limit Service verwendet werden.
 
+### Nginx
+
+Nginx verwendet das `ngx_http_limit_req_module`:
+
+```nginx
+# Zone definieren (in http-Block)
+limit_req_zone $binary_remote_addr zone=api_limit:10m rate=100r/s;
+
+# Rate Limit anwenden (in location-Block)
+location /api/v1 {
+    limit_req zone=api_limit burst=200 nodelay;
+    limit_req_status 429;
+
+    proxy_pass http://backend;
+}
+```
+
+**Features:**
+- ✅ Per-Location Konfiguration
+- ✅ Leaky-Bucket-Algorithmus
+- ✅ Burst-Handling mit nodelay
+- ✅ Sehr hohe Performance
+- ✅ Shared Memory Zones
+
+**Hinweis:** Nginx bietet eines der performantesten Rate Limiting Systeme. Die Zone-basierte Konfiguration ermöglicht flexible Limits pro Endpoint.
+
+### HAProxy
+
+HAProxy verwendet Stick Tables für Rate Limiting:
+
+```haproxy
+# Frontend mit Rate Limiting
+frontend api_front
+    bind *:80
+
+    # Track requests per IP
+    stick-table type ip size 100k expire 10s store http_req_rate(1s)
+    http-request track-sc0 src
+
+    # Rate Limit: 100 req/s
+    acl rate_limit sc0_http_req_rate gt 100
+    http-request deny deny_status 429 if rate_limit
+
+    default_backend api_backend
+```
+
+**Features:**
+- ✅ Stick Table-basiert (sehr performant)
+- ✅ Flexible Tracking (IP, Header, Session)
+- ✅ Verschiedene Zeitfenster
+- ⚠️ Manuelle ACL-Konfiguration erforderlich
+
+**Hinweis:** HAProxy's Stick Tables bieten extrem niedrige Latenz für Rate Limiting. Eignet sich besonders für High-Traffic Szenarien.
+
 ## Best Practices
 
 ### 1. Burst-Dimensionierung
@@ -431,10 +487,12 @@ routes:
 
 ### Provider-spezifische Dokumentation
 
+- [Envoy Local Rate Limit](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/local_rate_limit_filter)
 - [Kong Rate Limiting Plugin](https://docs.konghq.com/hub/kong-inc/rate-limiting/)
 - [APISIX limit-count Plugin](https://apisix.apache.org/docs/apisix/plugins/limit-count/)
 - [Traefik RateLimit Middleware](https://doc.traefik.io/traefik/middlewares/http/ratelimit/)
-- [Envoy Local Rate Limit](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/local_rate_limit_filter)
+- [Nginx ngx_http_limit_req_module](https://nginx.org/en/docs/http/ngx_http_limit_req_module.html)
+- [HAProxy Stick Tables](https://www.haproxy.com/documentation/haproxy-configuration-tutorials/rate-limiting/)
 
 ## Zusammenfassung
 

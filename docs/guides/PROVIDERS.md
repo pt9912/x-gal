@@ -2,7 +2,7 @@
 
 ## Übersicht
 
-GAL unterstützt vier führende API-Gateway-Provider. Jeder Provider hat spezifische Eigenschaften, Stärken und ideale Use Cases.
+GAL unterstützt sechs führende API-Gateway-Provider. Jeder Provider hat spezifische Eigenschaften, Stärken und ideale Use Cases.
 
 ## Unterstützte Provider
 
@@ -12,6 +12,8 @@ GAL unterstützt vier führende API-Gateway-Provider. Jeder Provider hat spezifi
 | Kong | YAML | Plugins | ✅ | ✅ | ✅ File + Admin API |
 | APISIX | JSON | Lua Serverless | ✅ | ✅ | ✅ File + Admin API |
 | Traefik | YAML | Middleware | ✅ | ✅ | ✅ File + API verify |
+| Nginx | CONF | ngx_http modules | ✅ | ✅ | ✅ File + reload |
+| HAProxy | CFG | ACLs + Lua | ✅ | ✅ | ✅ File + reload |
 
 ## Envoy Proxy
 
@@ -541,13 +543,233 @@ kubectl apply -f traefik.yaml
 
 ---
 
+## Nginx
+
+### Übersicht
+
+Nginx ist der weltweit meistgenutzte Web Server und Reverse Proxy mit extrem hoher Performance und Stabilität.
+
+> **💡 API-Referenz:** Für technische Details zur Implementierung siehe `gal/providers/nginx.py` (NginxProvider)
+
+**Stärken:**
+- Extrem hohe Performance
+- Bewährte Stabilität
+- Geringer Ressourcenverbrauch
+- OpenResty für Lua-Scripting
+- Umfangreiches Modul-Ökosystem
+
+**Ideal für:**
+- High-Traffic Web Applications
+- Static Content Delivery
+- Reverse Proxy + Load Balancer
+- Edge Computing
+- Legacy System Integration
+
+### GAL-Generierung
+
+**Output:** `nginx.conf` (Nginx Configuration)
+
+**Struktur:**
+
+```nginx
+http {
+    upstream user_service_upstream {
+        server user-service:8080;
+    }
+
+    server {
+        listen 80;
+
+        location /api/users {
+            proxy_pass http://user_service_upstream;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+    }
+}
+```
+
+### Transformationen
+
+Nginx nutzt **ngx_http Lua Modules** (via OpenResty):
+
+```nginx
+location /api/users {
+    rewrite_by_lua_block {
+        local cjson = require "cjson"
+        ngx.req.read_body()
+        local body = ngx.req.get_body_data()
+        if body then
+            local json_body = cjson.decode(body)
+            json_body.status = json_body.status or "active"
+            ngx.req.set_body_data(cjson.encode(json_body))
+        end
+    }
+    proxy_pass http://backend;
+}
+```
+
+**Features:**
+- Defaults via Lua
+- Computed Fields (UUID, Timestamp)
+- Header Manipulation
+- Request/Response Transformation
+
+### gRPC-Support
+
+```nginx
+server {
+    listen 443 ssl http2;
+
+    location / {
+        grpc_pass grpc://backend:50051;
+    }
+}
+```
+
+### Deployment
+
+GAL unterstützt direktes Deployment für Nginx:
+
+**Python API:**
+
+```python
+from gal import Manager
+from gal.providers.nginx import NginxProvider
+
+manager = Manager()
+provider = NginxProvider()
+config = manager.load_config("config.yaml")
+
+# File-based deployment
+provider.deploy(config, output_file="/etc/nginx/nginx.conf")
+```
+
+**Docker:**
+
+```bash
+# Konfiguration generieren
+python gal-cli.py generate -c config.yaml -p nginx -o nginx.conf
+
+# Nginx starten
+docker run -d \
+  -v $(pwd)/nginx.conf:/etc/nginx/nginx.conf:ro \
+  -p 80:80 \
+  -p 443:443 \
+  openresty/openresty:latest
+```
+
+---
+
+## HAProxy
+
+### Übersicht
+
+HAProxy ist ein extrem schneller und zuverlässiger Load Balancer und Proxy für TCP/HTTP mit erweiterten Routing-Funktionen.
+
+> **💡 API-Referenz:** Für technische Details zur Implementierung siehe `gal/providers/haproxy.py` (HAProxyProvider)
+
+**Stärken:**
+- Höchste Performance bei Load Balancing
+- Erweiterte ACL-Funktionen
+- Health Checking
+- Session Persistence
+- SSL/TLS Termination
+
+**Ideal für:**
+- High-Availability Setups
+- TCP Load Balancing
+- Complex Routing Requirements
+- Legacy Protocol Support
+- Mission-Critical Applications
+
+### GAL-Generierung
+
+**Output:** `haproxy.cfg` (HAProxy Configuration)
+
+**Struktur:**
+
+```haproxy
+global
+    maxconn 4096
+
+defaults
+    mode http
+    timeout connect 5000ms
+    timeout client 50000ms
+    timeout server 50000ms
+
+frontend http_front
+    bind *:80
+    use_backend user_backend if { path_beg /api/users }
+
+backend user_backend
+    balance roundrobin
+    server srv1 user-service:8080 check
+```
+
+### Transformationen
+
+HAProxy nutzt **HTTP Request/Response Manipulation** und **Lua Scripting**:
+
+```haproxy
+backend api_backend
+    http-request set-header X-Default-Status active
+    http-request set-header X-Request-ID %[uuid()]
+
+    http-request lua.transform_request
+    server srv1 backend:8080 check
+```
+
+**Features:**
+- Header Manipulation
+- ACL-basiertes Routing
+- Sticky Sessions
+- Rate Limiting via stick-tables
+
+### Deployment
+
+GAL unterstützt direktes Deployment für HAProxy:
+
+**Python API:**
+
+```python
+from gal import Manager
+from gal.providers.haproxy import HAProxyProvider
+
+manager = Manager()
+provider = HAProxyProvider()
+config = manager.load_config("config.yaml")
+
+# File-based deployment
+provider.deploy(config, output_file="/etc/haproxy/haproxy.cfg")
+```
+
+**Docker:**
+
+```bash
+# Konfiguration generieren
+python gal-cli.py generate -c config.yaml -p haproxy -o haproxy.cfg
+
+# HAProxy starten
+docker run -d \
+  -v $(pwd)/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro \
+  -p 80:80 \
+  -p 8404:8404 \
+  haproxy:2.9-alpine
+```
+
+---
+
 ## Provider-Vergleich
 
 ### Performance
 
 | Provider | Requests/sec | Latency (p50) | Latency (p99) |
 |----------|--------------|---------------|---------------|
+| Nginx | ~120k | <1ms | <3ms |
 | Envoy | ~100k | <1ms | <5ms |
+| HAProxy | ~95k | <1ms | <4ms |
 | APISIX | ~80k | <1ms | <6ms |
 | Kong | ~50k | 2ms | 15ms |
 | Traefik | ~40k | 3ms | 20ms |
@@ -556,13 +778,13 @@ kubectl apply -f traefik.yaml
 
 ### Transformations-Vergleich
 
-| Feature | Envoy | Kong | APISIX | Traefik |
-|---------|-------|------|--------|---------|
-| Defaults | ✅ Lua | ✅ Headers | ✅ Lua | ⚠️ Plugins |
-| Computed Fields | ✅ Lua | ❌ | ✅ Lua | ❌ |
-| UUID Generation | ✅ | ❌ | ✅ | ❌ |
-| Timestamp | ✅ | ❌ | ✅ | ❌ |
-| Validation | ⚠️ Limited | ⚠️ Limited | ✅ Full | ❌ |
+| Feature | Envoy | Kong | APISIX | Traefik | Nginx | HAProxy |
+|---------|-------|------|--------|---------|-------|---------|
+| Defaults | ✅ Lua | ✅ Headers | ✅ Lua | ⚠️ Plugins | ✅ ngx | ⚠️ Limited |
+| Computed Fields | ✅ Lua | ❌ | ✅ Lua | ❌ | ✅ ngx | ❌ |
+| UUID Generation | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ |
+| Timestamp | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ |
+| Validation | ⚠️ Limited | ⚠️ Limited | ✅ Full | ❌ | ⚠️ Limited | ⚠️ Limited |
 
 ### Use Case Matrix
 

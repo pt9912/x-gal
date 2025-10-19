@@ -540,6 +540,85 @@ http_filters:
               cluster: jwks_cluster
 ```
 
+### Nginx
+
+Nginx implementiert Authentication mit ngx_http-Modulen und OpenResty Lua.
+
+**Basic Auth:**
+- Modul: `ngx_http_auth_basic_module`
+- Features: Native Basic Auth, htpasswd-Unterstützung
+- Hinweis: Production-ready, weit verbreitet
+
+**API Key:**
+- Modul: `ngx_http_lua_module` (OpenResty)
+- Features: Lua-basierte Header-Validierung
+- Hinweis: Flexibel via Lua-Scripting
+
+**JWT:**
+- Modul: `lua-resty-jwt` (OpenResty)
+- Features: Vollständige JWT-Validierung, RS256/ES256/HS256
+- Hinweis: Benötigt OpenResty, sehr performant
+
+**Generiertes Config-Beispiel:**
+```nginx
+location /api/protected {
+    auth_basic "Protected Area";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+
+    proxy_pass http://backend;
+}
+
+# API Key via Lua
+location /api/key {
+    access_by_lua_block {
+        local api_key = ngx.var.http_x_api_key
+        if api_key ~= "your-secret-key-123" then
+            ngx.status = 401
+            ngx.say("Unauthorized")
+            ngx.exit(401)
+        end
+    }
+    proxy_pass http://backend;
+}
+```
+
+### HAProxy
+
+HAProxy implementiert Authentication mit ACLs und HTTP Header-Checks.
+
+**Basic Auth:**
+- Feature: HTTP Basic Authentication via ACLs
+- Features: Native Basic Auth, Userlist-Unterstützung
+- Hinweis: Production-ready
+
+**API Key:**
+- Feature: HTTP Header ACL-Checks
+- Features: Header-basierte Validierung
+- Hinweis: Einfache ACL-Regeln
+
+**JWT:**
+- Feature: Lua-basierte Validierung
+- Features: Lua-Integration für Token-Validierung
+- Hinweis: Benötigt externe Lua-Bibliotheken
+
+**Generiertes Config-Beispiel:**
+```haproxy
+# Basic Auth
+userlist admins
+    user admin password $6$rounds=50000$...
+
+frontend api_front
+    bind *:80
+    acl is_authenticated http_auth(admins)
+    http-request deny if !is_authenticated
+
+    # API Key Check
+    acl valid_api_key hdr(X-API-Key) -m str your-secret-key-123
+    http-request deny if !valid_api_key
+
+    default_backend api_backend
+```
+
 ## Best Practices
 
 ### Allgemeine Sicherheit
@@ -913,7 +992,7 @@ Für Custom-Authentication-Anforderungen, die nicht von eingebauten Typen abgede
 GAL v1.1.0 bietet umfassende Authentication-Unterstützung:
 
 ✅ Drei Authentication-Typen: Basic, API Key, JWT
-✅ Alle vier Gateway-Provider unterstützt
+✅ Alle sechs Gateway-Provider unterstützt (Envoy, Kong, APISIX, Traefik, Nginx, HAProxy)
 ✅ Per-Route Authentication-Konfiguration
 ✅ Kombination mit Rate Limiting
 ✅ Production-ready JWT mit JWKS-Support

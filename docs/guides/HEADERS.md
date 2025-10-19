@@ -40,10 +40,12 @@ All GAL providers support header manipulation:
 
 | Provider | Request Headers | Response Headers | Notes |
 |----------|----------------|------------------|-------|
+| **Envoy** | ✅ | ✅ | Native route-level header manipulation |
 | **Kong** | ✅ | ✅ | request-transformer, response-transformer plugins |
 | **APISIX** | ✅ | ✅ | proxy-rewrite, response-rewrite plugins |
 | **Traefik** | ✅ | ✅ | headers middleware |
-| **Envoy** | ✅ | ✅ | Native route-level header manipulation |
+| **Nginx** | ✅ | ✅ | proxy_set_header, add_header directives |
+| **HAProxy** | ✅ | ✅ | http-request/http-response set-header |
 
 ---
 

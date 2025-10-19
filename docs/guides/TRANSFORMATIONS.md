@@ -522,7 +522,9 @@ curl -X POST http://gateway:8080/api/users \
 
 | Provider | Overhead | Empfehlung |
 |----------|----------|------------|
+| Nginx | ~0.3-1ms | ✅ Production-ready |
 | Envoy | ~0.5-1ms | ✅ Production-ready |
+| HAProxy | ~0.5-1ms | ✅ Production-ready |
 | APISIX | ~0.5-2ms | ✅ Production-ready |
 | Kong | ~2-5ms | ⚠️ Monitor bei High-Traffic |
 | Traefik | N/A | Keine nativen Transformationen |
