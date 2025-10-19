@@ -5,8 +5,18 @@ Provider-agnostic API Gateway configuration system
 
 __version__ = "1.0.0"
 
-from .config import Config, Service, Transformation
+from .config import Config, GrpcTransformation, ProtoDescriptor, Service, Transformation
 from .manager import Manager
+from .proto_manager import ProtoManager
 from .provider import Provider
 
-__all__ = ["Config", "Service", "Transformation", "Manager", "Provider"]
+__all__ = [
+    "Config",
+    "Service",
+    "Transformation",
+    "Manager",
+    "Provider",
+    "ProtoDescriptor",
+    "GrpcTransformation",
+    "ProtoManager",
+]

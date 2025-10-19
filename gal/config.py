@@ -254,6 +254,7 @@ class Route:
     body_transformation: Optional["BodyTransformationConfig"] = None
     timeout: Optional["TimeoutConfig"] = None
     retry: Optional["RetryConfig"] = None
+    grpc_transformation: Optional["GrpcTransformation"] = None
 
 
 @dataclass
@@ -1037,6 +1038,138 @@ class Plugin:
 
 
 @dataclass
+class ProtoDescriptor:
+    """Protobuf descriptor configuration for gRPC services.
+
+    Defines how to load Protocol Buffer (.proto) files that describe
+    gRPC service interfaces and message types.
+
+    Attributes:
+        name: Unique identifier for this descriptor (used as reference)
+        source: Source type - "file", "inline", or "url"
+        path: File path to .proto or .desc file (when source="file")
+        content: Inline proto definition (when source="inline")
+        url: Download URL for proto file (when source="url")
+
+    Examples:
+        >>> # File-based descriptor
+        >>> desc = ProtoDescriptor(
+        ...     name="user_service",
+        ...     source="file",
+        ...     path="/etc/gal/protos/user.desc"
+        ... )
+
+        >>> # Inline descriptor
+        >>> desc = ProtoDescriptor(
+        ...     name="order_service",
+        ...     source="inline",
+        ...     content='syntax = "proto3"; package order.v1;'
+        ... )
+
+        >>> # URL-based descriptor
+        >>> desc = ProtoDescriptor(
+        ...     name="payment_service",
+        ...     source="url",
+        ...     url="https://api.example.com/protos/payment.proto"
+        ... )
+
+    Validation:
+        - name: Required, non-empty
+        - source: Must be "file", "inline", or "url"
+        - path: Required if source="file", must exist
+        - content: Required if source="inline"
+        - url: Required if source="url", must be valid HTTP(S) URL
+    """
+
+    name: str
+    source: str  # "file", "inline", "url"
+    path: str = ""
+    content: str = ""
+    url: str = ""
+
+    def __post_init__(self):
+        """Validate proto descriptor configuration."""
+        if not self.name:
+            raise ValueError("ProtoDescriptor.name is required")
+
+        if self.source not in ["file", "inline", "url"]:
+            raise ValueError(
+                f"Invalid source: {self.source}. Must be 'file', 'inline', or 'url'"
+            )
+
+        if self.source == "file" and not self.path:
+            raise ValueError("ProtoDescriptor.path is required when source='file'")
+
+        if self.source == "inline" and not self.content:
+            raise ValueError("ProtoDescriptor.content is required when source='inline'")
+
+        if self.source == "url" and not self.url:
+            raise ValueError("ProtoDescriptor.url is required when source='url'")
+
+
+@dataclass
+class GrpcTransformation:
+    """gRPC-specific transformation configuration.
+
+    Defines transformations to apply to gRPC request and response messages
+    using Protocol Buffer descriptors.
+
+    Attributes:
+        enabled: Enable/disable gRPC transformation (default: True)
+        proto_descriptor: Reference to ProtoDescriptor name
+        package: Protobuf package name (e.g., "user.v1")
+        service: Service name from proto (e.g., "UserService")
+        request_type: Request message type (e.g., "CreateUserRequest")
+        response_type: Response message type (e.g., "CreateUserResponse")
+        request_transform: Request transformation rules
+        response_transform: Response transformation rules
+
+    Examples:
+        >>> transform = GrpcTransformation(
+        ...     enabled=True,
+        ...     proto_descriptor="user_service",
+        ...     package="user.v1",
+        ...     service="UserService",
+        ...     request_type="CreateUserRequest",
+        ...     response_type="CreateUserResponse",
+        ...     request_transform=RequestBodyTransformation(
+        ...         add_fields={"trace_id": "{{uuid}}"}
+        ...     )
+        ... )
+
+    Validation:
+        - proto_descriptor: Required when enabled=True
+        - package: Required when enabled=True
+        - service: Required when enabled=True
+        - request_type: Required when enabled=True
+        - response_type: Required when enabled=True
+    """
+
+    enabled: bool = True
+    proto_descriptor: str = ""
+    package: str = ""
+    service: str = ""
+    request_type: str = ""
+    response_type: str = ""
+    request_transform: Optional["RequestBodyTransformation"] = None
+    response_transform: Optional["ResponseBodyTransformation"] = None
+
+    def __post_init__(self):
+        """Validate gRPC transformation configuration."""
+        if self.enabled:
+            if not self.proto_descriptor:
+                raise ValueError("proto_descriptor is required when enabled=True")
+            if not self.package:
+                raise ValueError("package is required when enabled=True")
+            if not self.service:
+                raise ValueError("service is required when enabled=True")
+            if not self.request_type:
+                raise ValueError("request_type is required when enabled=True")
+            if not self.response_type:
+                raise ValueError("response_type is required when enabled=True")
+
+
+@dataclass
 class Config:
     """Main GAL configuration container.
 
@@ -1049,6 +1182,7 @@ class Config:
         global_config: Global gateway settings
         services: List of backend services
         plugins: List of gateway plugins (default: empty list)
+        proto_descriptors: List of Protocol Buffer descriptors for gRPC (default: empty list)
 
     Example:
         >>> config = Config(
@@ -1066,6 +1200,7 @@ class Config:
     global_config: GlobalConfig
     services: List[Service]
     plugins: List[Plugin] = field(default_factory=list)
+    proto_descriptors: List[ProtoDescriptor] = field(default_factory=list)
 
     @classmethod
     def from_yaml(cls, filepath: str) -> "Config":
