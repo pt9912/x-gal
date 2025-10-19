@@ -19,7 +19,13 @@ Praktische Anleitungen für häufige Aufgaben und Use Cases:
 | Guide | Beschreibung | Für wen |
 |-------|--------------|---------|
 | [Schnellstart](guides/QUICKSTART.md) | Installation und erste Schritte | Alle Nutzer |
-| [Provider-Dokumentation](guides/PROVIDERS.md) | Details zu jedem Gateway-Provider | DevOps, Architects |
+| [Provider-Dokumentation](guides/PROVIDERS.md) | Übersicht aller Gateway-Provider | DevOps, Architects |
+| [Nginx](guides/NGINX.md) | Nginx-spezifische Konfiguration und Features | Nginx-Nutzer |
+| [Envoy](guides/ENVOY.md) | Envoy-spezifische Konfiguration und Features | Envoy-Nutzer |
+| [Kong](guides/KONG.md) | Kong-spezifische Konfiguration und Features | Kong-Nutzer |
+| [APISIX](guides/APISIX.md) | APISIX-spezifische Konfiguration und Features | APISIX-Nutzer |
+| [Traefik](guides/TRAEFIK.md) | Traefik-spezifische Konfiguration und Features | Traefik-Nutzer |
+| [HAProxy](guides/HAPROXY.md) | HAProxy-spezifische Konfiguration und Features | HAProxy-Nutzer |
 | [Transformations-Guide](guides/TRANSFORMATIONS.md) | Request-Transformationen und Best Practices | Developers, Architects |
 | [Entwickler-Guide](guides/DEVELOPMENT.md) | Beitragen zum Projekt | Contributors |
 
@@ -63,10 +69,12 @@ services:
 
 ```bash
 # Für beliebigen Provider generieren
+gal-cli.py generate -c config.yaml -p nginx
 gal-cli.py generate -c config.yaml -p envoy
 gal-cli.py generate -c config.yaml -p kong
 gal-cli.py generate -c config.yaml -p apisix
 gal-cli.py generate -c config.yaml -p traefik
+gal-cli.py generate -c config.yaml -p haproxy
 ```
 
 ### Hauptfeatures
@@ -79,12 +87,14 @@ gal-cli.py generate -c config.yaml -p traefik
 
 ## Unterstützte Provider
 
-| Provider | Status | Output-Format | Transformations |
-|----------|--------|---------------|-----------------|
-| [Envoy](guides/PROVIDERS.md#envoy-proxy) | ✅ | YAML | Lua Filters |
-| [Kong](guides/PROVIDERS.md#kong-api-gateway) | ✅ | YAML | Plugins |
-| [APISIX](guides/PROVIDERS.md#apache-apisix) | ✅ | JSON | Lua Serverless |
-| [Traefik](guides/PROVIDERS.md#traefik) | ✅ | YAML | Middleware |
+| Provider | Status | Output-Format | Transformations | Import/Export |
+|----------|--------|---------------|-----------------|---------------|
+| [Nginx](guides/NGINX.md) | ✅ | nginx.conf | Lua/njs | ✅ / ✅ |
+| [Envoy](guides/ENVOY.md) | ✅ | YAML | Lua Filters | ✅ / ✅ |
+| [Kong](guides/KONG.md) | ✅ | YAML | Plugins | ✅ / ✅ |
+| [APISIX](guides/APISIX.md) | ✅ | JSON/YAML | Lua Serverless | ✅ / ✅ |
+| [Traefik](guides/TRAEFIK.md) | ✅ | YAML/TOML | Middleware | ✅ / ✅ |
+| [HAProxy](guides/HAPROXY.md) | ✅ | haproxy.cfg | Lua | ⚠️ / ✅ |
 
 ## Häufig verwendete Ressourcen
 
@@ -245,7 +255,7 @@ services:
 
 | Fehler | Ursache | Lösung |
 |--------|---------|--------|
-| "Provider not registered" | Unbekannter Provider | Nutze: envoy, kong, apisix, traefik |
+| "Provider not registered" | Unbekannter Provider | Nutze: nginx, envoy, kong, apisix, traefik, haproxy |
 | "Port must be specified" | port: 0 in global | Setze gültigen Port (z.B. 8080) |
 | "No such file" | Config-Datei fehlt | Prüfe Pfad zur Config-Datei |
 | "Invalid YAML" | Syntax-Fehler | Validiere YAML-Syntax |
@@ -321,7 +331,16 @@ MIT License - siehe [LICENSE](../LICENSE)
 
 ## Versionshinweise
 
-**Aktuelle Version:** 1.0.0
+**Aktuelle Version:** 1.3.0
+
+**Neu in v1.3.0:**
+- ✅ Nginx Import-Unterstützung (Custom Parser für nginx.conf)
+- ✅ Traefik Import-Unterstützung (YAML Parser)
+- ✅ APISIX Import-Unterstützung (JSON/YAML Parser)
+- ✅ Kong Import-Unterstützung (Erweitert)
+- ✅ Envoy Import-Unterstützung (Erweitert)
+- ✅ Umfassende Feature Coverage Analyse für alle 6 Provider
+- ✅ Provider-spezifische Dokumentationsguides
 
 Siehe [CHANGELOG.md](../CHANGELOG.md) für vollständige Release-Notes.
 
@@ -329,10 +348,12 @@ Siehe [CHANGELOG.md](../CHANGELOG.md) für vollständige Release-Notes.
 
 ### Externe Dokumentation
 
+- [Nginx Dokumentation](https://nginx.org/en/docs/)
 - [Envoy Dokumentation](https://www.envoyproxy.io/docs)
 - [Kong Dokumentation](https://docs.konghq.com/)
 - [APISIX Dokumentation](https://apisix.apache.org/docs/)
 - [Traefik Dokumentation](https://doc.traefik.io/traefik/)
+- [HAProxy Dokumentation](https://docs.haproxy.org/)
 
 ### Verwandte Projekte
 
@@ -342,6 +363,6 @@ Siehe [CHANGELOG.md](../CHANGELOG.md) für vollständige Release-Notes.
 
 ---
 
-**Dokumentations-Version:** 1.0.0
+**Dokumentations-Version:** 1.3.0
 **Letzte Aktualisierung:** Oktober 2025
 **Sprache:** Deutsch

@@ -63,11 +63,13 @@ dev = [
     "black>=24.0.0",
     "flake8>=7.0.0",
     "isort>=5.13.0",
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.0.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/pt9912/x-gal"
-Documentation = "https://github.com/pt9912/x-gal/blob/main/README.md"
+Documentation = "https://pt9912.github.io/x-gal/"
 Repository = "https://github.com/pt9912/x-gal"
 "Bug Tracker" = "https://github.com/pt9912/x-gal/issues"
 Changelog = "https://github.com/pt9912/x-gal/blob/main/CHANGELOG.md"

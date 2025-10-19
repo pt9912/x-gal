@@ -1,0 +1,127 @@
+site_name: GAL - Gateway Abstraction Layer
+site_description: Provider-agnostischer Konfigurations-Layer für API Gateways (Nginx, Envoy, Kong, APISIX, Traefik, HAProxy)
+site_author: Dietmar Burkard
+site_url: https://pt9912.github.io/x-gal/
+
+repo_url: https://github.com/pt9912/x-gal
+repo_name: pt9912/x-gal
+
+exclude_docs: |
+  README.md
+
+theme:
+  name: material
+  language: de
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Zu Dunkelmodus wechseln
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Zu Hellmodus wechseln
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Start: index.md
+  - Guides:
+    - Schnellstart: guides/QUICKSTART.md
+    - Provider Übersicht: guides/PROVIDERS.md
+    - Nginx: guides/NGINX.md
+    - Envoy: guides/ENVOY.md
+    - Kong: guides/KONG.md
+    - APISIX: guides/APISIX.md
+    - Traefik: guides/TRAEFIK.md
+    - HAProxy: guides/HAPROXY.md
+    - Transformationen: guides/TRANSFORMATIONS.md
+    - Entwicklung: guides/DEVELOPMENT.md
+  - Features:
+    - Authentication: guides/AUTHENTICATION.md
+    - CORS: guides/CORS.md
+    - Rate Limiting: guides/RATE_LIMITING.md
+    - Circuit Breaker: guides/CIRCUIT_BREAKER.md
+    - Health Checks: guides/HEALTH_CHECKS.md
+    - Headers: guides/HEADERS.md
+    - Logging & Observability: guides/LOGGING_OBSERVABILITY.md
+    - Body Transformation: guides/BODY_TRANSFORMATION.md
+    - WebSocket: guides/WEBSOCKET.md
+    - Timeout & Retry: guides/TIMEOUT_RETRY.md
+  - API-Referenz:
+    - CLI: api/CLI_REFERENCE.md
+    - Konfiguration: api/CONFIGURATION.md
+  - Architektur: architecture/ARCHITECTURE.md
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+plugins:
+  - search:
+      lang: de
+  - tags
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/pt9912/x-gal
+  version:
+    provider: mike
+
+copyright: Copyright &copy; 2024-2025 Dietmar Burkard - MIT License

@@ -16,7 +16,7 @@ Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong
 - ✅ **Einheitliche YAML-Konfiguration** für mehrere API-Gateway-Provider
 - ✅ **Unterstützung für 6 Provider:** Envoy, Kong, APISIX, Traefik, Nginx, HAProxy
 - ✅ **Automatische Payload-Transformationsgenerierung**
-- ✅ **REST- und gRPC-Service-Unterstützung** (3 gRPC + 2 REST Services)
+- ✅ **REST- und gRPC-Service-Unterstützung**
 - ✅ **Default-Wert-Injektion**
 - ✅ **Berechnete Felder** (UUIDs, Zeitstempel)
 - ✅ **Feldvalidierung**
@@ -24,13 +24,13 @@ Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong
 - ✅ **Reines Python** - kein Go erforderlich!
 - ✅ **CI/CD Ready** - GitHub Actions Workflows integriert
 - ✅ **Umfassende Tests** - 464 Tests mit 89% Coverage
-- 🆕 **Traffic Management** - Rate Limiting, Circuit Breaker, Health Checks & Load Balancing
-- 🆕 **Security** - Authentication (Basic, API Key, JWT), Header Manipulation, CORS
-- 🆕 **WebSocket Support** - Real-time bidirectional communication (all 6 providers)
-- 🆕 **Body Transformation** - Request/Response body manipulation with dynamic fields
-- 🆕 **Timeout & Retry** - Connection/read/send timeouts, automatic retries with exponential backoff
-- 🆕 **Logging & Observability** - Structured logging (JSON), Prometheus/OpenTelemetry metrics, log sampling, custom fields
-- 🚀 **Config Import** (v1.3.0) - Import existing Envoy, Kong, APISIX, Traefik, Nginx configs to GAL format (`gal import-config`)
+- ✅ **Traffic Management** - Rate Limiting, Circuit Breaker, Health Checks & Load Balancing
+- ✅ **Sicherheit** - Authentication (Basic, API Key, JWT), Header-Manipulation, CORS
+- ✅ **WebSocket-Unterstützung** - Echtzeit bidirektionale Kommunikation (alle 6 Provider)
+- ✅ **Body-Transformation** - Request/Response Body-Manipulation mit dynamischen Feldern
+- ✅ **Timeout & Retry** - Verbindungs-/Lese-/Sende-Timeouts, automatische Wiederholungen mit exponentiellem Backoff
+- ✅ **Logging & Observability** - Strukturiertes Logging (JSON), Prometheus/OpenTelemetry-Metriken, Log-Sampling, benutzerdefinierte Felder
+- ✅ **Config-Import** (v1.3.0) - Importiere bestehende Envoy, Kong, APISIX, Traefik, Nginx Configs ins GAL-Format (`gal import-config`)
 
 ## Installation
 
@@ -76,7 +76,7 @@ python3 -m venv venv
 source venv/bin/activate  # Unter Windows: venv\Scripts\activate
 
 # Abhängigkeiten installieren
-pip install -e .         # Runtime dependencies
+pip install -e .         # Laufzeit-Abhängigkeiten
 pip install -e .[dev]    # Mit Dev-Tools (pytest, black, flake8, isort)
 
 # CLI ausführbar machen
@@ -93,7 +93,7 @@ pip install gal-gateway
 gal --help
 gal --version
 
-# Mit Development Tools
+# Mit Entwicklungs-Tools
 pip install gal-gateway[dev]
 
 # Spezifische Version
@@ -105,8 +105,8 @@ pip install --index-url https://test.pypi.org/simple/ \
             gal-gateway
 ```
 
-**PyPI Links:**
-- **Stable Releases:** https://pypi.org/project/gal-gateway/
+**PyPI-Links:**
+- **Stabile Releases:** https://pypi.org/project/gal-gateway/
 - **Pre-Releases (TestPyPI):** https://test.pypi.org/project/gal-gateway/
 - **Dokumentation:** [PyPI Publishing Guide](docs/PYPI_PUBLISHING.md)
 
@@ -160,8 +160,8 @@ Jeder mit Transformationsregeln für:
 | Kong | ✅ | Lua Plugins |
 | APISIX | ✅ | Lua Scripts |
 | Traefik | ✅ | Middleware |
-| Nginx | ✅ | Open Source (ngx_http modules) |
-| HAProxy | ✅ | Advanced Load Balancing & ACLs |
+| Nginx | ✅ | Open Source (ngx_http-Module) |
+| HAProxy | ✅ | Erweiterte Load Balancing & ACLs |
 
 ## Projektstruktur
 
@@ -266,7 +266,7 @@ docker-compose --profile generate up gal-generate
 CONFIG_FILE=examples/gateway-config.yaml docker-compose --profile validate up gal-validate
 ```
 
-### Environment Variables
+### Umgebungsvariablen
 
 - `PROVIDER`: Gateway-Provider (envoy, kong, apisix, traefik, nginx, haproxy)
 - `CONFIG_FILE`: Pfad zur Konfigurationsdatei
@@ -288,18 +288,18 @@ CONFIG_FILE=examples/gateway-config.yaml docker-compose --profile validate up ga
 - [CORS](docs/guides/CORS.md) - Cross-Origin Resource Sharing
 - [Circuit Breaker](docs/guides/CIRCUIT_BREAKER.md) - Fehlertoleranz & Resilienz
 - [Health Checks & Load Balancing](docs/guides/HEALTH_CHECKS.md) - Hochverfügbarkeit
-- [**WebSocket Support**](docs/guides/WEBSOCKET.md) - Real-time bidirectional communication
-- [**Body Transformation**](docs/guides/BODY_TRANSFORMATION.md) - Request/Response body manipulation (add/remove/rename fields, PII filtering)
-- [**Timeout & Retry Policies**](docs/guides/TIMEOUT_RETRY.md) - Connection/read/send timeouts, automatic retries with exponential backoff
-- [**Logging & Observability**](docs/guides/LOGGING_OBSERVABILITY.md) - Structured logging (JSON/text), Prometheus/OpenTelemetry metrics, log sampling, custom fields
+- [**WebSocket-Unterstützung**](docs/guides/WEBSOCKET.md) - Echtzeit bidirektionale Kommunikation
+- [**Body-Transformation**](docs/guides/BODY_TRANSFORMATION.md) - Request/Response Body-Manipulation (Felder hinzufügen/entfernen/umbenennen, PII-Filterung)
+- [**Timeout & Retry Policies**](docs/guides/TIMEOUT_RETRY.md) - Verbindungs-/Lese-/Sende-Timeouts, automatische Wiederholungen mit exponentiellem Backoff
+- [**Logging & Observability**](docs/guides/LOGGING_OBSERVABILITY.md) - Strukturiertes Logging (JSON/Text), Prometheus/OpenTelemetry-Metriken, Log-Sampling, benutzerdefinierte Felder
 
 ### Provider-Guides
-- [**Envoy Provider**](docs/guides/ENVOY.md) - CNCF cloud-native proxy, Filter-Architektur, xDS API
-- [**Kong Provider**](docs/guides/KONG.md) - Plugin-Ökosystem, Admin API, DB-less mode
-- [**APISIX Provider**](docs/guides/APISIX.md) - Ultra-high performance, etcd integration, Lua scripting
-- [**Traefik Provider**](docs/guides/TRAEFIK.md) - Auto-discovery, Let's Encrypt, Cloud-native
-- [**Nginx Provider**](docs/guides/NGINX.md) - Open Source, ngx_http modules, OpenResty
-- [**HAProxy Provider**](docs/guides/HAPROXY.md) - Advanced Load Balancing, ACLs, High performance
+- [**Envoy Provider**](docs/guides/ENVOY.md) - CNCF cloud-native Proxy, Filter-Architektur, xDS API
+- [**Kong Provider**](docs/guides/KONG.md) - Plugin-Ökosystem, Admin API, DB-less Modus
+- [**APISIX Provider**](docs/guides/APISIX.md) - Ultra-hohe Performance, etcd-Integration, Lua-Scripting
+- [**Traefik Provider**](docs/guides/TRAEFIK.md) - Auto-Discovery, Let's Encrypt, Cloud-native
+- [**Nginx Provider**](docs/guides/NGINX.md) - Open Source, ngx_http-Module, OpenResty
+- [**HAProxy Provider**](docs/guides/HAPROXY.md) - Erweiterte Load Balancing, ACLs, Hohe Performance
 
 ### Roadmap & Changelog
 - [**Roadmap**](ROADMAP.md) - Geplante Features und Releases
@@ -307,7 +307,7 @@ CONFIG_FILE=examples/gateway-config.yaml docker-compose --profile validate up ga
 - [**v1.2.0 Plan**](docs/v1.2.0-PLAN.md) - v1.2.0 Implementierungsplan (✅ 100% abgeschlossen - 6/6 Features)
 - [Changelog](CHANGELOG.md)
 
-## Testing & Development
+## Tests & Entwicklung
 
 ### Tests ausführen
 
@@ -327,22 +327,22 @@ pytest -v --log-cli-level=DEBUG
 
 ### Test-Suite
 
-- **385 Tests** mit **89% Code Coverage**
-- Unit Tests für alle Module
+- **385 Tests** mit **89% Code-Coverage**
+- Unit-Tests für alle Module
 - Provider-spezifische Tests (Envoy, Kong, APISIX, Traefik, Nginx, HAProxy)
-- CLI Tests mit Click CliRunner
-- End-to-End Workflow Tests
-- Deployment Tests (mit Mocking)
-- Real-World Szenario Tests
-- Feature Tests (Rate Limiting, Auth, Headers, CORS, Circuit Breaker, Health Checks, WebSocket, Body Transformation, Timeout & Retry, Logging & Observability)
+- CLI-Tests mit Click CliRunner
+- End-to-End-Workflow-Tests
+- Deployment-Tests (mit Mocking)
+- Praxisnahe Szenario-Tests
+- Feature-Tests (Rate Limiting, Auth, Headers, CORS, Circuit Breaker, Health Checks, WebSocket, Body-Transformation, Timeout & Retry, Logging & Observability)
 
-### Code Quality
+### Code-Qualität
 
 ```bash
-# Formatting mit black
+# Formatierung mit black
 black .
 
-# Import sorting mit isort
+# Import-Sortierung mit isort
 isort .
 
 # Linting mit flake8
@@ -358,19 +358,19 @@ Das Projekt verwendet GitHub Actions für kontinuierliche Integration:
 1. **Tests** (`.github/workflows/test.yml`)
    - Läuft auf Python 3.10, 3.11, 3.12
    - Automatische Tests bei jedem Push/PR
-   - Code Quality Checks
-   - Coverage Reporting
+   - Code-Qualitätsprüfungen
+   - Coverage-Berichte
 
 2. **Docker Build** (`.github/workflows/docker-build.yml`)
    - Automatischer Build und Push zu ghcr.io
-   - Multi-Platform Support (amd64, arm64)
+   - Multi-Plattform-Unterstützung (amd64, arm64)
    - Intelligentes Tagging (semver, branch, sha)
 
 3. **Release** (`.github/workflows/release.yml`)
    - Automatische Releases bei Git Tags
    - Changelog-Generierung
-   - Package Building
-   - GitHub Release Creation
+   - Package-Erstellung
+   - GitHub Release-Erstellung
 
 ### Release erstellen
 
@@ -385,7 +385,7 @@ git push origin v1.0.1
 # - Distribution Packages
 ```
 
-## Contributing
+## Mitwirken
 
 Beiträge sind willkommen! Bitte:
 

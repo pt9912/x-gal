@@ -172,7 +172,46 @@ Beispiel:
 - Provider-Generierung unterstützt jetzt Health-Check-Konfiguration
 ```
 
-### 8. Tests aktualisieren
+### 8. mkdocs.yml Navigation aktualisieren
+
+**Bei neuem Guide:**
+- Füge Guide zur `nav:` Sektion in `mkdocs.yml` hinzu
+- Sortiere nach Kategorie:
+  - **Guides**: Schnellstart, Provider-Übersicht, Provider-spezifisch, Transformationen, Entwicklung
+  - **Features**: Authentication, CORS, Rate Limiting, Circuit Breaker, etc.
+  - **API-Referenz**: CLI, Konfiguration
+  - **Architektur**: ARCHITECTURE.md
+
+**Bei neuem Feature:**
+- Füge Feature-Guide unter `Features:` in der Navigation hinzu
+- Alphabetische Sortierung innerhalb der Kategorie
+
+**Bei Provider-Erweiterung:**
+- Aktualisiere Provider-Guide in der Navigation (falls Name geändert)
+
+**Beispiel mkdocs.yml Update:**
+```yaml
+nav:
+  - Start: index.md
+  - Guides:
+    - Schnellstart: guides/QUICKSTART.md
+    - Provider Übersicht: guides/PROVIDERS.md
+    - Nginx: guides/NGINX.md
+    # ... weitere Provider
+  - Features:
+    - Authentication: guides/AUTHENTICATION.md
+    - CORS: guides/CORS.md
+    - Health Checks: guides/HEALTH_CHECKS.md  # ← Neu hinzugefügt
+    # ... weitere Features
+```
+
+**Bei docs/index.md Aktualisierung:**
+- Aktualisiere Feature-Liste auf Landing Page
+- Aktualisiere Provider-Tabelle
+- Aktualisiere Versionshinweise-Sektion
+- Füge neue Quick-Links hinzu
+
+### 9. Tests aktualisieren
 
 **Bei neuem Feature:**
 - Erstelle/erweitere Test-Datei: `tests/test_<feature>.py`
@@ -180,7 +219,7 @@ Beispiel:
 - Teste Config-Modell-Validierung
 - Teste Edge-Cases
 
-### 9. Dokumentations-Checkliste
+### 10. Dokumentations-Checkliste
 
 Verwende diese Checkliste für jede Code-Änderung:
 
@@ -188,7 +227,10 @@ Verwende diese Checkliste für jede Code-Änderung:
 Dokumentation Update Checklist:
 □ Python Docstrings für neue/geänderte Klassen und Methoden
 □ README.md Features/Provider-Matrix aktualisiert
+□ docs/README.md aktualisiert (Dokumentations-Hauptseite)
+□ docs/index.md aktualisiert (MkDocs Landing Page)
 □ Feature-Guide in docs/guides/ erstellt/aktualisiert (auf Deutsch!)
+□ mkdocs.yml Navigation aktualisiert (neue Guides/Features hinzugefügt)
 □ Beispiel-Konfiguration in examples/ erstellt
 □ ROADMAP.md aktualisiert (falls Teil von v1.X.0)
 □ vx.x.x-PLAN.md aktualisiert (Feature-Status, Progress, Implementation Details)
@@ -196,6 +238,7 @@ Dokumentation Update Checklist:
 □ Tests geschrieben und erfolgreich
 □ Breaking Changes dokumentiert
 □ Provider-Kompatibilität dokumentiert
+□ GitHub Pages Deployment erfolgreich (nach Push)
 ```
 
 ## Spezielle Szenarien
@@ -226,17 +269,24 @@ Dokumentation Update Checklist:
    - Feature zur Liste hinzufügen
    - Provider-Matrix aktualisieren
 
-7. **ROADMAP.md** (falls Teil von v1.X.0):
+7. **docs/index.md** (MkDocs Landing Page):
+   - Feature zu Features-Sektion hinzufügen
+   - Feature-Tabelle aktualisieren
+
+8. **mkdocs.yml**:
+   - Feature-Guide zur Navigation hinzufügen unter `Features:`
+
+9. **ROADMAP.md** (falls Teil von v1.X.0):
    - Feature als Done markieren
    - Progress aktualisieren
 
-8. **vx.x.x-PLAN.md** (falls Teil von v1.X.0):
+10. **vx.x.x-PLAN.md** (falls Teil von v1.X.0):
    - Feature-Status aktualisieren (Pending → In Progress → Done)
    - Progress-Prozentsatz aktualisieren
    - Implementation Details hinzufügen (Commits, Dateien, Test-Ergebnisse)
    - Milestone als erledigt markieren
 
-9. **CHANGELOG.md**:
+11. **CHANGELOG.md**:
    - Unter "Added" eintragen
 
 ### Neuer Provider hinzugefügt (z.B. Nginx)
@@ -253,26 +303,37 @@ Dokumentation Update Checklist:
    - Feature-Matrix für neuen Provider erstellen
    - Installation/Setup-Hinweise
 
-4. **Tests** (`tests/test_nginx.py`):
+4. **docs/README.md**:
+   - Provider zur Guides-Tabelle hinzufügen
+   - Provider zur unterstützten Provider-Tabelle hinzufügen
+
+5. **docs/index.md** (MkDocs Landing Page):
+   - Provider zur Provider-Tabelle hinzufügen
+   - Provider-Guide zu Guides-Navigation hinzufügen
+
+6. **mkdocs.yml**:
+   - Provider-Guide zur Navigation hinzufügen unter `Guides:`
+
+7. **Tests** (`tests/test_nginx.py`):
    - Vollständige Test-Suite für Provider
    - Alle Features testen
 
-5. **Beispiele**:
+8. **Beispiele**:
    - Alle bestehenden Beispiele auf neuen Provider testen
    - Provider-spezifische Beispiele hinzufügen
 
-6. **Guides**:
+9. **Guides**:
    - Alle Feature-Guides um Provider-Implementierung erweitern
 
-7. **ROADMAP.md**:
+10. **ROADMAP.md**:
    - Provider zur Liste hinzufügen
    - Feature-Matrix aktualisieren
 
-8. **vx.x.x-PLAN.md** (falls Teil von v1.X.0):
+11. **vx.x.x-PLAN.md** (falls Teil von v1.X.0):
    - Provider-Feature als Done markieren
    - Implementation Details dokumentieren
 
-9. **CHANGELOG.md**:
+12. **CHANGELOG.md**:
    - Unter "Added" eintragen
 
 ### Config Breaking Change
@@ -330,12 +391,23 @@ Nach jedem Dokumentations-Update:
    - Alle YAML-Beispiele in `examples/` testen
    - `python gal-cli.py generate examples/<example>.yaml`
 
-4. **Link-Check**:
+4. **MkDocs-Build**:
+   - `mkdocs build --strict` - Dokumentation bauen (strict mode)
+   - Prüfe auf broken links oder fehlende Dateien
+   - `mkdocs serve` - Lokal testen auf http://127.0.0.1:8000
+
+5. **Link-Check**:
    - Alle Links in Markdown-Dateien prüfen
    - Interne Verweise auf andere Guides
+   - Externe Links (GitHub, Provider-Docs)
 
-5. **Build-Check**:
+6. **Build-Check**:
    - `python -m build` - Distribution Packages erstellen
+
+7. **GitHub Pages Deployment**:
+   - Nach Push auf main/develop: GitHub Actions Workflow überwachen
+   - Verifiziere erfolgreichen Deployment auf https://pt9912.github.io/x-gal/
+   - Teste Navigation und Suchfunktion
 
 ## Integration mit anderen Skills
 
@@ -391,6 +463,16 @@ Nach Dokumentations-Update zeige Zusammenfassung:
   - Health Checks zur Feature-Liste hinzugefügt
   - Provider-Matrix aktualisiert
 
+✅ docs/README.md:
+  - Feature zu Guides-Tabelle hinzugefügt
+
+✅ docs/index.md (MkDocs Landing Page):
+  - Feature zu Features-Sektion hinzugefügt
+  - Feature-Links aktualisiert
+
+✅ mkdocs.yml:
+  - HEALTH_CHECKS.md zur Navigation hinzugefügt (Features)
+
 ✅ ROADMAP.md:
   - Feature 7 als Done markiert
   - Progress 71% → 86%
@@ -405,5 +487,7 @@ Nach Dokumentations-Update zeige Zusammenfassung:
 🔗 Nächste Schritte:
   - Beispiele testen: python gal-cli.py generate examples/health-checks-example.yaml
   - Tests ausführen: pytest tests/test_health_checks.py -v
+  - MkDocs lokal testen: mkdocs serve
+  - GitHub Pages Deployment nach Push überwachen
   - Vor Release: CHANGELOG.md vervollständigen
 ```
