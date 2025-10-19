@@ -31,6 +31,8 @@ Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong
 - ✅ **Timeout & Retry** - Verbindungs-/Lese-/Sende-Timeouts, automatische Wiederholungen mit exponentiellem Backoff
 - ✅ **Logging & Observability** - Strukturiertes Logging (JSON), Prometheus/OpenTelemetry-Metriken, Log-Sampling, benutzerdefinierte Felder
 - ✅ **Config-Import** (v1.3.0) - Importiere bestehende Envoy, Kong, APISIX, Traefik, Nginx, HAProxy Configs ins GAL-Format (`gal import-config`)
+- ✅ **Compatibility Checker** (v1.3.0) - Prüfe Provider-Kompatibilität und vergleiche Feature-Unterstützung (`gal check-compatibility`, `gal compare-providers`)
+- ✅ **Migration Assistant** (v1.3.0) - Interaktiver Migrations-Workflow mit Compatibility-Validierung und Migration Reports (`gal migrate`)
 
 ## Installation
 
@@ -210,6 +212,28 @@ python gal-cli.py import-config --provider apisix --input apisix.yaml --output g
 python gal-cli.py import-config --provider traefik --input traefik.yaml --output gal-config.yaml
 python gal-cli.py import-config --provider nginx --input nginx.conf --output gal-config.yaml
 python gal-cli.py import-config --provider haproxy --input haproxy.cfg --output gal-config.yaml
+
+# 🔍 Provider-Kompatibilität prüfen (v1.3.0)
+# Einzelnen Provider prüfen
+python gal-cli.py check-compatibility --config gal-config.yaml --target-provider envoy
+
+# Alle Provider vergleichen
+python gal-cli.py compare-providers --config gal-config.yaml
+
+# Mit detaillierter Ausgabe
+python gal-cli.py check-compatibility --config gal-config.yaml --target-provider traefik --verbose
+
+# 🔀 Zwischen Providern migrieren (v1.3.0)
+# Interaktiver Modus (Prompts für alle Parameter)
+python gal-cli.py migrate
+
+# Nicht-interaktiver Modus
+python gal-cli.py migrate \
+  --source-provider kong \
+  --source-config kong.yaml \
+  --target-provider envoy \
+  --output-dir ./migration \
+  --yes
 
 # Konfigurationsinformationen anzeigen
 python gal-cli.py info --config CONFIG

@@ -9,7 +9,7 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ### Hinzugefügt
 
-#### Config Import Features (v1.3.0)
+#### Config Import & Migration Features (v1.3.0)
 
 - **HAProxy Config Import** (Feature 6)
   - Import von haproxy.cfg zu GAL YAML
@@ -27,6 +27,40 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
   - Examples: `examples/haproxy/haproxy.cfg` (197 lines), `examples/haproxy/simple-haproxy.cfg` (35 lines)
   - Documentation: `docs/import/haproxy.md` (800+ lines)
   - CLI: `gal import-config --provider haproxy --input haproxy.cfg --output gal-config.yaml`
+
+- **Compatibility Checker** (Feature 7)
+  - Provider-Kompatibilität prüfen: Validiere GAL-Configs gegen Provider-Feature-Support
+  - Multi-Provider-Vergleich: Vergleiche Feature-Support über alle 6 Provider
+  - Feature Support Matrix: 18 Features × 6 Provider = 108 Kompatibilitäts-Einträge
+  - Compatibility Score: 0-100% Score-Berechnung (Full=1.0, Partial=0.5, Unsupported=0.0)
+  - Provider-spezifische Recommendations: Workarounds und Alternativen für nicht unterstützte Features
+  - Implementation: `gal/compatibility.py` (601 lines, 86% coverage)
+  - Tests: 26 tests (all passing, test_compatibility.py, 530+ lines)
+  - Documentation: `docs/import/compatibility.md` (550+ lines)
+  - CLI Commands:
+    - `gal check-compatibility --config CONFIG --target-provider PROVIDER [--verbose]`
+    - `gal compare-providers --config CONFIG [--providers P1,P2,...] [--verbose]`
+
+- **Migration Assistant** (Feature 8)
+  - Interaktiver CLI-Workflow: Schritt-für-Schritt Migration zwischen Providern
+  - 5-Schritte Workflow: Reading → Parsing → Converting → Validating → Generating
+  - 3 Generierte Dateien: gal-config.yaml (GAL), target config (provider-spezifisch), migration-report.md
+  - Automatic Compatibility Validation: Integration mit CompatibilityChecker (Feature 7)
+  - Migration Report Generator: Markdown-Report mit Summary, Features Status, Services, Testing Checklist, Next Steps
+  - Provider-agnostisch: Alle 6×6 = 36 Provider-Kombinationen unterstützt
+  - Implementation: `gal-cli.py` migrate command (+380 lines) + _generate_migration_report helper
+  - Tests: 31 tests (all passing, test_migrate.py, 820+ lines)
+    - TestMigrateBasic (7 tests): Kong→Envoy, Envoy→Kong, Traefik→Nginx, Output-Verzeichnis
+    - TestMigrateFileGeneration (7 tests): YAML/Markdown Validierung
+    - TestMigrateCompatibility (4 tests): Compatibility Score, Warnungen
+    - TestMigrateEdgeCases (5 tests): Ungültige Provider, leere Configs
+    - TestMigrateAllProviders (1 test): Kong → alle 5 anderen Provider
+    - TestMigrateYesFlag (2 tests): --yes/-y Flags
+    - TestMigrateReportContent (5 tests): Report-Struktur und Inhalt
+  - Documentation: `docs/import/migration.md` (325 lines)
+  - CLI Command:
+    - Interactive: `gal migrate` (Prompts für alle Parameter)
+    - Non-interactive: `gal migrate -s kong -i kong.yaml -t envoy -o ./migration --yes`
 
 ## [1.2.0] - 2025-10-18
 
