@@ -392,13 +392,13 @@ class NginxProvider(Provider):
 
         # Location blocks for routes
         for i, route in enumerate(service.routes):
-            self._generate_location(service, route, i, output)
+            self._generate_location(service, route, i, config, output)
 
         output.append("    }")
         output.append("")
 
     def _generate_location(
-        self, service: Service, route: Route, route_index: int, output: List[str]
+        self, service: Service, route: Route, route_index: int, config: Config, output: List[str]
     ) -> None:
         """Generate location block for route.
 
@@ -406,6 +406,7 @@ class NginxProvider(Provider):
             service: Service configuration
             route: Route configuration
             route_index: Index of route in service
+            config: Global configuration
             output: Output buffer to append to
         """
         output.append(f"        # Route: {route.path_prefix}")
