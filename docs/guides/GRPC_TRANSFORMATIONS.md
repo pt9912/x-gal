@@ -2,7 +2,7 @@
 
 **Version:** 1.4.0
 **Status:** ✅ Vollständig implementiert
-**Supported Providers:** Envoy ✅, Nginx ✅, APISIX ✅, Kong ⚠️, HAProxy ⚠️, Traefik ❌
+**Supported Providers:** Envoy ✅, Nginx ✅, APISIX ✅, Kong ⚠️, HAProxy ⚠️, Traefik ❌, Azure APIM ❌
 
 ---
 
@@ -35,6 +35,7 @@ gRPC Transformations ermöglichen die Manipulation von Protocol Buffer (Protobuf
 | **Kong** | ⚠️ Eingeschränkt | grpc-gateway plugin | Requires custom plugin oder grpc-gateway |
 | **HAProxy** | ⚠️ Manuell | External Lua script | Requires manual Lua script setup |
 | **Traefik** | ❌ Nicht unterstützt | N/A | No Lua support, use ForwardAuth |
+| **Azure APIM** | ❌ Nicht unterstützt | N/A | No native gRPC transformation, use grpc-gateway |
 
 ---
 
@@ -1207,7 +1208,7 @@ end
 
 ## Weitere Ressourcen
 
-- **Technische Spezifikation**: [docs/v1.4.0-GRPC-SPEC.md](../v1.4.0-GRPC-SPEC.md)
+- **Technische Spezifikation**: [docs/v1.4.0-GRPC-SPEC.md](https://github.com/pt9912/x-gal/blob/develop/docs/v1.4.0-GRPC-SPEC.md)
 - **API Referenz**: [gal/proto_manager.py](https://github.com/pt9912/x-gal/blob/main/gal/proto_manager.py)
 - **Beispiele**: [examples/grpc-transformation-example.yaml](https://github.com/pt9912/x-gal/blob/main/examples/grpc-transformation-example.yaml)
 - **Tests**: [tests/test_grpc_*.py](https://github.com/pt9912/x-gal/tree/main/tests)

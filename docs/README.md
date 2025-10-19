@@ -95,6 +95,7 @@ gal-cli.py generate -c config.yaml -p haproxy
 | [APISIX](guides/APISIX.md) | ✅ | JSON/YAML | Lua Serverless | ✅ / ✅ |
 | [Traefik](guides/TRAEFIK.md) | ✅ | YAML/TOML | Middleware | ✅ / ✅ |
 | [HAProxy](guides/HAPROXY.md) | ✅ | haproxy.cfg | Lua | ⚠️ / ✅ |
+| [Azure APIM](guides/AZURE_APIM.md) | ✅ | ARM/JSON | Policy XML | ✅ / ✅ |
 
 ## Häufig verwendete Ressourcen
 

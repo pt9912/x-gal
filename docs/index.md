@@ -179,7 +179,7 @@ Technische Details und Design:
 
 **Features aus v1.3.0:**
 
-- Config Import für alle 6 Provider (Nginx, Envoy, Kong, APISIX, Traefik, HAProxy)
+- Config Import für alle 7 Provider (Nginx, Envoy, Kong, APISIX, Traefik, HAProxy, Azure APIM)
 - Compatibility Checker für Provider-Migration
 - Migration Assistant für automatische Provider-Wechsel
 - HAProxy Config Parser

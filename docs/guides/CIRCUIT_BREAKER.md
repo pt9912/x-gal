@@ -51,7 +51,7 @@ CLOSED (Normal) → OPEN (Broken) → HALF_OPEN (Testing) → CLOSED
 | **Half-Open Requests** | ✅ | - | ✅ | - | - | - | Test-Requests |
 | **Status Code Detection** | ✅ | - | ✅ | ✅ | - | ⚠️ | Welche Codes = Fehler |
 
-**Coverage**: 50% (3 von 6 Providern haben native Unterstützung)
+**Coverage**: 43% (3 von 7 Providern haben native Unterstützung)
 
 - **Envoy**: Native `Outlier Detection` ✅
 - **APISIX**: Native `api-breaker` Plugin ✅

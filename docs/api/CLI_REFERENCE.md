@@ -46,6 +46,9 @@ gal-cli.py generate --config <datei> [--provider <provider>] [--output <datei>]
 - `kong` - Kong API Gateway
 - `apisix` - Apache APISIX
 - `traefik` - Traefik
+- `nginx` - Nginx/OpenResty
+- `haproxy` - HAProxy
+- `azure_apim` - Azure API Management
 
 **Beispiele:**
 

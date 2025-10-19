@@ -26,7 +26,7 @@ Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong
 - ✅ **Umfassende Tests** - 535 Tests mit 89% Coverage
 - ✅ **Traffic Management** - Rate Limiting, Circuit Breaker, Health Checks & Load Balancing
 - ✅ **Sicherheit** - Authentication (Basic, API Key, JWT), Header-Manipulation, CORS
-- ✅ **WebSocket-Unterstützung** - Echtzeit bidirektionale Kommunikation (alle 6 Provider)
+- ✅ **WebSocket-Unterstützung** - Echtzeit bidirektionale Kommunikation (alle 7 Provider)
 - ✅ **Body-Transformation** - Request/Response Body-Manipulation mit dynamischen Feldern
 - ✅ **Timeout & Retry** - Verbindungs-/Lese-/Sende-Timeouts, automatische Wiederholungen mit exponentiellem Backoff
 - ✅ **Logging & Observability** - Strukturiertes Logging (JSON), Prometheus/OpenTelemetry-Metriken, Log-Sampling, benutzerdefinierte Felder

@@ -931,7 +931,7 @@ WebSocket Support in GAL ermöglicht:
 - ✅ **Echtzeitkommunikation** für moderne Anwendungen
 - ✅ **Bidirektionale Push-Nachrichten** vom Server
 - ✅ **Niedrige Latenz** durch persistente Verbindungen
-- ✅ **Volle Provider-Unterstützung** (alle 6 Provider)
+- ✅ **Volle Provider-Unterstützung** (alle 7 Provider)
 - ✅ **Authentication & Rate Limiting** für Sicherheit
 - ✅ **Load Balancing** für Hochverfügbarkeit
 - ✅ **Einfache Konfiguration** mit YAML
