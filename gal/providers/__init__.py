@@ -3,6 +3,7 @@ Gateway provider implementations
 """
 
 from .apisix import APISIXProvider
+from .azure_apim import AzureAPIMProvider
 from .envoy import EnvoyProvider
 from .haproxy import HAProxyProvider
 from .kong import KongProvider
@@ -16,4 +17,5 @@ __all__ = [
     "TraefikProvider",
     "NginxProvider",
     "HAProxyProvider",
+    "AzureAPIMProvider",
 ]

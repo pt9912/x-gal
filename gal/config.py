@@ -20,6 +20,9 @@ class GlobalConfig:
         port: Gateway listen port (default: 10000)
         admin_port: Admin interface port (default: 9901)
         timeout: Request timeout duration (default: "30s")
+        logging: Optional logging configuration
+        metrics: Optional metrics configuration
+        azure_apim: Optional Azure API Management global configuration
 
     Example:
         >>> config = GlobalConfig(host="127.0.0.1", port=8080)
@@ -33,6 +36,7 @@ class GlobalConfig:
     timeout: str = "30s"
     logging: Optional["LoggingConfig"] = None
     metrics: Optional["MetricsConfig"] = None
+    azure_apim: Optional["AzureAPIMGlobalConfig"] = None
 
 
 @dataclass
@@ -894,6 +898,82 @@ class Transformation:
 
 
 @dataclass
+class AzureAPIMGlobalConfig:
+    """Azure API Management global configuration.
+
+    Global configuration for Azure APIM deployment, including
+    resource group, service name, location, and SKU.
+
+    Attributes:
+        resource_group: Azure resource group name
+        apim_service_name: APIM service instance name
+        location: Azure region (e.g., "westeurope", "eastus")
+        sku: APIM pricing tier (Developer, Basic, Standard, Premium)
+
+    Example:
+        >>> global_config = AzureAPIMGlobalConfig(
+        ...     resource_group="my-resource-group",
+        ...     apim_service_name="my-apim-service",
+        ...     location="westeurope",
+        ...     sku="Developer"
+        ... )
+        >>> global_config.location
+        'westeurope'
+    """
+
+    resource_group: str = "gal-resource-group"
+    apim_service_name: str = "gal-apim-service"
+    location: str = "westeurope"
+    sku: str = "Developer"
+
+
+@dataclass
+class AzureAPIMConfig:
+    """Azure API Management specific configuration.
+
+    Configuration for Azure API Management provider, including
+    product settings, API versioning, and subscription keys.
+
+    Attributes:
+        product_name: APIM Product name (default: "GAL-Product")
+        product_description: Product description
+        product_published: Whether product is published (default: True)
+        product_subscription_required: Require subscription keys (default: True)
+        api_revision: API revision number (default: "1")
+        api_version: API version identifier (e.g., "v1")
+        api_version_set_id: API version set ID for grouping
+        openapi_export: Generate OpenAPI spec (default: True)
+        openapi_version: OpenAPI specification version (default: "3.0.0")
+        subscription_keys_required: Require subscription keys (default: True)
+        rate_limit_calls: Maximum calls in renewal period (default: 100)
+        rate_limit_renewal_period: Period in seconds (default: 60)
+
+    Example:
+        >>> apim_config = AzureAPIMConfig(
+        ...     product_name="UserAPI-Product",
+        ...     api_revision="1",
+        ...     api_version="v1",
+        ...     rate_limit_calls=1000
+        ... )
+        >>> apim_config.product_name
+        'UserAPI-Product'
+    """
+
+    product_name: str = "GAL-Product"
+    product_description: str = "API Product managed by GAL"
+    product_published: bool = True
+    product_subscription_required: bool = True
+    api_revision: str = "1"
+    api_version: Optional[str] = None
+    api_version_set_id: Optional[str] = None
+    openapi_export: bool = True
+    openapi_version: str = "3.0.0"
+    subscription_keys_required: bool = True
+    rate_limit_calls: int = 100
+    rate_limit_renewal_period: int = 60
+
+
+@dataclass
 class Service:
     """Backend service configuration.
 
@@ -907,6 +987,7 @@ class Service:
         upstream: Backend service endpoint configuration
         routes: List of routing rules for this service
         transformation: Optional request transformation configuration
+        azure_apim: Optional Azure API Management specific configuration
 
     Example:
         >>> service = Service(
@@ -926,6 +1007,7 @@ class Service:
     upstream: Upstream
     routes: List[Route]
     transformation: Optional[Transformation] = None
+    azure_apim: Optional[AzureAPIMConfig] = None
 
 
 @dataclass
