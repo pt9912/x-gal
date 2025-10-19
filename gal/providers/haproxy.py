@@ -6,10 +6,24 @@ Supports advanced load balancing, health checks, rate limiting, headers, ACLs.
 """
 
 import logging
-from typing import Any, Dict, List
+import re
+from typing import Any, Dict, List, Optional
 
-from gal.config import Config, Route, Service, UpstreamTarget
+from gal.config import (
+    Config,
+    GlobalConfig,
+    Route,
+    Service,
+    Upstream,
+    UpstreamTarget,
+    LoadBalancerConfig,
+    HealthCheckConfig,
+    ActiveHealthCheck,
+    HeaderManipulation,
+    RateLimitConfig,
+)
 from gal.provider import Provider
+from gal.parsers.haproxy_parser import HAProxyConfigParser, HAProxySection, SectionType
 
 logger = logging.getLogger(__name__)
 
@@ -580,19 +594,397 @@ class HAProxyProvider(Provider):
 
         return value
 
-    def parse(self, provider_config: str):
+    def parse(self, provider_config: str) -> Config:
         """Parse HAProxy configuration to GAL format.
 
-        TODO: Implementation pending for v1.3.0 Feature 6 (Custom Parser).
+        Parses haproxy.cfg format with custom parser.
+        Extracts frontends, backends, servers, and directives.
 
         Args:
-            provider_config: HAProxy haproxy.cfg configuration
+            provider_config: HAProxy haproxy.cfg configuration string
+
+        Returns:
+            Config: GAL configuration object
 
         Raises:
-            NotImplementedError: HAProxy parser not yet implemented
+            ValueError: If config is invalid or cannot be parsed
         """
-        raise NotImplementedError(
-            "HAProxy config import will be implemented in v1.3.0 Feature 6. "
-            "Requires custom haproxy.cfg parser. "
-            "Use 'gal import --provider haproxy' after the feature is released."
+        logger.info("Parsing HAProxy configuration to GAL format")
+
+        if not provider_config or not provider_config.strip():
+            raise ValueError("Empty configuration")
+
+        self._import_warnings = []
+
+        # Parse config into sections
+        parser = HAProxyConfigParser()
+        sections = parser.parse(provider_config)
+
+        # Extract global config
+        global_config = self._parse_global(sections)
+
+        # Parse services from backends
+        services = self._parse_services(sections)
+
+        return Config(
+            version="1.0",
+            provider="haproxy",
+            global_config=global_config,
+            services=services,
         )
+
+    def _parse_global(self, sections: List[HAProxySection]) -> GlobalConfig:
+        """Extract global config from sections.
+
+        Args:
+            sections: List of all configuration sections
+
+        Returns:
+            GlobalConfig: Global configuration
+        """
+        # Try to extract from defaults or first frontend
+        defaults = [s for s in sections if s.type == SectionType.DEFAULTS]
+        frontends = [s for s in sections if s.type == SectionType.FRONTEND]
+
+        host = "0.0.0.0"
+        port = 80
+        timeout = "30s"
+
+        # Try to get bind from first frontend
+        if frontends:
+            frontend = frontends[0]
+            for directive in frontend.directives:
+                if directive["name"] == "bind":
+                    # Parse bind directive: "bind *:80" or "bind 0.0.0.0:8080"
+                    bind_value = directive["value"]
+                    match = re.match(r'([^:]+):(\d+)', bind_value)
+                    if match:
+                        bind_host, bind_port = match.groups()
+                        if bind_host != "*":
+                            host = bind_host
+                        port = int(bind_port)
+                    elif bind_value.isdigit():
+                        port = int(bind_value)
+
+        # Try to get timeout from defaults
+        if defaults:
+            for directive in defaults[0].directives:
+                if directive["name"] == "timeout" and "client" in directive["value"]:
+                    timeout = self._parse_timeout(directive["value"])
+
+        return GlobalConfig(host=host, port=port, timeout=timeout)
+
+    def _parse_services(self, sections: List[HAProxySection]) -> List[Service]:
+        """Parse HAProxy backends to GAL services.
+
+        Args:
+            sections: List of all configuration sections
+
+        Returns:
+            List of Service objects
+        """
+        services = []
+
+        # Collect backends and frontends
+        backends = [s for s in sections if s.type == SectionType.BACKEND]
+        frontends = [s for s in sections if s.type == SectionType.FRONTEND]
+        listen_sections = [s for s in sections if s.type == SectionType.LISTEN]
+
+        # Parse backends
+        for backend in backends:
+            service = self._parse_backend(backend, frontends)
+            if service:
+                services.append(service)
+
+        # Parse listen sections (combined frontend+backend)
+        for listen in listen_sections:
+            service = self._parse_listen(listen)
+            if service:
+                services.append(service)
+
+        return services
+
+    def _parse_backend(
+        self, backend: HAProxySection, frontends: List[HAProxySection]
+    ) -> Optional[Service]:
+        """Parse HAProxy backend to GAL service.
+
+        Args:
+            backend: Backend section
+            frontends: List of frontend sections for routing info
+
+        Returns:
+            Service object or None if cannot parse
+        """
+        name = backend.name or "unnamed_backend"
+
+        # Parse server targets
+        targets = []
+        lb_algorithm = "round_robin"
+        health_check = None
+        sticky_sessions = False
+        cookie_name = None
+        headers_config = None
+
+        for directive in backend.directives:
+            if directive["name"] == "server":
+                target = self._parse_server_directive(directive["value"])
+                if target:
+                    targets.append(target)
+
+            elif directive["name"] == "balance":
+                lb_algorithm = self._map_lb_algorithm(directive["value"])
+
+            elif directive["name"] == "option":
+                if "httpchk" in directive["value"]:
+                    health_check = self._parse_httpchk(directive["value"])
+
+            elif directive["name"] == "http-check":
+                # HAProxy 2.0+ health check syntax
+                if not health_check:
+                    health_check = HealthCheckConfig(
+                        active=ActiveHealthCheck(path="/", interval="10s", timeout="5s")
+                    )
+
+            elif directive["name"] == "cookie":
+                # Sticky sessions via cookie
+                cookie_parts = directive["value"].split()
+                if cookie_parts:
+                    cookie_name = cookie_parts[0]
+                    sticky_sessions = True
+
+            elif directive["name"] == "http-request" and "set-header" in directive["value"]:
+                # Header manipulation
+                if not headers_config:
+                    headers_config = HeaderManipulation(add={})
+                header_match = re.search(r'set-header\s+(\S+)\s+(.+)', directive["value"])
+                if header_match:
+                    header_name, header_value = header_match.groups()
+                    headers_config.add[header_name] = header_value.strip('"')
+
+        # Build upstream
+        upstream = Upstream(
+            targets=targets,
+            load_balancer=LoadBalancerConfig(
+                algorithm=lb_algorithm,
+                sticky_sessions=sticky_sessions,
+                cookie_name=cookie_name,
+            ) if targets else None,
+            health_check=health_check,
+        )
+
+        # Find routes from frontends
+        routes = self._find_routes_for_backend(name, frontends)
+
+        return Service(
+            name=name,
+            type="rest",  # HAProxy is HTTP-focused
+            protocol="http",
+            upstream=upstream,
+            routes=routes if routes else [Route(path_prefix="/")],
+            headers=headers_config,
+        )
+
+    def _parse_listen(self, listen: HAProxySection) -> Optional[Service]:
+        """Parse HAProxy listen section (combined frontend+backend).
+
+        Args:
+            listen: Listen section
+
+        Returns:
+            Service object or None if cannot parse
+        """
+        name = listen.name or "unnamed_listen"
+
+        # Parse similar to backend
+        targets = []
+        lb_algorithm = "round_robin"
+        routes = [Route(path_prefix="/")]
+        bind_port = 80
+
+        for directive in listen.directives:
+            if directive["name"] == "server":
+                target = self._parse_server_directive(directive["value"])
+                if target:
+                    targets.append(target)
+
+            elif directive["name"] == "balance":
+                lb_algorithm = self._map_lb_algorithm(directive["value"])
+
+            elif directive["name"] == "bind":
+                # Extract port from bind
+                bind_value = directive["value"]
+                match = re.match(r'[^:]+:(\d+)', bind_value)
+                if match:
+                    bind_port = int(match.group(1))
+
+        upstream = Upstream(
+            targets=targets,
+            load_balancer=LoadBalancerConfig(algorithm=lb_algorithm) if targets else None,
+        )
+
+        return Service(
+            name=name,
+            type="rest",
+            protocol="http",
+            upstream=upstream,
+            routes=routes,
+        )
+
+    def _parse_server_directive(self, value: str) -> Optional[UpstreamTarget]:
+        """Parse server directive.
+
+        Format: name host:port [options]
+
+        Args:
+            value: Server directive value
+
+        Returns:
+            UpstreamTarget or None if cannot parse
+        """
+        parts = value.split()
+        if len(parts) < 2:
+            return None
+
+        # parts[0] is server name, parts[1] is host:port
+        server_name = parts[0]
+        address = parts[1]
+
+        # Parse host:port
+        match = re.match(r'([^:]+):(\d+)', address)
+        if not match:
+            return None
+
+        host, port = match.groups()
+
+        # Parse options (weight, check, etc.)
+        weight = 1
+        for part in parts[2:]:
+            if part.startswith("weight"):
+                try:
+                    weight = int(part.split()[1])
+                except (IndexError, ValueError):
+                    pass
+
+        return UpstreamTarget(host=host, port=int(port), weight=weight)
+
+    def _map_lb_algorithm(self, balance_value: str) -> str:
+        """Map HAProxy balance algorithm to GAL.
+
+        Args:
+            balance_value: HAProxy balance directive value
+
+        Returns:
+            GAL load balancing algorithm name
+        """
+        balance_map = {
+            "roundrobin": "round_robin",
+            "leastconn": "least_connections",
+            "source": "ip_hash",
+            "uri": "uri_hash",
+            "hdr": "header_hash",
+            "first": "first",
+        }
+
+        balance_type = balance_value.split()[0]
+        return balance_map.get(balance_type, "round_robin")
+
+    def _parse_httpchk(self, value: str) -> HealthCheckConfig:
+        """Parse option httpchk directive.
+
+        Format: httpchk [METHOD] [URI] [VERSION]
+
+        Args:
+            value: httpchk directive value
+
+        Returns:
+            HealthCheckConfig
+        """
+        parts = value.split()
+        path = "/"
+        method = "GET"
+
+        # Parse parts: httpchk GET /health HTTP/1.1
+        if len(parts) > 1:
+            method = parts[1]
+        if len(parts) > 2:
+            path = parts[2]
+
+        return HealthCheckConfig(
+            active=ActiveHealthCheck(
+                path=path,
+                interval="10s",
+                timeout="5s",
+                healthy_threshold=3,
+                unhealthy_threshold=2,
+            )
+        )
+
+    def _parse_timeout(self, value: str) -> str:
+        """Parse timeout directive value.
+
+        Args:
+            value: Timeout value (e.g., "client 30s" or "50s")
+
+        Returns:
+            Timeout string in GAL format
+        """
+        parts = value.split()
+        if len(parts) >= 2:
+            # "client 30s" -> "30s"
+            return parts[1]
+        return "30s"
+
+    def _find_routes_for_backend(
+        self, backend_name: str, frontends: List[HAProxySection]
+    ) -> List[Route]:
+        """Find routes that use this backend.
+
+        Args:
+            backend_name: Name of backend
+            frontends: List of frontend sections
+
+        Returns:
+            List of Route objects
+        """
+        routes = []
+
+        for frontend in frontends:
+            # Look for use_backend or default_backend directives
+            for directive in frontend.directives:
+                if directive["name"] == "use_backend":
+                    # Parse: use_backend backend_name if condition
+                    parts = directive["value"].split()
+                    if parts and parts[0] == backend_name:
+                        # Try to extract path from ACL condition
+                        route = self._parse_use_backend_condition(directive["value"])
+                        if route:
+                            routes.append(route)
+
+                elif directive["name"] == "default_backend":
+                    if directive["value"] == backend_name:
+                        routes.append(Route(path_prefix="/"))
+
+        return routes if routes else [Route(path_prefix="/")]
+
+    def _parse_use_backend_condition(self, value: str) -> Optional[Route]:
+        """Parse use_backend condition to extract route.
+
+        Args:
+            value: use_backend directive value
+
+        Returns:
+            Route object or None
+        """
+        # Simple path extraction from ACL
+        # Example: "backend_api if { path_beg /api }"
+        path_match = re.search(r'path_beg\s+(/\S+)', value)
+        if path_match:
+            return Route(path_prefix=path_match.group(1))
+
+        # Example: "backend_api if { path /api }"
+        path_match = re.search(r'path\s+(/\S+)', value)
+        if path_match:
+            return Route(path_prefix=path_match.group(1))
+
+        return None
