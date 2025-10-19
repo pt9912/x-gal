@@ -485,7 +485,7 @@ gal info --config CONFIG
 
 ## Weiterführende Ressourcen
 
-- [Import Guide](README.md) - Provider-Import Dokumentation
+- [Import & Migration Guide](migration.md) - Provider-Import Dokumentation
 - [Provider Guides](../guides/PROVIDERS.md) - Provider-spezifische Informationen
 - [v1.3.0 Plan](../v1.3.0-PLAN.md) - Feature-Implementierungsplan
 
