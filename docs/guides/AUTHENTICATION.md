@@ -619,6 +619,71 @@ frontend api_front
     default_backend api_backend
 ```
 
+### Azure APIM
+
+Azure API Management implementiert Authentication mit Policy XML.
+
+**Basic Auth:**
+- Feature: Nicht nativ unterstützt
+- Workaround: validate-jwt mit Custom IDP oder ForwardAuth
+- Hinweis: Azure AD empfohlen statt Basic Auth
+
+**API Key (Subscription Keys):**
+- Feature: `check-header` Policy
+- Features: Native Subscription Key Management, Product-basierte Keys, Primary/Secondary Keys
+- Hinweis: Production-ready, Built-in Developer Portal
+
+**JWT (Azure AD):**
+- Feature: `validate-jwt` Policy
+- Features: OpenID Connect Discovery, Azure AD Integration, Required Claims, Audience/Issuer Validation
+- Hinweis: Empfohlene Methode für Production
+
+**OAuth 2.0:**
+- Feature: `validate-jwt` + OAuth2 Authorization Server
+- Features: Vollständige OAuth 2.0 Flows, Token Introspection
+- Hinweis: Enterprise-ready
+
+**Generiertes Config-Beispiel (Policy XML):**
+```xml
+<!-- Subscription Keys -->
+<policies>
+    <inbound>
+        <base />
+        <check-header name="Ocp-Apim-Subscription-Key"
+                      failed-check-httpcode="401"
+                      failed-check-error-message="Missing or invalid subscription key" />
+    </inbound>
+</policies>
+
+<!-- Azure AD JWT -->
+<policies>
+    <inbound>
+        <base />
+        <validate-jwt header-name="Authorization"
+                      failed-validation-httpcode="401"
+                      failed-validation-error-message="Unauthorized">
+            <openid-config url="https://login.microsoftonline.com/{tenant-id}/v2.0/.well-known/openid-configuration" />
+            <audiences>
+                <audience>api://my-api</audience>
+            </audiences>
+            <required-claims>
+                <claim name="roles" match="any">
+                    <value>admin</value>
+                    <value>user</value>
+                </claim>
+            </required-claims>
+        </validate-jwt>
+    </inbound>
+</policies>
+```
+
+**Azure APIM-spezifische Features:**
+- **Subscription Keys:** Automatische Key-Generierung, Primary/Secondary Keys für Key Rotation
+- **Developer Portal:** Self-Service Subscription Management
+- **Products:** Gruppierung von APIs mit unterschiedlichen Subscription Tiers
+- **Azure AD Integration:** Native Integration ohne Custom Code
+- **Named Values:** Sichere Storage für Secrets (Azure Key Vault Integration)
+
 ## Best Practices
 
 ### Allgemeine Sicherheit

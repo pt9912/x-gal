@@ -2,7 +2,7 @@
 
 **Provider-agnostisches Konfigurationssystem für API-Gateways**
 
-GAL ermöglicht es Ihnen, API-Gateway-Konfigurationen einmal zu definieren und für verschiedene Provider (Nginx, Envoy, Kong, APISIX, Traefik, HAProxy) zu generieren.
+GAL ermöglicht es Ihnen, API-Gateway-Konfigurationen einmal zu definieren und für verschiedene Provider (Nginx, Envoy, Kong, APISIX, Traefik, HAProxy, Azure APIM) zu generieren.
 
 ---
 
@@ -80,14 +80,15 @@ gal generate -c config.yaml -p kong
 
 ## Unterstützte Provider
 
-| Provider | Status | Output-Format | Transformations | Import/Export |
-|----------|--------|---------------|-----------------|---------------|
-| [Nginx](guides/NGINX.md) | :white_check_mark: | nginx.conf | Lua/njs | :white_check_mark: / :white_check_mark: |
-| [Envoy](guides/ENVOY.md) | :white_check_mark: | YAML | Lua Filters | :white_check_mark: / :white_check_mark: |
-| [Kong](guides/KONG.md) | :white_check_mark: | YAML | Plugins | :white_check_mark: / :white_check_mark: |
-| [APISIX](guides/APISIX.md) | :white_check_mark: | JSON/YAML | Lua Serverless | :white_check_mark: / :white_check_mark: |
-| [Traefik](guides/TRAEFIK.md) | :white_check_mark: | YAML/TOML | Middleware | :white_check_mark: / :white_check_mark: |
-| [HAProxy](guides/HAPROXY.md) | :white_check_mark: | haproxy.cfg | Lua | :warning: / :white_check_mark: |
+| Provider | Status | Output-Format | Transformations | Import/Export | Deployment |
+|----------|--------|---------------|-----------------|---------------|------------|
+| [Nginx](guides/NGINX.md) | :white_check_mark: | nginx.conf | Lua/njs | :white_check_mark: / :white_check_mark: | Self-Hosted |
+| [Envoy](guides/ENVOY.md) | :white_check_mark: | YAML | Lua Filters | :white_check_mark: / :white_check_mark: | Self-Hosted |
+| [Kong](guides/KONG.md) | :white_check_mark: | YAML | Plugins | :white_check_mark: / :white_check_mark: | Self-Hosted |
+| [APISIX](guides/APISIX.md) | :white_check_mark: | JSON/YAML | Lua Serverless | :white_check_mark: / :white_check_mark: | Self-Hosted |
+| [Traefik](guides/TRAEFIK.md) | :white_check_mark: | YAML/TOML | Middleware | :white_check_mark: / :white_check_mark: | Self-Hosted |
+| [HAProxy](guides/HAPROXY.md) | :white_check_mark: | haproxy.cfg | Lua | :warning: / :white_check_mark: | Self-Hosted |
+| **[Azure APIM](guides/AZURE_APIM.md)** | :white_check_mark: | **ARM/JSON** | **Policy XML** | :x: / :white_check_mark: | **Azure Cloud** |
 
 ---
 
@@ -99,7 +100,7 @@ Praktische Anleitungen für häufige Aufgaben:
 
 - **[Schnellstart](guides/QUICKSTART.md)** - Installation und erste Schritte in 5 Minuten
 - **[Provider-Übersicht](guides/PROVIDERS.md)** - Vergleich aller Gateway-Provider
-- **Provider-spezifisch**: [Nginx](guides/NGINX.md) | [Envoy](guides/ENVOY.md) | [Kong](guides/KONG.md) | [APISIX](guides/APISIX.md) | [Traefik](guides/TRAEFIK.md) | [HAProxy](guides/HAPROXY.md)
+- **Provider-spezifisch**: [Nginx](guides/NGINX.md) | [Envoy](guides/ENVOY.md) | [Kong](guides/KONG.md) | [APISIX](guides/APISIX.md) | [Traefik](guides/TRAEFIK.md) | [HAProxy](guides/HAPROXY.md) | [Azure APIM](guides/AZURE_APIM.md)
 - **[Transformationen](guides/TRANSFORMATIONS.md)** - Request-Transformationen und Best Practices
 - **[Entwicklung](guides/DEVELOPMENT.md)** - Zum Projekt beitragen
 
@@ -115,6 +116,8 @@ Detaillierte Feature-Dokumentation:
 - **[Headers](guides/HEADERS.md)** - Header-Manipulation
 - **[Logging & Observability](guides/LOGGING_OBSERVABILITY.md)** - Monitoring & Logging
 - **[Body Transformation](guides/BODY_TRANSFORMATION.md)** - Request/Response Transformation
+- **[gRPC Transformations](guides/GRPC_TRANSFORMATIONS.md)** - Protobuf-basierte gRPC Transformationen
+- **[Azure API Management](guides/AZURE_APIM.md)** - Cloud-Native API Gateway für Azure
 - **[WebSocket](guides/WEBSOCKET.md)** - WebSocket-Unterstützung
 - **[Timeout & Retry](guides/TIMEOUT_RETRY.md)** - Timeout- & Retry-Strategien
 
@@ -158,19 +161,30 @@ Technische Details und Design:
 
 ## Neuigkeiten
 
-### Version 1.3.0
+### Version 1.4.0
 
-**Neu in v1.3.0:**
+**Neu in v1.4.0:**
 
-- :white_check_mark: Nginx Import-Unterstützung (Custom Parser für nginx.conf)
-- :white_check_mark: Traefik Import-Unterstützung (YAML Parser)
-- :white_check_mark: APISIX Import-Unterstützung (JSON/YAML Parser)
-- :white_check_mark: Kong Import-Unterstützung (Erweitert)
-- :white_check_mark: Envoy Import-Unterstützung (Erweitert)
-- :white_check_mark: Umfassende Feature Coverage Analyse für alle 6 Provider
-- :white_check_mark: Provider-spezifische Dokumentationsguides
+- :white_check_mark: **gRPC Transformations** - Protobuf-basierte Request/Response Transformationen
+- :white_check_mark: **Azure API Management** - Cloud Provider Support mit ARM Templates
+- :white_check_mark: Proto Descriptor Management (file/inline/url)
+- :white_check_mark: Azure AD JWT Validation & Subscription Keys
+- :white_check_mark: OpenAPI 3.0 Export für APIM
+- :white_check_mark: 71 neue Tests für gRPC, 29 neue Tests für Azure APIM
+- :white_check_mark: 3000+ Zeilen neue Dokumentation
 
 [Zum Changelog →](https://github.com/pt9912/x-gal/blob/main/CHANGELOG.md)
+
+### Version 1.3.0
+
+**Features aus v1.3.0:**
+
+- Config Import für alle 6 Provider (Nginx, Envoy, Kong, APISIX, Traefik, HAProxy)
+- Compatibility Checker für Provider-Migration
+- Migration Assistant für automatische Provider-Wechsel
+- HAProxy Config Parser
+
+[Vollständiger Changelog →](https://github.com/pt9912/x-gal/blob/main/CHANGELOG.md)
 
 ---
 

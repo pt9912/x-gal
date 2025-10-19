@@ -437,6 +437,54 @@ backend backend_api_service
 - `connect_timeout` → `retry-on conn-failure`
 - `http_503` → `retry-on 503`
 
+### Azure APIM
+
+Azure API Management konfiguriert Timeouts via Policy XML:
+
+**Timeout-Konfiguration**:
+```xml
+<policies>
+    <inbound>
+        <base />
+        <!-- Forward-request timeout -->
+        <forward-request timeout="120" />
+    </inbound>
+</policies>
+```
+
+**Backend Timeout**:
+```xml
+<policies>
+    <backend>
+        <base />
+        <set-backend-service base-url="https://backend.example.com" />
+        <!-- Backend send timeout -->
+        <send-request timeout="60">
+            ...
+        </send-request>
+    </backend>
+</policies>
+```
+
+**Retry-Konfiguration**:
+Azure APIM bietet keine native Retry-Policy. Workarounds:
+- **send-request Policy** mit `count` und `interval` für Custom Retries
+- **Azure Functions** mit Retry-Logik als Backend
+- **Application Insights** für Monitoring fehlgeschlagener Requests
+
+**Besonderheiten**:
+- Timeouts in **Sekunden** (nicht Millisekunden)
+- `forward-request timeout`: Read Timeout für gesamten Request
+- Keine native Retry-Konfiguration (benötigt Custom Logic)
+- Standard Timeout: 300 Sekunden (5 Minuten)
+
+**GAL-Mapping**:
+- `timeout.read: "120s"` → `<forward-request timeout="120" />`
+- `timeout.send: "60s"` → `<send-request timeout="60">`
+- `retry.*`: Nicht unterstützt (Warning im Log)
+
+**Hinweis**: Für Production-Retries empfiehlt Azure die Verwendung von Azure Functions oder Logic Apps mit eingebauter Retry-Logik.
+
 ---
 
 ## Häufige Anwendungsfälle

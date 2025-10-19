@@ -2,7 +2,7 @@
 
 ## Was ist GAL?
 
-Gateway Abstraction Layer (GAL) ist ein Tool, das es ermöglicht, API-Gateway-Konfigurationen einmal zu definieren und für verschiedene Gateway-Provider (Envoy, Kong, APISIX, Traefik) zu generieren.
+Gateway Abstraction Layer (GAL) ist ein Tool, das es ermöglicht, API-Gateway-Konfigurationen einmal zu definieren und für verschiedene Gateway-Provider (Envoy, Kong, APISIX, Traefik, Nginx, HAProxy, Azure APIM) zu generieren.
 
 **Vorteile:**
 - ✅ Keine Vendor Lock-in

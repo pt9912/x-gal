@@ -2,18 +2,19 @@
 
 ## Übersicht
 
-GAL unterstützt sechs führende API-Gateway-Provider. Jeder Provider hat spezifische Eigenschaften, Stärken und ideale Use Cases.
+GAL unterstützt sieben führende API-Gateway-Provider - sechs selbst-gehostete und einen Cloud-nativen Provider. Jeder Provider hat spezifische Eigenschaften, Stärken und ideale Use Cases.
 
 ## Unterstützte Provider
 
-| Provider | Output-Format | Transformations | gRPC | REST | GAL Deploy API |
-|----------|--------------|-----------------|------|------|----------------|
-| Envoy | YAML | Lua Filters | ✅ | ✅ | ✅ File + API check |
-| Kong | YAML | Plugins | ✅ | ✅ | ✅ File + Admin API |
-| APISIX | JSON | Lua Serverless | ✅ | ✅ | ✅ File + Admin API |
-| Traefik | YAML | Middleware | ✅ | ✅ | ✅ File + API verify |
-| Nginx | CONF | ngx_http modules | ✅ | ✅ | ✅ File + reload |
-| HAProxy | CFG | ACLs + Lua | ✅ | ✅ | ✅ File + reload |
+| Provider | Output-Format | Transformations | gRPC | REST | GAL Deploy API | Cloud |
+|----------|--------------|-----------------|------|------|----------------|-------|
+| Envoy | YAML | Lua Filters | ✅ | ✅ | ✅ File + API check | Self-Hosted |
+| Kong | YAML | Plugins | ✅ | ✅ | ✅ File + Admin API | Self-Hosted |
+| APISIX | JSON | Lua Serverless | ✅ | ✅ | ✅ File + Admin API | Self-Hosted |
+| Traefik | YAML | Middleware | ✅ | ✅ | ✅ File + API verify | Self-Hosted |
+| Nginx | CONF | ngx_http modules | ✅ | ✅ | ✅ File + reload | Self-Hosted |
+| HAProxy | CFG | ACLs + Lua | ✅ | ✅ | ✅ File + reload | Self-Hosted |
+| **Azure APIM** | **ARM+JSON** | **Policy XML** | **✅** | **✅** | **✅ ARM Deploy** | **Azure Cloud** |
 
 ## Envoy Proxy
 
@@ -761,41 +762,253 @@ docker run -d \
 
 ---
 
+## Azure API Management (Cloud Provider)
+
+### Übersicht
+
+Azure API Management (APIM) ist Microsofts vollständig verwalteter Cloud-Native API Gateway Service für Azure-Anwendungen.
+
+> **💡 API-Referenz:** Für technische Details zur Implementierung siehe `gal/providers/azure_apim.py:24-64` (AzureAPIMProvider Klassen-Docstring)
+
+**Stärken:**
+- Fully Managed Service (keine Server-Wartung)
+- Native Azure Integration (Azure AD, Key Vault, App Services)
+- Developer Portal mit Self-Service
+- Subscription Keys Management
+- OpenAPI 3.0 Import/Export
+- Multi-Region Deployment (Premium SKU)
+- Application Insights Integration
+
+**Ideal für:**
+- Azure Cloud-Native Applications
+- Enterprise API Management
+- Hybrid Cloud (On-Premises + Azure)
+- API Monetization mit Subscription Tiers
+- Developer Portals mit API Documentation
+
+### GAL-Generierung
+
+**Output:** `azure-apim-template.json` (ARM Template) + `openapi.json` (OpenAPI 3.0)
+
+**Struktur (ARM Template):**
+
+```json
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "resources": [
+    {
+      "type": "Microsoft.ApiManagement/service",
+      "name": "my-apim-service",
+      "sku": {
+        "name": "Developer"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis",
+      "name": "user_api",
+      "properties": {
+        "path": "api",
+        "protocols": ["https"]
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/products",
+      "name": "UserAPI-Product",
+      "properties": {
+        "subscriptionRequired": true
+      }
+    }
+  ]
+}
+```
+
+### Transformationen
+
+Azure APIM nutzt **Policy XML** für Transformationen:
+
+```xml
+<policies>
+    <inbound>
+        <base />
+        <rate-limit calls="6000" renewal-period="60" />
+        <validate-jwt header-name="Authorization">
+            <openid-config url="https://login.microsoftonline.com/{tenant}/v2.0/.well-known/openid-configuration" />
+        </validate-jwt>
+        <set-header name="X-Custom-Header" exists-action="override">
+            <value>custom-value</value>
+        </set-header>
+    </inbound>
+    <outbound>
+        <base />
+    </outbound>
+</policies>
+```
+
+**Features:**
+- Rate Limiting (calls + renewal-period)
+- Azure AD JWT Validation
+- Subscription Key Validation
+- Header Manipulation (request + response)
+- Backend URL Routing
+- Caching (cache-lookup, cache-store)
+
+**Authentifizierung:**
+- Subscription Keys (API Key Management)
+- Azure AD OAuth2/OIDC (validate-jwt policy)
+- Custom Headers
+
+### Azure-spezifische Features
+
+**Products & Subscriptions:**
+```yaml
+azure_apim:
+  product_name: "Premium-Tier"
+  product_subscription_required: true
+  rate_limit_calls: 120000  # 2000 req/min
+```
+
+**Developer Portal:**
+- Automatisch verfügbar unter `https://<apim-service>.developer.azure-api.net`
+- API-Dokumentation aus OpenAPI
+- Self-Service Subscription Management
+- Interactive API Testing
+
+**SKU-Optionen:**
+- Developer: Development/Testing (no SLA)
+- Consumption: Serverless, pay-per-request
+- Basic: Small production APIs
+- Standard: Production APIs mit VNet
+- Premium: Enterprise (Multi-Region, 99.99% SLA)
+
+### Deployment
+
+GAL unterstützt Azure CLI Deployment:
+
+**Python API:**
+
+```python
+from gal import Manager
+from gal.providers.azure_apim import AzureAPIMProvider
+
+manager = Manager()
+provider = AzureAPIMProvider()
+config = manager.load_config("config.yaml")
+
+# ARM Template generieren
+arm_template = provider.generate(config)
+
+# OpenAPI Spec generieren
+openapi_spec = provider.generate_openapi(config)
+```
+
+**Azure CLI:**
+
+```bash
+# GAL Config → ARM Template
+gal generate -c config.yaml -p azure_apim -o azure-apim-template.json
+
+# Resource Group erstellen
+az group create --name gal-rg --location westeurope
+
+# ARM Template deployen
+az deployment group create \
+  --resource-group gal-rg \
+  --template-file azure-apim-template.json
+```
+
+**Terraform:**
+
+```hcl
+resource "azurerm_template_deployment" "gal_apim" {
+  name                = "gal-apim-deployment"
+  resource_group_name = azurerm_resource_group.gal.name
+  template_body       = file("azure-apim-template.json")
+  deployment_mode     = "Incremental"
+}
+```
+
+**CI/CD (GitHub Actions):**
+
+```yaml
+- name: Deploy to Azure APIM
+  run: |
+    gal generate -c azure-apim.yaml -p azure_apim -o template.json
+    az deployment group create \
+      --resource-group ${{ secrets.RESOURCE_GROUP }} \
+      --template-file template.json
+```
+
+### Vergleich: Azure APIM vs Self-Hosted
+
+| Feature | Azure APIM | Self-Hosted (Envoy/Kong/etc.) |
+|---------|-----------|-------------------------------|
+| **Wartung** | Fully Managed | Manuell |
+| **Skalierung** | Automatisch | Manuell |
+| **Updates** | Automatisch | Manuell |
+| **Kosten** | Pay-per-SKU | Infrastructure Kosten |
+| **Developer Portal** | Built-in | Custom |
+| **Azure Integration** | Native | Manual |
+| **Multi-Cloud** | Azure-only | ✅ |
+| **Vendor Lock-in** | Azure | Portabel |
+
+**Wann Azure APIM verwenden?**
+- ✅ Azure Cloud-Native Apps
+- ✅ Enterprise API Management benötigt
+- ✅ Developer Portal erforderlich
+- ✅ Fully Managed bevorzugt
+- ✅ Azure AD Integration
+
+**Wann Self-Hosted verwenden?**
+- ✅ Multi-Cloud (AWS, GCP, Azure)
+- ✅ Kubernetes-Native
+- ✅ Volle Kontrolle benötigt
+- ✅ Cost-Optimierung
+- ✅ On-Premises
+
+---
+
 ## Provider-Vergleich
 
 ### Performance
 
-| Provider | Requests/sec | Latency (p50) | Latency (p99) |
-|----------|--------------|---------------|---------------|
-| Nginx | ~120k | <1ms | <3ms |
-| Envoy | ~100k | <1ms | <5ms |
-| HAProxy | ~95k | <1ms | <4ms |
-| APISIX | ~80k | <1ms | <6ms |
-| Kong | ~50k | 2ms | 15ms |
-| Traefik | ~40k | 3ms | 20ms |
+| Provider | Requests/sec | Latency (p50) | Latency (p99) | Deployment |
+|----------|--------------|---------------|---------------|------------|
+| Nginx | ~120k | <1ms | <3ms | Self-Hosted |
+| Envoy | ~100k | <1ms | <5ms | Self-Hosted |
+| HAProxy | ~95k | <1ms | <4ms | Self-Hosted |
+| APISIX | ~80k | <1ms | <6ms | Self-Hosted |
+| Kong | ~50k | 2ms | 15ms | Self-Hosted |
+| Traefik | ~40k | 3ms | 20ms | Self-Hosted |
+| Azure APIM | Varies* | Varies* | Varies* | Azure Cloud |
 
-*Benchmark-Werte sind Richtwerte und variieren je nach Setup*
+*Benchmark-Werte sind Richtwerte und variieren je nach Setup. Azure APIM Performance hängt von SKU ab (Developer < Basic < Standard < Premium)*
 
 ### Transformations-Vergleich
 
-| Feature | Envoy | Kong | APISIX | Traefik | Nginx | HAProxy |
-|---------|-------|------|--------|---------|-------|---------|
-| Defaults | ✅ Lua | ✅ Headers | ✅ Lua | ⚠️ Plugins | ✅ ngx | ⚠️ Limited |
-| Computed Fields | ✅ Lua | ❌ | ✅ Lua | ❌ | ✅ ngx | ❌ |
-| UUID Generation | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ |
-| Timestamp | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ |
-| Validation | ⚠️ Limited | ⚠️ Limited | ✅ Full | ❌ | ⚠️ Limited | ⚠️ Limited |
+| Feature | Envoy | Kong | APISIX | Traefik | Nginx | HAProxy | Azure APIM |
+|---------|-------|------|--------|---------|-------|---------|------------|
+| Defaults | ✅ Lua | ✅ Headers | ✅ Lua | ⚠️ Plugins | ✅ ngx | ⚠️ Limited | ✅ Policy XML |
+| Computed Fields | ✅ Lua | ❌ | ✅ Lua | ❌ | ✅ ngx | ❌ | ⚠️ Limited |
+| UUID Generation | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ⚠️ Custom |
+| Timestamp | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ⚠️ Custom |
+| Validation | ⚠️ Limited | ⚠️ Limited | ✅ Full | ❌ | ⚠️ Limited | ⚠️ Limited | ✅ Policy |
+| Rate Limiting | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Built-in |
+| JWT Auth | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ Azure AD |
+| Header Manipulation | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Policy |
 
 ### Use Case Matrix
 
 | Use Case | Empfohlen | Warum |
 |----------|-----------|-------|
 | Kubernetes Service Mesh | Envoy | Native Integration |
-| API Management Platform | Kong | Enterprise Features |
+| API Management Platform | Kong, Azure APIM | Enterprise Features |
 | High-Traffic Edge | APISIX | Performance |
 | Docker Development | Traefik | Auto-Discovery |
 | gRPC Heavy | Envoy, APISIX | Native HTTP/2 |
 | Multi-Cloud | Kong, APISIX | Provider-agnostic |
+| **Azure Cloud-Native** | **Azure APIM** | **Fully Managed, Azure AD** |
+| **Developer Portal** | **Azure APIM, Kong** | **Built-in Portal** |
+| **Hybrid Cloud** | **Azure APIM, Kong** | **On-Prem + Cloud** |
 
 ## Provider-Wechsel
 
@@ -878,6 +1091,9 @@ Alle Provider-Implementierungen enthalten umfassende Google-style Docstrings mit
 | `gal/providers/kong.py:12-146` | KongProvider | Kong Declarative Config Generator |
 | `gal/providers/apisix.py:13-219` | APISIXProvider | APISIX JSON Config Generator |
 | `gal/providers/traefik.py:12-155` | TraefikProvider | Traefik Dynamic Config Generator |
+| `gal/providers/nginx.py` | NginxProvider | Nginx Config Generator |
+| `gal/providers/haproxy.py` | HAProxyProvider | HAProxy Config Generator |
+| `gal/providers/azure_apim.py:24-64` | AzureAPIMProvider | Azure APIM ARM Template Generator |
 
 ### Methoden-Dokumentation
 

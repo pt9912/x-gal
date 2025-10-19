@@ -4,13 +4,14 @@
 
 Rate Limiting ist ein essenzielles Feature zur Kontrolle der Anzahl von Anfragen, die ein Client an Ihre API senden kann. Es hilft, Ihre Backend-Services vor Überlastung zu schützen und stellt sicher, dass alle Clients fair auf Ressourcen zugreifen können.
 
-GAL v1.1.0 bietet native Rate Limiting Unterstützung für alle unterstützten Gateway-Provider:
+GAL bietet native Rate Limiting Unterstützung für alle unterstützten Gateway-Provider:
 - **Envoy**: local_ratelimit Filter
 - **Kong**: rate-limiting Plugin
 - **APISIX**: limit-count Plugin
 - **Traefik**: rateLimit Middleware
 - **Nginx**: ngx_http_limit_req_module
 - **HAProxy**: Stick Tables
+- **Azure APIM**: rate-limit Policy XML
 
 ## Quick Start
 
@@ -328,6 +329,63 @@ frontend api_front
 - ⚠️ Manuelle ACL-Konfiguration erforderlich
 
 **Hinweis:** HAProxy's Stick Tables bieten extrem niedrige Latenz für Rate Limiting. Eignet sich besonders für High-Traffic Szenarien.
+
+### Azure APIM
+
+Azure API Management verwendet Policy XML für Rate Limiting:
+
+```xml
+<policies>
+    <inbound>
+        <base />
+        <rate-limit calls="6000" renewal-period="60" />
+    </inbound>
+</policies>
+```
+
+**Konvertierung:** GAL konvertiert `requests_per_second` zu `calls` per `renewal-period`:
+- `requests_per_second: 100` → `calls="6000" renewal-period="60"` (100 req/s * 60s = 6000 calls)
+- `requests_per_second: 10` → `calls="600" renewal-period="60"` (10 req/s * 60s = 600 calls)
+
+**Features:**
+- ✅ Product-Level Rate Limits (globale Limits pro Subscription Tier)
+- ✅ Operation-Level Rate Limits (spezifische Limits pro Endpoint)
+- ✅ Per-Subscription Tracking (Limits pro API Key)
+- ✅ Automatische 429 Responses mit Retry-After Header
+- ⚠️ Keine Burst-Konfiguration (festes Zeitfenster)
+
+**Azure APIM-spezifische Features:**
+
+**Product-Level Limits:**
+```yaml
+azure_apim:
+  product_name: "Starter-Tier"
+  rate_limit_calls: 6000        # 100 req/s
+  rate_limit_renewal_period: 60
+```
+
+**Multi-Tier Rate Limiting:**
+```yaml
+# Free Tier
+azure_apim:
+  product_name: "Free-Tier"
+  rate_limit_calls: 600          # 10 req/s
+  rate_limit_renewal_period: 60
+
+# Premium Tier
+azure_apim:
+  product_name: "Premium-Tier"
+  rate_limit_calls: 120000       # 2000 req/s
+  rate_limit_renewal_period: 60
+```
+
+**Quota Policies (zusätzlich zu Rate Limits):**
+Azure APIM unterstützt auch Quota Policies für längere Zeitfenster (nicht in GAL implementiert):
+```xml
+<quota calls="10000" renewal-period="86400" /> <!-- 10k calls per day -->
+```
+
+**Hinweis:** Azure APIM eignet sich besonders für API Monetization mit unterschiedlichen Subscription Tiers.
 
 ## Best Practices
 

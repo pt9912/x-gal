@@ -14,7 +14,7 @@ Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong
 ## Features
 
 - ✅ **Einheitliche YAML-Konfiguration** für mehrere API-Gateway-Provider
-- ✅ **Unterstützung für 6 Provider:** Envoy, Kong, APISIX, Traefik, Nginx, HAProxy
+- ✅ **Unterstützung für 7 Provider:** Envoy, Kong, APISIX, Traefik, Nginx, HAProxy, Azure APIM
 - ✅ **Automatische Payload-Transformationsgenerierung**
 - ✅ **REST- und gRPC-Service-Unterstützung**
 - ✅ **Default-Wert-Injektion**
@@ -31,6 +31,7 @@ Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong
 - ✅ **Timeout & Retry** - Verbindungs-/Lese-/Sende-Timeouts, automatische Wiederholungen mit exponentiellem Backoff
 - ✅ **Logging & Observability** - Strukturiertes Logging (JSON), Prometheus/OpenTelemetry-Metriken, Log-Sampling, benutzerdefinierte Felder
 - ✅ **gRPC Transformations** (v1.4.0) - Protobuf-basierte Request/Response-Transformationen für gRPC mit Proto-Descriptor-Management (file/inline/url), Trace-ID-Injection, Feld-Manipulation (add/remove/rename), Provider-Support (Envoy, Nginx, APISIX)
+- ✅ **Azure API Management** (v1.4.0) - Cloud Provider Support für Azure APIM mit ARM Template Generation, Policy XML (rate-limit, validate-jwt, headers), Subscription Keys, Azure AD Integration, OpenAPI 3.0 Export
 - ✅ **Config-Import** (v1.3.0) - Importiere bestehende Envoy, Kong, APISIX, Traefik, Nginx, HAProxy Configs ins GAL-Format (`gal import-config`)
 - ✅ **Compatibility Checker** (v1.3.0) - Prüfe Provider-Kompatibilität und vergleiche Feature-Unterstützung (`gal check-compatibility`, `gal compare-providers`)
 - ✅ **Migration Assistant** (v1.3.0) - Interaktiver Migrations-Workflow mit Compatibility-Validierung und Migration Reports (`gal migrate`)

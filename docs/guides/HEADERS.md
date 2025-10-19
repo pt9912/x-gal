@@ -46,6 +46,7 @@ All GAL providers support header manipulation:
 | **Traefik** | ✅ | ✅ | headers middleware |
 | **Nginx** | ✅ | ✅ | proxy_set_header, add_header directives |
 | **HAProxy** | ✅ | ✅ | http-request/http-response set-header |
+| **Azure APIM** | ✅ | ✅ | set-header Policy XML (inbound/outbound) |
 
 ---
 
@@ -329,6 +330,48 @@ routes:
     response_headers_to_remove:
       - Server
 ```
+
+### Azure APIM (set-header Policy)
+
+Azure API Management uses Policy XML for header manipulation:
+
+**Request Headers (Inbound)**:
+```xml
+<policies>
+    <inbound>
+        <base />
+        <set-header name="X-Custom" exists-action="override">
+            <value>value</value>
+        </set-header>
+        <set-header name="X-Internal" exists-action="delete" />
+    </inbound>
+</policies>
+```
+
+**Response Headers (Outbound)**:
+```xml
+<policies>
+    <outbound>
+        <base />
+        <set-header name="X-Response" exists-action="override">
+            <value>ok</value>
+        </set-header>
+        <set-header name="Server" exists-action="delete" />
+    </outbound>
+</policies>
+```
+
+**exists-action Options**:
+- `override`: Replace header if exists, add if not (default for set)
+- `append`: Add to existing header value
+- `skip`: Only add if doesn't exist
+- `delete`: Remove header
+
+**GAL Mapping**:
+- `request_add` → `<inbound>` `exists-action="override"`
+- `response_add` → `<outbound>` `exists-action="override"`
+- `request_remove` → `<inbound>` `exists-action="delete"`
+- `response_remove` → `<outbound>` `exists-action="delete"`
 
 ---
 

@@ -11,7 +11,7 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ### Hinzugefügt
 
-#### gRPC Transformations Feature
+#### gRPC Transformations Feature (Feature 1)
 
 - **gRPC Protobuf Transformations** (v1.4.0 Feature 1)
   - Protocol Buffer-basierte Request/Response Transformationen für gRPC Services
@@ -43,6 +43,72 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
     - Technical Spec: `docs/v1.4.0-GRPC-SPEC.md` (1000+ lines)
     - Examples: `examples/grpc-transformation-example.yaml` (11 scenarios, 616 lines)
   - Use Cases: Trace-ID injection, Security compliance (password removal), API compatibility (field renaming), Multi-service transformations
+
+#### Azure API Management Provider (Feature 3)
+
+- **Azure API Management (APIM) Cloud Provider Support** (v1.4.0 Feature 3)
+  - Fully managed Azure API Gateway mit ARM Template Generation
+  - ARM Template Generation für Azure Deployment:
+    - Microsoft.ApiManagement/service (APIM Service mit SKU: Developer, Consumption, Basic, Standard, Premium)
+    - Microsoft.ApiManagement/service/apis (API Resources mit revision, version)
+    - Microsoft.ApiManagement/service/apis/operations (HTTP Operations/Endpoints)
+    - Microsoft.ApiManagement/service/apis/operations/policies (Policy XML)
+    - Microsoft.ApiManagement/service/products (Products mit Subscription Keys)
+    - Microsoft.ApiManagement/service/backends (Backend Targets)
+  - Policy XML Generation (Azure APIM Policy Language):
+    - Inbound Policies: rate-limit (calls + renewal-period), validate-jwt (Azure AD), check-header (Subscription Keys), set-header (request headers), set-backend-service (upstream URLs)
+    - Outbound Policies: set-header (response headers), cache-store (caching)
+    - Backend/On-Error Policies: base policy
+  - Authentication Support:
+    - Subscription Keys: API Key authentication mit check-header policy (Ocp-Apim-Subscription-Key)
+    - Azure AD JWT: validate-jwt policy mit OpenID Connect Discovery, audiences, required-claims (roles, scp)
+  - OpenAPI 3.0 Export: Automatische OpenAPI Spec Generation für APIM Import mit Security Schemes (OAuth2, API Key)
+  - Azure-spezifische Features: Products & Subscriptions, Developer Portal Integration, Named Values Support (planned), VNet Integration (Premium SKU)
+  - Provider Implementation: `gal/providers/azure_apim.py` (+551 lines)
+    - AzureAPIMProvider class mit generate(), validate(), generate_openapi()
+    - ARM Template generation methods (_generate_apim_service, _generate_api_resource, _generate_operation, _generate_operation_policy, _generate_product, _generate_backend)
+    - Policy XML builder (_build_policy_xml) mit rate-limit, validate-jwt, set-header, backend-service
+  - Config Model: `gal/config.py` (AzureAPIMConfig, AzureAPIMGlobalConfig dataclasses)
+    - AzureAPIMGlobalConfig: resource_group, apim_service_name, location, sku
+    - AzureAPIMConfig: product_name, product_description, product_published, product_subscription_required, api_revision, api_version, openapi_export, subscription_keys_required, rate_limit_calls, rate_limit_renewal_period
+  - Tests: 29 tests (100% pass rate, test_azure_apim.py, 480+ lines)
+    - Provider basics (2 tests)
+    - ARM Template generation (4 tests)
+    - Policy generation (3 tests: rate-limit, headers, backend URL)
+    - Product generation (1 test)
+    - Backend generation (2 tests: HTTP + HTTPS)
+    - OpenAPI export (1 test)
+    - Validation (2 tests: valid config, missing product name)
+    - Edge cases (3 tests: missing azure_apim config, empty upstream, default HTTP methods)
+  - Documentation: `docs/guides/AZURE_APIM.md` (1600+ lines, German)
+    - Übersicht & Motivation (Warum Azure APIM?)
+    - Azure APIM Hierarchie (Products, APIs, Operations, Policies, Backends)
+    - Schnellstart (3 Steps: Config, ARM Template, Azure Deployment)
+    - Konfigurationsoptionen (Global Config, Service Config, SKU-Optionen)
+    - Policy-Generierung (Rate Limiting, JWT Validation, Subscription Keys, Header Manipulation, Backend URL)
+    - OpenAPI Export (OpenAPI 3.0 Spec Generation + APIM Import)
+    - Azure-spezifische Features (Products & Subscriptions, Developer Portal, Azure AD Integration, Named Values, VNet Integration)
+    - Deployment-Strategien (Azure CLI, Terraform, Bicep, CI/CD GitHub Actions, Blue-Green Deployment)
+    - Best Practices (SKU-Auswahl, Subscription Management, Rate Limiting Strategy, Caching, Monitoring, Security Hardening, Multi-Environment)
+    - Troubleshooting (ARM Deployment, Subscription Keys, JWT Validation, Rate Limiting, Backend Connection)
+    - 5 vollständige Beispiele (Public API, Subscription Keys, Azure AD JWT, Multi-Region, Custom Headers)
+    - Provider-Vergleich (Azure APIM vs Kong, Envoy, APISIX, Traefik)
+  - Examples: `examples/azure-apim-example.yaml` (7 comprehensive scenarios, 400 lines)
+    - Public API (minimal config, no subscription keys)
+    - User API (Subscription Keys + Rate Limiting)
+    - Admin API (Azure AD JWT + required claims)
+    - Payment API (strict rate limiting)
+    - Analytics API (multiple routes with different limits)
+    - Webhook API (custom header manipulation)
+    - Premium API (all features combined: JWT + Rate Limiting + Headers)
+  - Provider Integration: `gal/providers/__init__.py` (AzureAPIMProvider registered)
+  - Deployment Support:
+    - Azure CLI: `az deployment group create`
+    - Terraform: azurerm_template_deployment resource
+    - Bicep: `az bicep decompile/build`
+    - CI/CD: GitHub Actions workflow example
+  - Test Coverage: 85%+ (gal/providers/azure_apim.py)
+  - Use Cases: Azure Cloud-Native Applications, Enterprise API Gateways, Hybrid Cloud, API Monetization, Developer Portals
 
 ## [1.3.0] - 2025-10-19
 
