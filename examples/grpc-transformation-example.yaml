@@ -1,0 +1,615 @@
+# gRPC Transformations - Comprehensive Examples
+#
+# This file demonstrates various gRPC transformation scenarios using GAL.
+# Each example shows a different use case and transformation pattern.
+#
+# Version: 1.4.0
+# Provider: Envoy, Nginx, APISIX
+# Documentation: docs/guides/GRPC_TRANSFORMATIONS.md
+
+---
+# Example 1: Simple Trace-ID Injection
+# Use Case: Add correlation ID to all requests
+version: "1.0"
+provider: envoy
+
+proto_descriptors:
+  - name: user_service
+    source: file
+    path: /protos/user.proto
+
+services:
+  - name: user_api
+    type: grpc
+    protocol: http2
+    upstream:
+      host: user-service
+      port: 50051
+
+    routes:
+      - path_prefix: /user.v1.UserService/CreateUser
+        grpc_transformation:
+          enabled: true
+          proto_descriptor: user_service
+          package: user.v1
+          service: UserService
+          request_type: CreateUserRequest
+          response_type: CreateUserResponse
+          request_transform:
+            add_fields:
+              trace_id: "{{uuid}}"              # Auto-generated UUID
+              request_timestamp: "{{timestamp}}" # Unix timestamp
+
+---
+# Example 2: Security - Password Removal
+# Use Case: Strip sensitive fields before logging/monitoring
+version: "1.0"
+provider: nginx
+
+proto_descriptors:
+  - name: auth_service
+    source: file
+    path: /protos/auth.proto
+
+services:
+  - name: auth_api
+    type: grpc
+    protocol: http2
+    upstream:
+      host: auth-service
+      port: 50051
+
+    routes:
+      - path_prefix: /auth.v1.AuthService/Login
+        grpc_transformation:
+          enabled: true
+          proto_descriptor: auth_service
+          package: auth.v1
+          service: AuthService
+          request_type: LoginRequest
+          response_type: LoginResponse
+          request_transform:
+            remove_fields:
+              - password            # Remove before logging
+              - api_key            # Remove sensitive data
+              - secret_token       # Security compliance
+          response_transform:
+            filter_fields:
+              - internal_user_id   # Hide internal fields
+              - secret             # Remove secrets from response
+
+---
+# Example 3: Field Renaming for API Compatibility
+# Use Case: Adapt legacy API to new naming conventions
+version: "1.0"
+provider: apisix
+
+proto_descriptors:
+  - name: order_service
+    source: inline
+    content: |
+      syntax = "proto3";
+      package order.v1;
+
+      message Order {
+        string order_id = 1;
+        string user_id = 2;
+        string product_id = 3;
+      }
+
+      service OrderService {
+        rpc CreateOrder (CreateOrderRequest) returns (CreateOrderResponse);
+      }
+
+      message CreateOrderRequest {
+        string user_id = 1;
+        string product_id = 2;
+      }
+
+      message CreateOrderResponse {
+        Order order = 1;
+      }
+
+services:
+  - name: order_api
+    type: grpc
+    protocol: http2
+    upstream:
+      host: order-service
+      port: 50052
+
+    routes:
+      - path_prefix: /order.v1.OrderService/CreateOrder
+        grpc_transformation:
+          enabled: true
+          proto_descriptor: order_service
+          package: order.v1
+          service: OrderService
+          request_type: CreateOrderRequest
+          response_type: CreateOrderResponse
+          request_transform:
+            rename_fields:
+              user_id: customer_id    # Legacy → New
+              product_id: item_id     # API v1 → v2 compatibility
+
+---
+# Example 4: Multi-Field Transformation
+# Use Case: Complex transformation with add, remove, rename
+version: "1.0"
+provider: envoy
+
+proto_descriptors:
+  - name: payment_service
+    source: file
+    path: /protos/payment.proto
+
+services:
+  - name: payment_api
+    type: grpc
+    protocol: http2
+    upstream:
+      host: payment-service
+      port: 50053
+
+    routes:
+      - path_prefix: /payment.v1.PaymentService/ProcessPayment
+        grpc_transformation:
+          enabled: true
+          proto_descriptor: payment_service
+          package: payment.v1
+          service: PaymentService
+          request_type: ProcessPaymentRequest
+          response_type: ProcessPaymentResponse
+          request_transform:
+            add_fields:
+              trace_id: "{{uuid}}"
+              gateway_timestamp: "{{timestamp}}"
+              gateway_version: "v1.4.0"
+            remove_fields:
+              - credit_card_number  # PCI compliance
+              - cvv                 # Never forward CVV
+            rename_fields:
+              user_id: customer_id
+          response_transform:
+            filter_fields:
+              - internal_transaction_id
+              - debug_info
+            add_fields:
+              processed_by: gateway
+              response_timestamp: "{{timestamp}}"
+
+---
+# Example 5: URL-based Proto Descriptor
+# Use Case: Central proto registry
+version: "1.0"
+provider: envoy
+
+proto_descriptors:
+  - name: notification_service
+    source: url
+    url: https://proto-registry.example.com/notification.v1.proto
+
+services:
+  - name: notification_api
+    type: grpc
+    protocol: http2
+    upstream:
+      host: notification-service
+      port: 50054
+
+    routes:
+      - path_prefix: /notification.v1.NotificationService/SendEmail
+        grpc_transformation:
+          enabled: true
+          proto_descriptor: notification_service
+          package: notification.v1
+          service: NotificationService
+          request_type: SendEmailRequest
+          response_type: SendEmailResponse
+          request_transform:
+            add_fields:
+              request_id: "{{uuid}}"
+              sender: gateway
+
+---
+# Example 6: Multiple Services with Different Transformations
+# Use Case: Microservices architecture
+version: "1.0"
+provider: nginx
+
+proto_descriptors:
+  - name: user_service
+    source: file
+    path: /protos/user.proto
+  - name: order_service
+    source: file
+    path: /protos/order.proto
+  - name: inventory_service
+    source: file
+    path: /protos/inventory.proto
+
+services:
+  # User Service: Add trace-ID
+  - name: user_api
+    type: grpc
+    protocol: http2
+    upstream:
+      host: user-service
+      port: 50051
+    routes:
+      - path_prefix: /user.v1.UserService/
+        grpc_transformation:
+          enabled: true
+          proto_descriptor: user_service
+          package: user.v1
+          service: UserService
+          request_type: CreateUserRequest
+          response_type: CreateUserResponse
+          request_transform:
+            add_fields:
+              trace_id: "{{uuid}}"
+
+  # Order Service: Remove sensitive fields
+  - name: order_api
+    type: grpc
+    protocol: http2
+    upstream:
+      host: order-service
+      port: 50052
+    routes:
+      - path_prefix: /order.v1.OrderService/
+        grpc_transformation:
+          enabled: true
+          proto_descriptor: order_service
+          package: order.v1
+          service: OrderService
+          request_type: CreateOrderRequest
+          response_type: CreateOrderResponse
+          request_transform:
+            remove_fields:
+              - payment_details
+
+  # Inventory Service: Rename fields
+  - name: inventory_api
+    type: grpc
+    protocol: http2
+    upstream:
+      host: inventory-service
+      port: 50053
+    routes:
+      - path_prefix: /inventory.v1.InventoryService/
+        grpc_transformation:
+          enabled: true
+          proto_descriptor: inventory_service
+          package: inventory.v1
+          service: InventoryService
+          request_type: CheckStockRequest
+          response_type: CheckStockResponse
+          request_transform:
+            rename_fields:
+              product_id: item_id
+
+---
+# Example 7: Response-Only Transformation
+# Use Case: Filter internal fields from responses
+version: "1.0"
+provider: apisix
+
+proto_descriptors:
+  - name: analytics_service
+    source: file
+    path: /protos/analytics.proto
+
+services:
+  - name: analytics_api
+    type: grpc
+    protocol: http2
+    upstream:
+      host: analytics-service
+      port: 50055
+
+    routes:
+      - path_prefix: /analytics.v1.AnalyticsService/GetReport
+        grpc_transformation:
+          enabled: true
+          proto_descriptor: analytics_service
+          package: analytics.v1
+          service: AnalyticsService
+          request_type: GetReportRequest
+          response_type: GetReportResponse
+          # No request transformation
+          response_transform:
+            filter_fields:
+              - debug_info
+              - internal_metrics
+              - cache_stats
+            add_fields:
+              api_version: "v1"
+              generated_by: gateway
+
+---
+# Example 8: Hybrid - File + Inline Descriptors
+# Use Case: Mix production protos with test protos
+version: "1.0"
+provider: envoy
+
+proto_descriptors:
+  # Production proto (file-based)
+  - name: product_service
+    source: file
+    path: /protos/product.proto
+
+  # Test/Debug proto (inline)
+  - name: health_check
+    source: inline
+    content: |
+      syntax = "proto3";
+      package health.v1;
+
+      message HealthCheckRequest {}
+      message HealthCheckResponse {
+        string status = 1;
+      }
+
+      service HealthService {
+        rpc Check (HealthCheckRequest) returns (HealthCheckResponse);
+      }
+
+services:
+  - name: product_api
+    type: grpc
+    protocol: http2
+    upstream:
+      host: product-service
+      port: 50056
+    routes:
+      - path_prefix: /product.v1.ProductService/
+        grpc_transformation:
+          enabled: true
+          proto_descriptor: product_service
+          package: product.v1
+          service: ProductService
+          request_type: GetProductRequest
+          response_type: GetProductResponse
+          request_transform:
+            add_fields:
+              request_id: "{{uuid}}"
+
+  - name: health_api
+    type: grpc
+    protocol: http2
+    upstream:
+      host: product-service
+      port: 50056
+    routes:
+      - path_prefix: /health.v1.HealthService/
+        grpc_transformation:
+          enabled: true
+          proto_descriptor: health_check
+          package: health.v1
+          service: HealthService
+          request_type: HealthCheckRequest
+          response_type: HealthCheckResponse
+          response_transform:
+            add_fields:
+              gateway: "GAL v1.4.0"
+
+---
+# Example 9: Minimal Config - Essential Only
+# Use Case: Simple pass-through with trace-ID
+version: "1.0"
+provider: envoy
+
+proto_descriptors:
+  - name: simple_service
+    source: inline
+    content: |
+      syntax = "proto3";
+      package simple.v1;
+      message Request { string data = 1; }
+      message Response { string result = 1; }
+      service SimpleService {
+        rpc Process (Request) returns (Response);
+      }
+
+services:
+  - name: simple_api
+    type: grpc
+    protocol: http2
+    upstream:
+      host: backend
+      port: 50051
+    routes:
+      - path_prefix: /simple.v1.SimpleService/Process
+        grpc_transformation:
+          enabled: true
+          proto_descriptor: simple_service
+          package: simple.v1
+          service: SimpleService
+          request_type: Request
+          response_type: Response
+          request_transform:
+            add_fields:
+              id: "{{uuid}}"
+
+---
+# Example 10: Production-Ready - Complete Configuration
+# Use Case: Real-world microservices setup
+version: "1.0"
+provider: envoy
+
+global_config:
+  host: 0.0.0.0
+  port: 10000
+  admin_port: 9901
+
+proto_descriptors:
+  - name: user_service_v1
+    source: file
+    path: /protos/user.v1.proto
+  - name: order_service_v1
+    source: file
+    path: /protos/order.v1.proto
+  - name: payment_service_v1
+    source: url
+    url: https://proto-registry.company.com/payment.v1.proto
+
+services:
+  # User Service
+  - name: user_api
+    type: grpc
+    protocol: http2
+    upstream:
+      host: user-service.production.svc.cluster.local
+      port: 50051
+    load_balancer:
+      algorithm: round_robin
+    health_check:
+      active:
+        enabled: true
+        interval: 10
+        timeout: 5
+        healthy_threshold: 2
+        unhealthy_threshold: 3
+    routes:
+      - path_prefix: /user.v1.UserService/CreateUser
+        grpc_transformation:
+          enabled: true
+          proto_descriptor: user_service_v1
+          package: user.v1
+          service: UserService
+          request_type: CreateUserRequest
+          response_type: CreateUserResponse
+          request_transform:
+            add_fields:
+              trace_id: "{{uuid}}"
+              request_timestamp: "{{timestamp}}"
+              gateway_version: "v1.4.0"
+              environment: production
+            remove_fields:
+              - password
+              - social_security_number
+            rename_fields:
+              user_id: customer_id
+          response_transform:
+            filter_fields:
+              - internal_id
+              - debug_info
+            add_fields:
+              api_version: "v1"
+              processed_by: gateway
+
+      - path_prefix: /user.v1.UserService/GetUser
+        grpc_transformation:
+          enabled: true
+          proto_descriptor: user_service_v1
+          package: user.v1
+          service: UserService
+          request_type: GetUserRequest
+          response_type: GetUserResponse
+          request_transform:
+            add_fields:
+              trace_id: "{{uuid}}"
+          response_transform:
+            filter_fields:
+              - password_hash
+              - email_verified_at
+
+  # Order Service
+  - name: order_api
+    type: grpc
+    protocol: http2
+    upstream:
+      host: order-service.production.svc.cluster.local
+      port: 50052
+    routes:
+      - path_prefix: /order.v1.OrderService/CreateOrder
+        grpc_transformation:
+          enabled: true
+          proto_descriptor: order_service_v1
+          package: order.v1
+          service: OrderService
+          request_type: CreateOrderRequest
+          response_type: CreateOrderResponse
+          request_transform:
+            add_fields:
+              trace_id: "{{uuid}}"
+              order_timestamp: "{{timestamp}}"
+            rename_fields:
+              user_id: customer_id
+              product_id: item_id
+
+  # Payment Service
+  - name: payment_api
+    type: grpc
+    protocol: http2
+    upstream:
+      host: payment-service.production.svc.cluster.local
+      port: 50053
+    routes:
+      - path_prefix: /payment.v1.PaymentService/ProcessPayment
+        grpc_transformation:
+          enabled: true
+          proto_descriptor: payment_service_v1
+          package: payment.v1
+          service: PaymentService
+          request_type: ProcessPaymentRequest
+          response_type: ProcessPaymentResponse
+          request_transform:
+            add_fields:
+              trace_id: "{{uuid}}"
+              gateway_id: envoy-prod-01
+            remove_fields:
+              - credit_card_number
+              - cvv
+              - billing_address
+          response_transform:
+            filter_fields:
+              - internal_transaction_id
+              - processor_response
+            add_fields:
+              processed_by: gateway
+              response_timestamp: "{{timestamp}}"
+
+---
+# Example 11: Disabled Transformation (Pass-through)
+# Use Case: Temporarily disable transformation
+version: "1.0"
+provider: nginx
+
+proto_descriptors:
+  - name: test_service
+    source: file
+    path: /protos/test.proto
+
+services:
+  - name: test_api
+    type: grpc
+    protocol: http2
+    upstream:
+      host: test-service
+      port: 50051
+    routes:
+      - path_prefix: /test.v1.TestService/Test
+        grpc_transformation:
+          enabled: false  # Disabled - no transformation applied
+          proto_descriptor: test_service
+          package: test.v1
+          service: TestService
+          request_type: TestRequest
+          response_type: TestResponse
+
+---
+# Usage Instructions:
+#
+# 1. Choose an example that fits your use case
+# 2. Copy to your config file (gal-config.yaml)
+# 3. Adjust proto paths, service names, and transformations
+# 4. Generate gateway config:
+#    gal generate --config gal-config.yaml --provider envoy --output envoy.yaml
+# 5. Deploy to your gateway
+#
+# For more details, see:
+# - Documentation: docs/guides/GRPC_TRANSFORMATIONS.md
+# - Technical Spec: docs/v1.4.0-GRPC-SPEC.md
+# - Tests: tests/test_grpc_*.py
