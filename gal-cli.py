@@ -582,5 +582,379 @@ def _display_comparison_table(reports):
         )
 
 
+@cli.command()
+@click.option("--source-provider", "-s", help="Source provider (skip interactive mode)")
+@click.option("--source-config", "-i", help="Source configuration file")
+@click.option("--target-provider", "-t", help="Target provider")
+@click.option("--output-dir", "-o", help="Output directory for migration files")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation prompts")
+def migrate(source_provider, source_config, target_provider, output_dir, yes):
+    """Interactive migration assistant to migrate between providers"""
+    try:
+        import yaml
+        from datetime import datetime
+
+        # Display welcome message
+        click.echo("=" * 80)
+        click.echo("🔀 GAL Migration Assistant")
+        click.echo("=" * 80)
+        click.echo()
+
+        # Interactive prompts if options not provided
+        if not source_provider:
+            source_provider = click.prompt(
+                "Source Provider",
+                type=click.Choice(
+                    ["envoy", "kong", "apisix", "traefik", "nginx", "haproxy"],
+                    case_sensitive=False
+                )
+            )
+
+        if not source_config:
+            source_config = click.prompt(
+                "Source Configuration File",
+                type=click.Path(exists=True, dir_okay=False)
+            )
+
+        if not target_provider:
+            target_provider = click.prompt(
+                "Target Provider",
+                type=click.Choice(
+                    ["envoy", "kong", "apisix", "traefik", "nginx", "haproxy"],
+                    case_sensitive=False
+                )
+            )
+
+        if not output_dir:
+            output_dir = click.prompt(
+                "Output Directory",
+                default="./migration",
+                type=click.Path()
+            )
+
+        # Create output directory
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        click.echo()
+        click.echo("Migration Plan:")
+        click.echo(f"  Source: {source_provider} ({source_config})")
+        click.echo(f"  Target: {target_provider}")
+        click.echo(f"  Output: {output_dir}")
+        click.echo()
+
+        if not yes:
+            if not click.confirm("Proceed with migration?", default=True):
+                click.echo("Migration cancelled.")
+                return
+
+        click.echo()
+
+        # Step 1/5: Reading source config
+        click.echo("[1/5] 📖 Reading {} config...".format(source_provider.title()))
+
+        # Create manager and register providers
+        manager = Manager()
+        manager.register_provider(EnvoyProvider())
+        manager.register_provider(KongProvider())
+        manager.register_provider(APISIXProvider())
+        manager.register_provider(TraefikProvider())
+        manager.register_provider(NginxProvider())
+        manager.register_provider(HAProxyProvider())
+
+        # Get source provider instance
+        source_instance = manager.get_provider(source_provider)
+        if not source_instance:
+            click.echo(f"❌ Error: Source provider '{source_provider}' not found", err=True)
+            sys.exit(1)
+
+        # Read source config
+        with open(source_config, "r") as f:
+            source_config_content = f.read()
+
+        click.echo("   ✓ Config file read successfully")
+
+        # Step 2/5: Parsing and analyzing
+        click.echo("[2/5] 🔍 Parsing and analyzing...")
+
+        try:
+            gal_config = source_instance.parse(source_config_content)
+            click.echo(f"   ✓ Parsed {len(gal_config.services)} services")
+            total_routes = sum(len(s.routes) for s in gal_config.services)
+            click.echo(f"   ✓ Found {total_routes} routes")
+        except NotImplementedError:
+            click.echo(f"❌ Error: {source_provider} import not yet implemented", err=True)
+            sys.exit(1)
+        except Exception as e:
+            click.echo(f"❌ Error parsing config: {e}", err=True)
+            sys.exit(1)
+
+        # Step 3/5: Converting to GAL format
+        click.echo("[3/5] 🔄 Converting to GAL format...")
+
+        # Save GAL config
+        gal_config_path = output_path / "gal-config.yaml"
+
+        # Build YAML structure
+        config_dict = {
+            "version": gal_config.version,
+            "provider": target_provider,  # Set to target provider
+            "global": {
+                "host": gal_config.global_config.host,
+                "port": gal_config.global_config.port,
+            },
+            "services": [],
+        }
+
+        for service in gal_config.services:
+            service_dict = {
+                "name": service.name,
+                "type": service.type,
+                "protocol": service.protocol,
+                "upstream": {
+                    "targets": [
+                        {"host": t.host, "port": t.port, "weight": t.weight}
+                        for t in service.upstream.targets
+                    ]
+                },
+                "routes": [{"path_prefix": r.path_prefix} for r in service.routes],
+            }
+
+            # Add optional features if present
+            if service.upstream.load_balancer:
+                service_dict["upstream"]["load_balancer"] = {
+                    "algorithm": service.upstream.load_balancer.algorithm
+                }
+
+            if service.upstream.health_check:
+                hc = service.upstream.health_check
+                hc_dict = {}
+                if hasattr(hc, "active") and hc.active:
+                    hc_dict["active"] = {
+                        "enabled": hc.active.enabled,
+                        "http_path": hc.active.http_path,
+                        "interval": hc.active.interval,
+                        "timeout": hc.active.timeout,
+                    }
+                if hasattr(hc, "passive") and hc.passive:
+                    hc_dict["passive"] = {
+                        "enabled": hc.passive.enabled,
+                        "max_failures": hc.passive.max_failures,
+                    }
+                if hc_dict:
+                    service_dict["upstream"]["health_check"] = hc_dict
+
+            config_dict["services"].append(service_dict)
+
+        with open(gal_config_path, "w") as f:
+            yaml.safe_dump(config_dict, f, default_flow_style=False, sort_keys=False)
+
+        click.echo(f"   ✓ GAL config saved: {gal_config_path}")
+
+        # Step 4/5: Validating compatibility
+        click.echo(f"[4/5] ✅ Validating compatibility with {target_provider.title()}...")
+
+        checker = CompatibilityChecker()
+        compat_report = checker.check_provider(gal_config, target_provider)
+
+        score_percent = compat_report.compatibility_score * 100
+        click.echo(f"   ✓ Compatibility: {score_percent:.1f}% ({len(compat_report.features_supported)}/{compat_report.features_checked} features)")
+
+        if compat_report.features_partial:
+            click.echo(f"   ⚠️  {len(compat_report.features_partial)} partially supported features")
+
+        if compat_report.features_unsupported:
+            click.echo(f"   ❌ {len(compat_report.features_unsupported)} unsupported features")
+
+        # Step 5/5: Generating target config
+        click.echo(f"[5/5] 🎯 Generating {target_provider.title()} config...")
+
+        # Update config provider to target
+        gal_config.provider = target_provider
+
+        target_config = manager.generate(gal_config)
+
+        # Determine file extension
+        extensions = {
+            "envoy": "yaml",
+            "kong": "yaml",
+            "apisix": "json",
+            "traefik": "yaml",
+            "nginx": "conf",
+            "haproxy": "cfg",
+        }
+        ext = extensions.get(target_provider, "txt")
+        target_config_path = output_path / f"{target_provider}.{ext}"
+
+        with open(target_config_path, "w") as f:
+            f.write(target_config)
+
+        click.echo(f"   ✓ {target_provider.title()} config saved: {target_config_path}")
+
+        # Generate migration report
+        click.echo()
+        click.echo("📄 Generating migration report...")
+
+        report_path = output_path / "migration-report.md"
+        report_content = _generate_migration_report(
+            source_provider=source_provider,
+            source_config=source_config,
+            target_provider=target_provider,
+            gal_config=gal_config,
+            compat_report=compat_report,
+            total_routes=total_routes,
+        )
+
+        with open(report_path, "w") as f:
+            f.write(report_content)
+
+        click.echo(f"   ✓ Migration report saved: {report_path}")
+
+        # Success summary
+        click.echo()
+        click.echo("=" * 80)
+        click.echo("✅ Migration complete!")
+        click.echo("=" * 80)
+        click.echo()
+        click.echo("Files created:")
+        click.echo(f"  📄 {gal_config_path} (GAL format)")
+        click.echo(f"  📄 {target_config_path} ({target_provider.title()} config)")
+        click.echo(f"  📄 {report_path} (Migration report)")
+        click.echo()
+        click.echo(f"Compatibility: {score_percent:.1f}% ({len(compat_report.features_supported)}/{compat_report.features_checked} features)")
+
+        if compat_report.warnings:
+            click.echo(f"Warnings: {len(compat_report.warnings)}")
+            for warning in compat_report.warnings[:3]:  # Show first 3
+                click.echo(f"  ⚠️  {warning}")
+            if len(compat_report.warnings) > 3:
+                click.echo(f"  ... and {len(compat_report.warnings) - 3} more (see report)")
+
+        click.echo()
+        click.echo("Next steps:")
+        click.echo("  1. Review migration-report.md")
+        click.echo(f"  2. Test {target_provider}.{ext} in staging")
+        click.echo("  3. Deploy to production")
+        click.echo()
+
+    except Exception as e:
+        click.echo(f"❌ Migration failed: {e}", err=True)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+def _generate_migration_report(
+    source_provider, source_config, target_provider, gal_config, compat_report, total_routes
+):
+    """Generate migration report in Markdown format."""
+    from datetime import datetime
+
+    report = []
+    report.append(f"# Migration Report: {source_provider.title()} → {target_provider.title()}")
+    report.append("")
+    report.append(f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    report.append(f"**Source:** {source_config} ({source_provider.title()})")
+    report.append(f"**Target:** {target_provider.title()}")
+    report.append("")
+
+    # Summary
+    report.append("## Summary")
+    report.append("")
+    score_percent = compat_report.compatibility_score * 100
+    report.append(f"- **Compatibility:** {score_percent:.1f}% ({len(compat_report.features_supported)}/{compat_report.features_checked} features)")
+    report.append(f"- **Services Migrated:** {len(gal_config.services)}")
+    report.append(f"- **Routes Migrated:** {total_routes}")
+    report.append(f"- **Warnings:** {len(compat_report.warnings)}")
+    report.append("")
+
+    # Features Status
+    report.append("## Features Status")
+    report.append("")
+
+    if compat_report.features_supported:
+        report.append("### ✅ Fully Supported Features")
+        report.append("")
+        for feature in compat_report.features_supported:
+            report.append(f"- **{feature.feature_name}:** {feature.message}")
+        report.append("")
+
+    if compat_report.features_partial:
+        report.append("### ⚠️  Partially Supported Features")
+        report.append("")
+        for feature in compat_report.features_partial:
+            report.append(f"- **{feature.feature_name}:** {feature.message}")
+            if feature.recommendation:
+                report.append(f"  - 💡 **Recommendation:** {feature.recommendation}")
+        report.append("")
+
+    if compat_report.features_unsupported:
+        report.append("### ❌ Unsupported Features")
+        report.append("")
+        for feature in compat_report.features_unsupported:
+            report.append(f"- **{feature.feature_name}:** {feature.message}")
+            if feature.recommendation:
+                report.append(f"  - 💡 **Recommendation:** {feature.recommendation}")
+        report.append("")
+
+    # Warnings & Recommendations
+    if compat_report.warnings or compat_report.recommendations:
+        report.append("## Warnings & Recommendations")
+        report.append("")
+
+        for i, warning in enumerate(compat_report.warnings, 1):
+            report.append(f"{i}. **{warning}**")
+
+        for rec in compat_report.recommendations:
+            report.append(f"   - 💡 {rec}")
+        report.append("")
+
+    # Services Details
+    report.append("## Services")
+    report.append("")
+    for service in gal_config.services:
+        report.append(f"### {service.name}")
+        report.append("")
+        report.append(f"- **Type:** {service.type}")
+        report.append(f"- **Protocol:** {service.protocol}")
+        report.append(f"- **Upstream:** {service.upstream.host}:{service.upstream.port}")
+        report.append(f"- **Routes:** {len(service.routes)}")
+
+        if service.upstream.load_balancer:
+            report.append(f"- **Load Balancer:** {service.upstream.load_balancer.algorithm}")
+
+        if service.upstream.health_check:
+            report.append("- **Health Checks:** Configured")
+
+        report.append("")
+
+    # Testing Checklist
+    report.append("## Testing Checklist")
+    report.append("")
+    report.append("- [ ] Test in staging environment")
+    report.append(f"- [ ] Verify all {total_routes} routes")
+    report.append("- [ ] Check load balancing distribution")
+    report.append("- [ ] Validate health check behavior")
+    report.append("- [ ] Monitor backend connectivity")
+    report.append("- [ ] Performance comparison")
+    report.append("")
+
+    # Next Steps
+    report.append("## Next Steps")
+    report.append("")
+    report.append("1. ✅ Review this report")
+    report.append("2. ⏳ Test in staging environment")
+    if compat_report.features_partial or compat_report.features_unsupported:
+        report.append("3. ⏳ Address partially supported/unsupported features")
+        report.append("4. ⏳ Deploy to production")
+        report.append("5. ⏳ Monitor and validate")
+    else:
+        report.append("3. ⏳ Deploy to production")
+        report.append("4. ⏳ Monitor and validate")
+    report.append("")
+
+    return "\n".join(report)
+
+
 if __name__ == "__main__":
     cli()
