@@ -215,7 +215,7 @@ nav:
 
 **Bei neuem Feature:**
 - Erstelle/erweitere Test-Datei: `tests/test_<feature>.py`
-- Teste alle Provider (APISIX, Kong, Traefik, Envoy)
+- Teste alle Provider (Envoy, Kong, APISIX, Traefik, Nginx, HAProxy)
 - Teste Config-Modell-Validierung
 - Teste Edge-Cases
 
