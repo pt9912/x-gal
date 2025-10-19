@@ -9,6 +9,7 @@ from pathlib import Path
 
 import click
 
+from gal.compatibility import CompatibilityChecker, FeatureSupport
 from gal.manager import Manager
 from gal.providers import (
     APISIXProvider,
@@ -378,6 +379,207 @@ def list_providers():
     click.echo("  • traefik - Traefik")
     click.echo("  • nginx   - Nginx Open Source")
     click.echo("  • haproxy - HAProxy Load Balancer")
+
+
+@cli.command()
+@click.option("--config", "-c", required=True, help="Configuration file path")
+@click.option(
+    "--target-provider",
+    "-p",
+    required=True,
+    type=click.Choice(
+        ["envoy", "kong", "apisix", "traefik", "nginx", "haproxy"], case_sensitive=False
+    ),
+    help="Target provider to check compatibility with",
+)
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed feature information")
+def check_compatibility(config, target_provider, verbose):
+    """Check GAL config compatibility with a target provider"""
+    try:
+        # Load config
+        manager = Manager()
+        cfg = manager.load_config(config)
+
+        # Create compatibility checker
+        checker = CompatibilityChecker()
+
+        # Check compatibility
+        click.echo(f"Checking compatibility with {target_provider}...")
+        click.echo("")
+
+        report = checker.check_provider(cfg, target_provider)
+
+        # Display results
+        _display_compatibility_report(report, verbose)
+
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        import traceback
+
+        traceback.print_exc()
+        sys.exit(1)
+
+
+@cli.command()
+@click.option("--config", "-c", required=True, help="Configuration file path")
+@click.option(
+    "--providers",
+    "-p",
+    help="Comma-separated list of providers to compare (default: all)",
+)
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed feature information")
+def compare_providers(config, providers, verbose):
+    """Compare GAL config compatibility across multiple providers"""
+    try:
+        # Load config
+        manager = Manager()
+        cfg = manager.load_config(config)
+
+        # Parse provider list
+        if providers:
+            provider_list = [p.strip().lower() for p in providers.split(",")]
+        else:
+            provider_list = ["envoy", "kong", "apisix", "traefik", "nginx", "haproxy"]
+
+        # Create compatibility checker
+        checker = CompatibilityChecker()
+
+        # Compare providers
+        click.echo(f"Comparing compatibility across {len(provider_list)} providers...")
+        click.echo("")
+
+        reports = checker.compare_providers(cfg, provider_list)
+
+        # Display comparison table
+        _display_comparison_table(reports)
+
+        # Show detailed reports if verbose
+        if verbose:
+            click.echo("\n" + "=" * 80)
+            click.echo("DETAILED REPORTS")
+            click.echo("=" * 80)
+            for report in reports:
+                click.echo("")
+                _display_compatibility_report(report, verbose=True)
+
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        import traceback
+
+        traceback.print_exc()
+        sys.exit(1)
+
+
+def _display_compatibility_report(report, verbose=False):
+    """Display a single compatibility report."""
+    # Header
+    click.echo("=" * 80)
+    click.echo(f"COMPATIBILITY REPORT: {report.provider.upper()}")
+    click.echo("=" * 80)
+
+    # Overall status
+    status_symbol = "✅" if report.compatible else "❌"
+    status_text = "COMPATIBLE" if report.compatible else "NOT COMPATIBLE"
+    score_percent = report.compatibility_score * 100
+
+    click.echo(f"\n{status_symbol} Status: {status_text}")
+    click.echo(f"📊 Compatibility Score: {score_percent:.1f}%")
+    click.echo(f"🔍 Features Checked: {report.features_checked}")
+    click.echo("")
+
+    # Feature summary
+    click.echo(f"✅ Fully Supported:   {len(report.features_supported)}")
+    click.echo(f"⚠️  Partially Supported: {len(report.features_partial)}")
+    click.echo(f"❌ Not Supported:     {len(report.features_unsupported)}")
+    click.echo("")
+
+    # Warnings
+    if report.warnings:
+        click.echo("⚠️  WARNINGS:")
+        for warning in report.warnings:
+            click.echo(f"  • {warning}")
+        click.echo("")
+
+    # Recommendations
+    if report.recommendations:
+        click.echo("💡 RECOMMENDATIONS:")
+        for rec in report.recommendations:
+            click.echo(f"  • {rec}")
+        click.echo("")
+
+    # Detailed feature list (if verbose)
+    if verbose:
+        if report.features_supported:
+            click.echo("✅ FULLY SUPPORTED FEATURES:")
+            for feature in report.features_supported:
+                click.echo(f"  • {feature.feature_name}")
+                if feature.message:
+                    click.echo(f"    {feature.message}")
+            click.echo("")
+
+        if report.features_partial:
+            click.echo("⚠️  PARTIALLY SUPPORTED FEATURES:")
+            for feature in report.features_partial:
+                click.echo(f"  • {feature.feature_name}")
+                if feature.message:
+                    click.echo(f"    {feature.message}")
+                if feature.recommendation:
+                    click.echo(f"    💡 {feature.recommendation}")
+            click.echo("")
+
+        if report.features_unsupported:
+            click.echo("❌ UNSUPPORTED FEATURES:")
+            for feature in report.features_unsupported:
+                click.echo(f"  • {feature.feature_name}")
+                if feature.message:
+                    click.echo(f"    {feature.message}")
+                if feature.recommendation:
+                    click.echo(f"    💡 {feature.recommendation}")
+            click.echo("")
+
+
+def _display_comparison_table(reports):
+    """Display comparison table across multiple providers."""
+    click.echo("=" * 100)
+    click.echo("PROVIDER COMPARISON")
+    click.echo("=" * 100)
+    click.echo("")
+
+    # Table header
+    click.echo(
+        f"{'Provider':<12} {'Status':<15} {'Score':<10} {'Supported':<12} {'Partial':<10} {'Unsupported':<12}"
+    )
+    click.echo("-" * 100)
+
+    # Sort by score (descending)
+    sorted_reports = sorted(reports, key=lambda r: r.compatibility_score, reverse=True)
+
+    for report in sorted_reports:
+        status_symbol = "✅" if report.compatible else "❌"
+        status_text = "Compatible" if report.compatible else "Incompatible"
+        score_percent = f"{report.compatibility_score * 100:.1f}%"
+
+        click.echo(
+            f"{report.provider:<12} {status_symbol} {status_text:<13} {score_percent:<10} "
+            f"{len(report.features_supported):<12} {len(report.features_partial):<10} "
+            f"{len(report.features_unsupported):<12}"
+        )
+
+    click.echo("")
+
+    # Summary
+    compatible_count = sum(1 for r in reports if r.compatible)
+    click.echo(f"Summary: {compatible_count}/{len(reports)} providers are compatible")
+    click.echo("")
+
+    # Best provider recommendation
+    best = sorted_reports[0]
+    if best.compatibility_score == 1.0:
+        click.echo(f"✨ Best choice: {best.provider} (100% compatible)")
+    else:
+        click.echo(
+            f"💡 Best choice: {best.provider} ({best.compatibility_score * 100:.1f}% compatible)"
+        )
 
 
 if __name__ == "__main__":
