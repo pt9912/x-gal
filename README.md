@@ -23,13 +23,14 @@ Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong
 - ✅ **Strukturiertes Logging** mit konfigurierbaren Log-Levels
 - ✅ **Reines Python** - kein Go erforderlich!
 - ✅ **CI/CD Ready** - GitHub Actions Workflows integriert
-- ✅ **Umfassende Tests** - 464 Tests mit 89% Coverage
+- ✅ **Umfassende Tests** - 535 Tests mit 89% Coverage
 - ✅ **Traffic Management** - Rate Limiting, Circuit Breaker, Health Checks & Load Balancing
 - ✅ **Sicherheit** - Authentication (Basic, API Key, JWT), Header-Manipulation, CORS
 - ✅ **WebSocket-Unterstützung** - Echtzeit bidirektionale Kommunikation (alle 6 Provider)
 - ✅ **Body-Transformation** - Request/Response Body-Manipulation mit dynamischen Feldern
 - ✅ **Timeout & Retry** - Verbindungs-/Lese-/Sende-Timeouts, automatische Wiederholungen mit exponentiellem Backoff
 - ✅ **Logging & Observability** - Strukturiertes Logging (JSON), Prometheus/OpenTelemetry-Metriken, Log-Sampling, benutzerdefinierte Felder
+- ✅ **gRPC Transformations** (v1.4.0) - Protobuf-basierte Request/Response-Transformationen für gRPC mit Proto-Descriptor-Management (file/inline/url), Trace-ID-Injection, Feld-Manipulation (add/remove/rename), Provider-Support (Envoy, Nginx, APISIX)
 - ✅ **Config-Import** (v1.3.0) - Importiere bestehende Envoy, Kong, APISIX, Traefik, Nginx, HAProxy Configs ins GAL-Format (`gal import-config`)
 - ✅ **Compatibility Checker** (v1.3.0) - Prüfe Provider-Kompatibilität und vergleiche Feature-Unterstützung (`gal check-compatibility`, `gal compare-providers`)
 - ✅ **Migration Assistant** (v1.3.0) - Interaktiver Migrations-Workflow mit Compatibility-Validierung und Migration Reports (`gal migrate`)

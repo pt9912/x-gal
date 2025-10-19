@@ -67,6 +67,7 @@ nav:
     - Headers: guides/HEADERS.md
     - Logging & Observability: guides/LOGGING_OBSERVABILITY.md
     - Body Transformation: guides/BODY_TRANSFORMATION.md
+    - gRPC Transformations: guides/GRPC_TRANSFORMATIONS.md
     - WebSocket: guides/WEBSOCKET.md
     - Timeout & Retry: guides/TIMEOUT_RETRY.md
   - Config Import & Migration:

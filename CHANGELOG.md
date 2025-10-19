@@ -7,6 +7,43 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [1.4.0] - 2025-01-19
+
+### Hinzugefügt
+
+#### gRPC Transformations Feature
+
+- **gRPC Protobuf Transformations** (v1.4.0 Feature 1)
+  - Protocol Buffer-basierte Request/Response Transformationen für gRPC Services
+  - Proto Descriptor Management mit 3 Quellen: file, inline, url
+  - Automatische .proto → .desc Kompilierung mit protoc
+  - Request Transformationen: add_fields (trace_id, timestamp), remove_fields (password, secrets), rename_fields (API v1 → v2)
+  - Response Transformationen: filter_fields (internal data), add_fields (processed_by, api_version)
+  - Template Variables: {{uuid}} (auto-generated UUID), {{timestamp}} (Unix timestamp)
+  - Provider Support:
+    - ✅ Envoy: Full (lua-protobuf Lua filter, 283 lines)
+    - ✅ Nginx/OpenResty: Full (access_by_lua_block, body_filter_by_lua_block, 176 lines)
+    - ✅ APISIX: Full (serverless-pre-function plugin, 97 lines)
+    - ⚠️ Kong: Limited (grpc-gateway plugin + alternatives documented)
+    - ⚠️ HAProxy: Manual (external Lua script + setup instructions)
+    - ❌ Traefik: Not supported (alternatives documented)
+  - Config Model: `gal/config.py` (+146 lines)
+    - ProtoDescriptor dataclass (name, source, path, content, url)
+    - GrpcTransformation dataclass (enabled, proto_descriptor, package, service, request_type, response_type, request_transform, response_transform)
+  - Proto Manager: `gal/proto_manager.py` (+367 lines, 92% coverage)
+    - 9 methods: register_descriptor, get_descriptor, list_descriptors, clear, _validate_file, _process_inline, _process_url, _compile_proto
+    - protoc integration with timeout and error handling
+  - Tests: 71 tests (100% pass rate)
+    - test_grpc_config.py: 22 tests (Config validation)
+    - test_proto_manager.py: 21 tests (ProtoManager, 92% coverage)
+    - test_grpc_providers.py: 23 tests (Provider Lua generation)
+    - test_grpc_integration.py: 5 tests (End-to-end integration)
+  - Documentation:
+    - User Guide: `docs/guides/GRPC_TRANSFORMATIONS.md` (1500+ lines, German)
+    - Technical Spec: `docs/v1.4.0-GRPC-SPEC.md` (1000+ lines)
+    - Examples: `examples/grpc-transformation-example.yaml` (11 scenarios, 616 lines)
+  - Use Cases: Trace-ID injection, Security compliance (password removal), API compatibility (field renaming), Multi-service transformations
+
 ## [1.3.0] - 2025-10-19
 
 ### Hinzugefügt
