@@ -1196,8 +1196,8 @@ services:
 
 ### Beispiele
 
-- [Azure APIM Example Config](../../examples/azure-apim-example.yaml)
-- [Multi-Service YAML](../../examples/multi-service-example.yaml)
+- [Azure APIM Example Config](https://github.com/pt9912/x-gal/blob/develop/examples/azure-apim-example.yaml)
+- [Multi-Service YAML](https://github.com/pt9912/x-gal/blob/develop/examples/multi-service-example.yaml)
 
 ### Community
 
