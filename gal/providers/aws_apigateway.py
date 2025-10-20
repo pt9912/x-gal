@@ -24,17 +24,26 @@ References:
 
 from typing import Dict, List, Any, Optional
 from dataclasses import asdict
+from urllib.parse import urlparse
 import json
+import logging
 import yaml
 
 from gal.config import (
     Config,
     Service,
     Route,
+    Upstream,
     GlobalConfig,
     AWSAPIGatewayConfig,
+    AuthenticationConfig,
+    JwtConfig,
+    ApiKeyConfig,
 )
 from gal.provider import Provider
+from gal.parsers.aws_apigateway_parser import AWSAPIGatewayParser
+
+logger = logging.getLogger(__name__)
 
 
 class AWSAPIGatewayProvider(Provider):
@@ -148,21 +157,174 @@ class AWSAPIGatewayProvider(Provider):
         AWS API Gateway supports exporting APIs as OpenAPI 3.0 with
         x-amazon-apigateway extensions. This method parses those exports.
 
+        Export Command:
+            aws apigateway get-export --rest-api-id <api-id> \\
+                --stage-name <stage> --export-type oas30 > api.json
+
         Args:
             provider_config: OpenAPI 3.0 JSON/YAML from AWS API Gateway export
 
         Returns:
             GAL Config object
 
-        Raises:
-            NotImplementedError: Import functionality coming in next phase
+        Example:
+            >>> with open('api.json') as f:
+            ...     config = provider.parse(f.read())
+
+        Note:
+            x-amazon-apigateway extensions are parsed to extract integration
+            types, authorizers, and CORS configuration. Usage Plans and
+            WAF settings are NOT included in OpenAPI exports.
         """
-        # TODO: Implement AWS API Gateway import in next phase
-        # Similar to Azure APIM, we'll parse OpenAPI 3.0 exports
-        raise NotImplementedError(
-            "AWS API Gateway import will be implemented in next phase. "
-            "Use 'aws apigateway get-export' to export OpenAPI 3.0 spec."
+        logger.info("Parsing AWS API Gateway OpenAPI export to GAL configuration")
+
+        # Initialize parser
+        parser = AWSAPIGatewayParser()
+        api = parser.parse(provider_config, api_id="imported-api")
+
+        logger.info(f"Parsed API: {api.title} v{api.version}")
+
+        # Extract backend URL
+        backend_url = parser.extract_backend_url(api)
+        if not backend_url:
+            logger.warning("No backend URL found in OpenAPI spec")
+            backend_url = "https://backend.example.com"
+
+        # Parse backend URL
+        parsed_url = urlparse(backend_url)
+        backend_host = parsed_url.hostname or "backend.example.com"
+        backend_port = parsed_url.port or (443 if parsed_url.scheme == "https" else 80)
+        backend_protocol = parsed_url.scheme or "https"
+
+        # Extract routes
+        routes_data = parser.extract_routes(api)
+        routes = []
+
+        # Extract authentication
+        auth_type, auth_config = parser.extract_authentication(api)
+        authentication = None
+
+        if auth_type == "jwt" and auth_config:
+            authorizer_type = auth_config.get("authorizer_type")
+
+            if authorizer_type == "cognito":
+                # Cognito User Pool
+                provider_arns = auth_config.get("provider_arns", [])
+                issuer = None
+                if provider_arns:
+                    # Extract issuer from ARN
+                    # arn:aws:cognito-idp:region:account:userpool/pool-id
+                    arn = provider_arns[0]
+                    parts = arn.split(":")
+                    if len(parts) >= 6:
+                        region = parts[3]
+                        pool_id = parts[5].split("/")[-1]
+                        issuer = f"https://cognito-idp.{region}.amazonaws.com/{pool_id}"
+
+                authentication = AuthenticationConfig(
+                    type="jwt",
+                    jwt=JwtConfig(
+                        issuer=issuer or "https://cognito-idp.us-east-1.amazonaws.com/pool-id",
+                        audience="",  # Not available in OpenAPI export
+                    ),
+                )
+            elif authorizer_type == "lambda":
+                # Lambda Authorizer (treat as JWT)
+                authentication = AuthenticationConfig(
+                    type="jwt",
+                    jwt=JwtConfig(
+                        issuer="lambda-authorizer",
+                        audience="",
+                    ),
+                )
+            else:
+                # Generic JWT
+                authentication = AuthenticationConfig(
+                    type="jwt",
+                    jwt=JwtConfig(
+                        issuer="",
+                        audience="",
+                    ),
+                )
+
+        elif auth_type == "api_key" and auth_config:
+            key_name = auth_config.get("header_name", "x-api-key")
+            authentication = AuthenticationConfig(
+                type="api_key",
+                api_key=ApiKeyConfig(
+                    key_name=key_name,
+                    keys=[],  # Keys not available in OpenAPI export
+                ),
+            )
+
+        # Create routes
+        for route_data in routes_data:
+            route = Route(
+                path_prefix=route_data["path"],
+                methods=route_data["methods"],
+                authentication=authentication,
+            )
+            routes.append(route)
+
+        # Extract integration type
+        integration_type = parser.extract_integration_type(api)
+        lambda_arn = None
+
+        if integration_type == "AWS_PROXY":
+            lambda_arn = parser.extract_lambda_arn(api)
+            if not lambda_arn:
+                logger.warning("AWS_PROXY integration found but no Lambda ARN extracted")
+
+        # Extract CORS config
+        cors_config = parser.extract_cors_config(api)
+
+        # Extract API key requirement
+        api_key_required = parser.extract_api_key_required(api)
+
+        # Build AWS API Gateway config
+        aws_config = AWSAPIGatewayConfig(
+            api_name=api.title,
+            api_description=api.description,
+            endpoint_type="REGIONAL",  # Default, cannot be determined from export
+            stage_name="prod",  # Default, cannot be determined from export
+            integration_type=integration_type,
+            lambda_function_arn=lambda_arn,
+            api_key_required=api_key_required,
+            cors_enabled=cors_config["enabled"],
+            cors_allow_origins=cors_config["allow_origins"] if cors_config["allow_origins"] else ["*"],
+            cors_allow_methods=cors_config["allow_methods"] if cors_config["allow_methods"] else ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            cors_allow_headers=cors_config["allow_headers"] if cors_config["allow_headers"] else ["Content-Type", "Authorization"],
         )
+
+        # Create service
+        service = Service(
+            name=api.api_id,
+            type="rest",  # AWS API Gateway OpenAPI exports are always REST
+            protocol=backend_protocol,
+            upstream=Upstream(
+                host=backend_host,
+                port=backend_port,
+            ),
+            routes=routes,
+        )
+
+        # Create config
+        config = Config(
+            version="1.0",
+            provider="gal",  # Imported config is converted to GAL format
+            global_config=GlobalConfig(
+                aws_apigateway=aws_config,
+            ),
+            services=[service],
+        )
+
+        logger.info(
+            f"Imported AWS API Gateway: {len(routes)} routes, "
+            f"integration: {integration_type}, "
+            f"auth: {auth_type or 'none'}"
+        )
+
+        return config
 
     def generate(self, config: Config) -> str:
         """
