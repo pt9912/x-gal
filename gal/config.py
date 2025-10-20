@@ -1693,6 +1693,47 @@ class Config:
                 if "retry" in route_data:
                     retry = RetryConfig(**route_data["retry"])
 
+                # Parse route-level traffic split
+                traffic_split = None
+                if "traffic_split" in route_data:
+                    ts_data = route_data["traffic_split"]
+
+                    # Parse split targets
+                    targets = []
+                    for target_data in ts_data.get("targets", []):
+                        upstream_target = UpstreamTarget(**target_data["upstream"])
+                        split_target = SplitTarget(
+                            name=target_data["name"],
+                            weight=target_data["weight"],
+                            upstream=upstream_target,
+                            description=target_data.get("description"),
+                        )
+                        targets.append(split_target)
+
+                    # Parse routing rules
+                    routing_rules = None
+                    if "routing_rules" in ts_data:
+                        rules_data = ts_data["routing_rules"]
+                        header_rules = [
+                            HeaderMatchRule(**hr)
+                            for hr in rules_data.get("header_rules", [])
+                        ]
+                        cookie_rules = [
+                            CookieMatchRule(**cr)
+                            for cr in rules_data.get("cookie_rules", [])
+                        ]
+                        routing_rules = RoutingRules(
+                            header_rules=header_rules,
+                            cookie_rules=cookie_rules,
+                        )
+
+                    traffic_split = TrafficSplitConfig(
+                        enabled=ts_data.get("enabled", False),
+                        targets=targets,
+                        routing_rules=routing_rules,
+                        fallback_target=ts_data.get("fallback_target"),
+                    )
+
                 route = Route(
                     path_prefix=route_data["path_prefix"],
                     methods=route_data.get("methods"),
@@ -1705,6 +1746,7 @@ class Config:
                     body_transformation=body_transformation,
                     timeout=timeout,
                     retry=retry,
+                    traffic_split=traffic_split,
                 )
                 routes.append(route)
 
