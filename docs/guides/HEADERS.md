@@ -331,6 +331,409 @@ routes:
       - Server
 ```
 
+---
+
+### Nginx (proxy_set_header / add_header)
+
+Nginx implementiert Header Manipulation mit `proxy_set_header` für Request Headers und `add_header` für Response Headers.
+
+**Config-Beispiel (Request Headers):**
+```nginx
+# GAL generiert Nginx-Config
+http {
+    upstream backend {
+        server api.internal:8080;
+    }
+
+    server {
+        listen 80;
+        server_name api.example.com;
+
+        location /api {
+            # Request Headers (an Upstream)
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Request-ID $request_id;
+            proxy_set_header X-API-Version "v1";
+
+            # Response Headers (an Client)
+            add_header X-Frame-Options "DENY" always;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header X-Request-ID $request_id always;
+
+            # Headers entfernen (durch leeren Wert)
+            proxy_set_header X-Internal-Token "";
+            more_clear_headers 'Server';  # Benötigt ngx_headers_more module
+
+            proxy_pass http://backend;
+        }
+    }
+}
+```
+
+**Mit OpenResty (Lua für komplexe Logik):**
+```nginx
+location /api {
+    access_by_lua_block {
+        -- Request Headers setzen
+        ngx.req.set_header("X-Request-ID", ngx.var.request_id)
+        ngx.req.set_header("X-Forwarded-For", ngx.var.remote_addr)
+        ngx.req.set_header("X-API-Version", "v1")
+
+        -- Conditional Header Logic
+        local user_agent = ngx.req.get_headers()["User-Agent"]
+        if user_agent and string.match(user_agent, "Mobile") then
+            ngx.req.set_header("X-Device-Type", "mobile")
+        else
+            ngx.req.set_header("X-Device-Type", "desktop")
+        end
+
+        -- Header entfernen
+        ngx.req.clear_header("X-Internal-Token")
+    }
+
+    header_filter_by_lua_block {
+        -- Response Headers setzen
+        ngx.header["X-Request-ID"] = ngx.var.request_id
+        ngx.header["X-Response-Time"] = ngx.var.request_time
+        ngx.header["X-Frame-Options"] = "DENY"
+
+        -- Response Headers entfernen
+        ngx.header["Server"] = nil
+        ngx.header["X-Powered-By"] = nil
+    }
+
+    proxy_pass http://backend;
+}
+```
+
+**X-Forwarded-* Headers:**
+```nginx
+location /api {
+    # Standard Forwarded Headers
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Port $server_port;
+
+    # Custom Headers
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Original-URI $request_uri;
+
+    proxy_pass http://backend;
+}
+```
+
+**Nginx Besonderheiten**:
+- ✅ `proxy_set_header` für Request Headers an Upstream
+- ✅ `add_header` für Response Headers an Client
+- ✅ `always` Flag wichtig für add_header (auch bei Errors)
+- ✅ OpenResty/Lua für komplexe Header-Logik
+- ✅ `$request_id` Variable für Request Tracking
+- ⚠️ Header Removal: `proxy_set_header X-Header ""` (leerer Wert)
+- ⚠️ Response Header Removal: Benötigt `ngx_headers_more` Module (`more_clear_headers`)
+- ⚠️ `add_header` wird nicht vererbt (muss in jeder Location definiert werden)
+
+**Testing:**
+```bash
+# Request Headers testen
+curl -v http://nginx-host/api \
+  -H "User-Agent: TestClient/1.0" \
+  2>&1 | grep ">"
+
+# Response Headers prüfen
+curl -I http://nginx-host/api
+
+# Erwartete Response Headers:
+# X-Frame-Options: DENY
+# X-Content-Type-Options: nosniff
+# X-Request-ID: <uuid>
+
+# Header entfernt prüfen
+curl -I http://nginx-host/api | grep -i "Server:"
+# Sollte leer sein wenn more_clear_headers verwendet wird
+```
+
+**Nginx Config für GAL Header Manipulation:**
+```nginx
+# Vollständiges Beispiel für GAL-generierte Config
+http {
+    # Custom Log Format mit Request ID
+    log_format main_with_headers '$remote_addr - $remote_user [$time_local] '
+                                 '"$request" $status $body_bytes_sent '
+                                 '"$http_referer" "$http_user_agent" '
+                                 'request_id="$request_id"';
+
+    access_log /var/log/nginx/access.log main_with_headers;
+
+    upstream api_backend {
+        server api-1.internal:8080;
+        server api-2.internal:8080;
+    }
+
+    server {
+        listen 80;
+        server_name api.example.com;
+
+        # Security Headers (für alle Locations)
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
+
+        location /api/public {
+            # Request Headers
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-API-Type "public";
+            proxy_set_header X-Request-ID $request_id;
+
+            # Response Headers
+            add_header X-API-Version "v1" always;
+            add_header Cache-Control "public, max-age=3600" always;
+
+            proxy_pass http://api_backend;
+        }
+
+        location /api/private {
+            # Request Headers
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-API-Type "private";
+            proxy_set_header X-Request-ID $request_id;
+
+            # Response Headers
+            add_header X-API-Version "v1" always;
+            add_header Cache-Control "private, no-cache" always;
+
+            proxy_pass http://api_backend;
+        }
+    }
+}
+```
+
+---
+
+### HAProxy (http-request / http-response)
+
+HAProxy implementiert Header Manipulation mit `http-request` für Request Headers und `http-response` für Response Headers.
+
+**Config-Beispiel:**
+```haproxy
+# GAL generiert HAProxy-Config
+global
+    log stdout format raw local0
+    maxconn 4096
+
+defaults
+    log global
+    mode http
+    option httplog
+    timeout connect 5000ms
+    timeout client 50000ms
+    timeout server 50000ms
+
+frontend api_front
+    bind *:80
+
+    # Request Headers setzen (an Backend)
+    http-request set-header X-Forwarded-For %[src]
+    http-request set-header X-Forwarded-Proto https
+    http-request set-header X-Request-ID %[uuid()]
+    http-request add-header X-API-Version v1
+    http-request set-header X-Real-IP %[src]
+
+    # Request Headers entfernen
+    http-request del-header X-Internal-Token
+    http-request del-header X-Debug-Mode
+
+    # Response Headers setzen (an Client)
+    http-response set-header X-Frame-Options "DENY"
+    http-response set-header X-Content-Type-Options "nosniff"
+    http-response set-header X-XSS-Protection "1; mode=block"
+    http-response set-header X-Request-ID %[req.hdr(X-Request-ID)]
+
+    # Response Headers entfernen
+    http-response del-header Server
+    http-response del-header X-Powered-By
+
+    default_backend api_backend
+
+backend api_backend
+    balance roundrobin
+    server api1 api-1.internal:8080 check
+    server api2 api-2.internal:8080 check
+```
+
+**Conditional Headers mit ACLs:**
+```haproxy
+frontend api_front
+    bind *:80
+
+    # ACL für verschiedene API Typen
+    acl is_public_api path_beg /api/public
+    acl is_private_api path_beg /api/private
+    acl is_admin_api path_beg /api/admin
+
+    # Conditional Request Headers
+    http-request set-header X-API-Type "public" if is_public_api
+    http-request set-header X-API-Type "private" if is_private_api
+    http-request set-header X-API-Type "admin" if is_admin_api
+
+    # Device Type Detection
+    acl is_mobile hdr_sub(User-Agent) -i mobile
+    acl is_mobile hdr_sub(User-Agent) -i android
+    acl is_mobile hdr_sub(User-Agent) -i iphone
+    http-request set-header X-Device-Type "mobile" if is_mobile
+    http-request set-header X-Device-Type "desktop" if !is_mobile
+
+    # Response Headers mit Conditions
+    http-response set-header Cache-Control "public, max-age=3600" if is_public_api
+    http-response set-header Cache-Control "private, no-cache" if is_private_api
+
+    default_backend api_backend
+```
+
+**HAProxy Variables für Dynamic Headers:**
+```haproxy
+frontend api_front
+    bind *:80
+
+    # HAProxy Sample Fetch Methods
+    http-request set-header X-Client-IP %[src]
+    http-request set-header X-Client-Port %[src_port]
+    http-request set-header X-Server-Name %[env(HOSTNAME)]
+    http-request set-header X-Request-Time %[date()]
+    http-request set-header X-Request-ID %[uuid()]
+
+    # Forwarded Headers
+    http-request set-header X-Forwarded-For %[src]
+    http-request set-header X-Forwarded-Proto %[ssl_fc,iif(https,http)]
+    http-request set-header X-Forwarded-Host %[req.hdr(Host)]
+
+    # Response Headers mit Backend-Daten
+    http-response set-header X-Backend-Server %[res.hdr(X-Server-ID)]
+    http-response set-header X-Response-Time %[res.hdr(X-Processing-Time)]
+
+    default_backend api_backend
+```
+
+**Multi-Tenant Headers:**
+```haproxy
+frontend api_front
+    bind *:80
+
+    # Extract Tenant from Subdomain
+    acl tenant_acme hdr_beg(Host) -i acme.
+    acl tenant_widgets hdr_beg(Host) -i widgets.
+
+    # Set Tenant Headers
+    http-request set-header X-Tenant-ID "acme" if tenant_acme
+    http-request set-header X-Tenant-ID "widgets" if tenant_widgets
+
+    # Tenant-specific Backend Headers
+    http-request set-header X-Tenant-Region "us-west" if tenant_acme
+    http-request set-header X-Tenant-Region "eu-central" if tenant_widgets
+
+    default_backend api_backend
+```
+
+**HAProxy Besonderheiten**:
+- ✅ `http-request set-header` / `http-request add-header` für Request Headers
+- ✅ `http-response set-header` / `http-response add-header` für Response Headers
+- ✅ `http-request del-header` / `http-response del-header` für Header Removal
+- ✅ ACL-basierte Conditional Logic (sehr performant)
+- ✅ Sample Fetch Methods: `%[src]`, `%[uuid()]`, `%[req.hdr(Name)]`
+- ✅ `set-header` = replace, `add-header` = append
+- ✅ `%[req.hdr(Header)]` für Request Header Werte
+- ✅ `%[res.hdr(Header)]` für Response Header Werte
+- ⚠️ UUID generiert via `%[uuid()]` (HAProxy 1.9+)
+
+**Testing:**
+```bash
+# Request Headers testen
+curl -v http://haproxy-host/api \
+  -H "User-Agent: Mobile/1.0" \
+  2>&1 | grep ">"
+
+# Response Headers prüfen
+curl -I http://haproxy-host/api
+
+# Erwartete Response Headers:
+# X-Frame-Options: DENY
+# X-Content-Type-Options: nosniff
+# X-Request-ID: <uuid>
+
+# Multi-Tenant Testing
+curl -I http://acme.example.com/api
+# Sollte X-Tenant-ID: acme setzen
+
+# Device Detection Testing
+curl -I http://haproxy-host/api -A "Mozilla/5.0 (iPhone)"
+# Sollte X-Device-Type: mobile setzen
+```
+
+**HAProxy Config für GAL Header Manipulation:**
+```haproxy
+# Vollständiges Beispiel für GAL-generierte Config
+global
+    log stdout format raw local0
+    maxconn 4096
+
+defaults
+    log global
+    mode http
+    option httplog
+    option http-server-close
+    timeout connect 5000ms
+    timeout client 50000ms
+    timeout server 50000ms
+
+frontend api_front
+    bind *:80
+
+    # Standard Security Headers
+    http-response set-header X-Frame-Options "DENY"
+    http-response set-header X-Content-Type-Options "nosniff"
+    http-response set-header X-XSS-Protection "1; mode=block"
+    http-response set-header Strict-Transport-Security "max-age=31536000"
+
+    # Remove Backend Disclosure Headers
+    http-response del-header Server
+    http-response del-header X-Powered-By
+    http-response del-header X-AspNet-Version
+
+    # Request Identification
+    http-request set-header X-Request-ID %[uuid()]
+    http-request set-header X-Forwarded-For %[src]
+    http-request set-header X-Real-IP %[src]
+
+    # Route-specific Headers
+    acl is_public path_beg /api/public
+    acl is_private path_beg /api/private
+
+    http-request set-header X-API-Type "public" if is_public
+    http-request set-header X-API-Type "private" if is_private
+
+    http-response set-header X-API-Version "v1"
+    http-response set-header Cache-Control "public, max-age=3600" if is_public
+    http-response set-header Cache-Control "private, no-cache" if is_private
+
+    default_backend api_backend
+
+backend api_backend
+    balance roundrobin
+    option httpchk GET /health
+    server api1 api-1.internal:8080 check inter 5s
+    server api2 api-2.internal:8080 check inter 5s
+```
+
+---
+
 ### Azure APIM (set-header Policy)
 
 Azure API Management uses Policy XML for header manipulation:

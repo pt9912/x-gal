@@ -388,76 +388,523 @@ entryPoints:
 curl http://localhost:8082/metrics
 ```
 
-### 5. Nginx
+---
 
-**Logging:**
-- `log_format` mit JSON Support
-- Konfigurierbare Log Levels (debug, info, warn, error)
-- Custom Fields in JSON Format
+### Nginx (log_format / access_log)
 
-**Metriken:**
-- Externe Exporter erforderlich: `nginx-prometheus-exporter`
-- Oder VTS Module (nginx-module-vts)
+Nginx implementiert Logging mit `log_format` für Access Logs und `error_log` für Error Logs.
 
-**Beispiel-Konfiguration:**
+**Config-Beispiel (JSON Access Logs):**
 ```nginx
+# GAL generiert Nginx-Config
 http {
     # JSON Log Format
     log_format json_combined escape=json
       '{'
         '"time_local":"$time_local",'
+        '"time_iso8601":"$time_iso8601",'
         '"remote_addr":"$remote_addr",'
+        '"remote_user":"$remote_user",'
         '"request_method":"$request_method",'
         '"request_uri":"$request_uri",'
+        '"server_protocol":"$server_protocol",'
         '"status":"$status",'
+        '"body_bytes_sent":"$body_bytes_sent",'
         '"request_time":"$request_time",'
-        '"environment":"production"'
+        '"upstream_response_time":"$upstream_response_time",'
+        '"upstream_addr":"$upstream_addr",'
+        '"http_referer":"$http_referer",'
+        '"http_user_agent":"$http_user_agent",'
+        '"http_x_forwarded_for":"$http_x_forwarded_for",'
+        '"request_id":"$request_id"'
       '}';
 
     access_log /var/log/nginx/access.log json_combined;
-    error_log /var/log/nginx/error.log info;
+    error_log /var/log/nginx/error.log warn;
+
+    upstream backend {
+        server api.internal:8080;
+    }
+
+    server {
+        listen 80;
+        server_name api.example.com;
+
+        location /api {
+            proxy_pass http://backend;
+        }
+    }
+}
+```
+
+**Mit Custom Fields:**
+```nginx
+http {
+    # JSON Log Format mit Custom Fields
+    log_format json_custom escape=json
+      '{'
+        '"timestamp":"$time_iso8601",'
+        '"request_id":"$request_id",'
+        '"method":"$request_method",'
+        '"path":"$request_uri",'
+        '"status":"$status",'
+        '"latency":"$request_time",'
+        '"upstream_latency":"$upstream_response_time",'
+        '"bytes_sent":"$body_bytes_sent",'
+        '"user_agent":"$http_user_agent",'
+        '"environment":"production",'
+        '"cluster":"eu-west-1",'
+        '"version":"v1.2.0"'
+      '}';
+
+    access_log /var/log/nginx/access.log json_custom;
+}
+```
+
+**Mit OpenResty (Lua Logging):**
+```nginx
+location /api {
+    log_by_lua_block {
+        local cjson = require "cjson"
+
+        local log_entry = {
+            timestamp = ngx.var.time_iso8601,
+            request_id = ngx.var.request_id,
+            method = ngx.var.request_method,
+            path = ngx.var.request_uri,
+            status = ngx.var.status,
+            latency = ngx.var.request_time,
+            upstream_latency = ngx.var.upstream_response_time,
+            user_agent = ngx.var.http_user_agent,
+            -- Custom Fields
+            environment = "production",
+            tenant_id = ngx.var.http_x_tenant_id or "unknown"
+        }
+
+        ngx.log(ngx.INFO, cjson.encode(log_entry))
+    }
+
+    proxy_pass http://backend;
+}
+```
+
+**Error Log Levels:**
+```nginx
+# Error Log mit verschiedenen Levels
+error_log /var/log/nginx/error.log debug;   # Debug-Level (sehr verbose)
+error_log /var/log/nginx/error.log info;    # Info-Level
+error_log /var/log/nginx/error.log notice;  # Notice-Level
+error_log /var/log/nginx/error.log warn;    # Warning-Level (empfohlen)
+error_log /var/log/nginx/error.log error;   # Error-Level
+error_log /var/log/nginx/error.log crit;    # Critical-Level
+```
+
+**Nginx Besonderheiten**:
+- ✅ JSON Log Format mit `escape=json`
+- ✅ `$request_id` für Request Tracking (Nginx 1.11.0+)
+- ✅ `$request_time` für End-to-End Latency
+- ✅ `$upstream_response_time` für Backend Latency
+- ✅ OpenResty/Lua für Custom Logging-Logik
+- ✅ Conditional Logging mit `if` (map-basiert empfohlen)
+- ⚠️ Kein natives Log Sampling (benötigt Lua oder externe Tools)
+- ⚠️ Keine native Prometheus Metriken (benötigt nginx-prometheus-exporter)
+
+**Log Sampling mit OpenResty:**
+```nginx
+location /api {
+    log_by_lua_block {
+        -- Nur 10% der Requests loggen
+        if math.random() < 0.1 then
+            ngx.log(ngx.INFO, "Request: ", ngx.var.request_uri)
+        end
+    }
+
+    proxy_pass http://backend;
+}
+```
+
+**Health Check Endpoints ausschließen:**
+```nginx
+# Map für Conditional Logging
+map $request_uri $loggable {
+    default 1;
+    /health 0;
+    /metrics 0;
+    /ping 0;
+}
+
+server {
+    listen 80;
+
+    location / {
+        access_log /var/log/nginx/access.log json_combined if=$loggable;
+        proxy_pass http://backend;
+    }
 }
 ```
 
 **Metriken mit nginx-prometheus-exporter:**
 ```bash
-# Exporter starten
-nginx-prometheus-exporter -nginx.scrape-uri=http://localhost:8080/stub_status
+# 1. Nginx Stub Status aktivieren
+# nginx.conf:
+server {
+    listen 8080;
+    location /stub_status {
+        stub_status;
+        allow 127.0.0.1;
+        deny all;
+    }
+}
 
-# Metriken abrufen
+# 2. Exporter starten
+docker run -d \
+  --name nginx-exporter \
+  -p 9113:9113 \
+  nginx/nginx-prometheus-exporter:latest \
+  -nginx.scrape-uri=http://nginx:8080/stub_status
+
+# 3. Metriken abrufen
 curl http://localhost:9113/metrics
+
+# Verfügbare Metriken:
+# nginx_connections_active
+# nginx_connections_reading
+# nginx_connections_writing
+# nginx_http_requests_total
 ```
 
-### 6. HAProxy
+**Metriken mit VTS Module (nginx-module-vts):**
+```nginx
+# Nginx mit VTS Module kompiliert
+http {
+    vhost_traffic_status_zone;
 
-**Logging:**
-- Syslog Logging
-- Log Level Mapping (debug, info, notice, err)
-- JSON Format über `log-format` Directive
+    server {
+        listen 80;
 
-**Metriken:**
-- Stats Endpoint: `/stats;csv`
-- Externe Exporter: `haproxy_exporter`
+        location /status {
+            vhost_traffic_status_display;
+            vhost_traffic_status_display_format html;
+        }
 
-**Beispiel-Konfiguration:**
+        location /status/format/json {
+            vhost_traffic_status_display;
+            vhost_traffic_status_display_format json;
+        }
+
+        location /status/format/prometheus {
+            vhost_traffic_status_display;
+            vhost_traffic_status_display_format prometheus;
+        }
+    }
+}
+
+# Prometheus Metriken abrufen:
+curl http://localhost/status/format/prometheus
+```
+
+**Log Rotation (logrotate):**
+```bash
+# /etc/logrotate.d/nginx
+/var/log/nginx/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    notifempty
+    missingok
+    create 0644 nginx nginx
+    sharedscripts
+    postrotate
+        [ -f /var/run/nginx.pid ] && kill -USR1 `cat /var/run/nginx.pid`
+    endscript
+}
+```
+
+**Testing:**
+```bash
+# Access Logs in Echtzeit anzeigen
+tail -f /var/log/nginx/access.log
+
+# JSON Logs mit jq parsen
+tail -f /var/log/nginx/access.log | jq '.status, .request_time'
+
+# Error Logs filtern
+grep -i error /var/log/nginx/error.log
+
+# Metriken testen (mit nginx-prometheus-exporter)
+curl http://localhost:9113/metrics | grep nginx_http_requests_total
+```
+
+---
+
+### HAProxy (log / log-format)
+
+HAProxy implementiert Logging mit Syslog und Custom Log Formats.
+
+**Config-Beispiel (HTTP Logs):**
 ```haproxy
+# GAL generiert HAProxy-Config
 global
-    log 127.0.0.1 local0 info
-    # JSON format requires log-format directive
+    log 127.0.0.1:514 local0 info
+    log 127.0.0.1:514 local1 notice
+    maxconn 4096
 
 defaults
     log global
+    mode http
     option httplog
+    option http-server-close
+    timeout connect 5000ms
+    timeout client 50000ms
+    timeout server 50000ms
+
+frontend api_front
+    bind *:80
+    default_backend api_backend
+
+backend api_backend
+    balance roundrobin
+    server api1 api-1.internal:8080 check
+    server api2 api-2.internal:8080 check
+```
+
+**Custom Log Format (JSON-ähnlich):**
+```haproxy
+defaults
+    log global
+    mode http
+    option httplog
+
+    # Custom Log Format
+    log-format '{"time":"%t","client_ip":"%ci","client_port":%cp,"frontend":"%f","backend":"%b","server":"%s","time_request":%TR,"time_queue":%Tw,"time_connect":%Tc,"time_response":%Tr,"time_total":%Ta,"status":%ST,"bytes":%B,"method":"%HM","path":"%HP","query":"%HQ","http_version":"%HV","user_agent":"%{+Q}[capture.req.hdr(0)]"}'
+```
+
+**Detailliertes Log Format:**
+```haproxy
+defaults
+    log global
+    mode http
+
+    # Sehr detailliertes Log Format
+    log-format "%ci:%cp [%tr] %ft %b/%s %TR/%Tw/%Tc/%Tr/%Ta %ST %B %CC %CS %tsc %ac/%fc/%bc/%sc/%rc %sq/%bq %hr %hs %{+Q}r"
+
+    # Legende:
+    # %ci = Client IP
+    # %cp = Client Port
+    # %tr = Request Time
+    # %ft = Frontend Name
+    # %b = Backend Name
+    # %s = Server Name
+    # %TR = Time to receive full request
+    # %Tw = Time in queue
+    # %Tc = Time to connect to server
+    # %Tr = Time to receive full response
+    # %Ta = Total active time
+    # %ST = HTTP Status Code
+    # %B = Bytes sent
+```
+
+**Syslog Configuration:**
+```haproxy
+global
+    # Lokaler Syslog
+    log 127.0.0.1:514 local0 info
+
+    # Remote Syslog
+    log syslog.example.com:514 local0 info
+
+    # Stdout (Docker-kompatibel)
+    log stdout format raw local0 info
+```
+
+**Frontend-spezifische Logs:**
+```haproxy
+frontend api_front
+    bind *:80
+
+    # Frontend-spezifische Log-Konfiguration
+    log-tag api_gateway
+    option httplog
+
+    # Capture Headers für Logging
+    capture request header Host len 50
+    capture request header User-Agent len 200
+    capture request header X-Request-ID len 50
+
+    default_backend api_backend
+```
+
+**Conditional Logging (ACL-basiert):**
+```haproxy
+frontend api_front
+    bind *:80
+
+    # ACLs für Health Checks
+    acl is_health path /health
+    acl is_metrics path /metrics
+
+    # Logging deaktivieren für Health Checks
+    http-request set-log-level silent if is_health
+    http-request set-log-level silent if is_metrics
+
+    default_backend api_backend
+```
+
+**HAProxy Besonderheiten**:
+- ✅ Syslog-basiertes Logging (local0-local7)
+- ✅ `option httplog` für HTTP-spezifische Logs
+- ✅ `log-format` für Custom Formats
+- ✅ Capture Headers für zusätzliche Log-Felder
+- ✅ ACL-basiertes Conditional Logging
+- ✅ `log-tag` für Frontend/Backend Identification
+- ⚠️ Kein natives JSON Format (muss manuell konstruiert werden)
+- ⚠️ Syslog erforderlich (rsyslog, syslog-ng)
+- ⚠️ Keine direkte File-basierte Logs (nur via Syslog)
+
+**Syslog Setup (rsyslog):**
+```bash
+# /etc/rsyslog.d/haproxy.conf
+$ModLoad imudp
+$UDPServerRun 514
+
+# HAProxy Logs in separates File
+local0.* /var/log/haproxy/access.log
+
+# Log Rotation
+& stop
+```
+
+**Metriken mit HAProxy Stats:**
+```haproxy
+frontend stats
+    bind *:8404
+    stats enable
+    stats uri /stats
+    stats refresh 10s
+    stats show-legends
+    stats show-desc HAProxy Statistics
+    stats auth admin:password
+
+# Zugriff:
+# Browser: http://localhost:8404/stats
+# CSV: http://localhost:8404/stats;csv
 ```
 
 **Metriken mit haproxy_exporter:**
 ```bash
-# Exporter starten
-haproxy_exporter --haproxy.scrape-uri="http://localhost:8404/stats;csv"
+# 1. HAProxy Stats Socket aktivieren
+# haproxy.cfg:
+global
+    stats socket /var/run/haproxy.sock mode 600 level admin
+    stats timeout 30s
 
-# Metriken abrufen
+# 2. Exporter starten
+docker run -d \
+  --name haproxy-exporter \
+  -p 9101:9101 \
+  -v /var/run/haproxy.sock:/var/run/haproxy.sock \
+  quay.io/prometheus/haproxy-exporter:latest \
+  --haproxy.scrape-uri=unix:/var/run/haproxy.sock
+
+# 3. Metriken abrufen
 curl http://localhost:9101/metrics
+
+# Verfügbare Metriken:
+# haproxy_frontend_http_requests_total
+# haproxy_backend_http_responses_total
+# haproxy_server_up
+# haproxy_backend_response_time_average_seconds
 ```
+
+**Admin Socket für Monitoring:**
+```bash
+# HAProxy Runtime Stats abrufen
+echo "show stat" | socat stdio /var/run/haproxy.sock
+
+# Backend Server Status
+echo "show servers state" | socat stdio /var/run/haproxy.sock
+
+# Session Information
+echo "show sess" | socat stdio /var/run/haproxy.sock
+
+# Error Count
+echo "show errors" | socat stdio /var/run/haproxy.sock
+```
+
+**Testing:**
+```bash
+# Logs in Echtzeit anzeigen (via Syslog)
+tail -f /var/log/haproxy/access.log
+
+# HAProxy Stats anzeigen
+curl -u admin:password http://localhost:8404/stats
+
+# CSV Stats für Parsing
+curl -u admin:password http://localhost:8404/stats\;csv
+
+# Metriken testen (mit haproxy_exporter)
+curl http://localhost:9101/metrics | grep haproxy_frontend_http_requests_total
+
+# Admin Socket Testing
+echo "show info" | socat stdio /var/run/haproxy.sock
+```
+
+**Complete Observability Setup:**
+```haproxy
+# Vollständiges HAProxy Observability Setup
+global
+    # Logging
+    log stdout format raw local0 info
+    log 127.0.0.1:514 local0 info
+
+    # Stats Socket
+    stats socket /var/run/haproxy.sock mode 600 level admin
+    stats timeout 30s
+
+    maxconn 4096
+
+defaults
+    log global
+    mode http
+    option httplog
+    option http-server-close
+
+    # Custom Log Format mit Details
+    log-format '{"time":"%t","client":"%ci:%cp","frontend":"%f","backend":"%b/%s","status":%ST,"bytes":%B,"latency":%Ta,"method":"%HM","path":"%HP","user_agent":"%{+Q}[capture.req.hdr(1)]"}'
+
+    timeout connect 5000ms
+    timeout client 50000ms
+    timeout server 50000ms
+
+frontend api_front
+    bind *:80
+
+    # Capture Headers
+    capture request header User-Agent len 200
+    capture request header X-Request-ID len 50
+
+    # Health Check ohne Logging
+    acl is_health path /health
+    http-request set-log-level silent if is_health
+
+    default_backend api_backend
+
+frontend stats
+    bind *:8404
+    stats enable
+    stats uri /stats
+    stats refresh 5s
+    stats show-legends
+
+backend api_backend
+    balance roundrobin
+    option httpchk GET /health
+    server api1 api-1.internal:8080 check inter 5s
+    server api2 api-2.internal:8080 check inter 5s
+```
+
+---
 
 ### GCP API Gateway
 

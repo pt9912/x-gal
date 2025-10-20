@@ -334,6 +334,183 @@ routes:
 - ✅ Regex-Support für Origins
 - ⚠️ Wildcard `*` wird zu `safe_regex: '.*'` konvertiert
 
+---
+
+### Nginx (add_header directive)
+
+Nginx implementiert CORS mit `add_header` Directives in Location-Blöcken:
+
+```nginx
+# GAL generiert Nginx-Config
+location /api {
+    # Handle OPTIONS (Preflight) Request
+    if ($request_method = 'OPTIONS') {
+        add_header 'Access-Control-Allow-Origin' 'https://app.example.com' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
+        add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, X-API-Key' always;
+        add_header 'Access-Control-Max-Age' '86400' always;
+        add_header 'Content-Type' 'text/plain charset=UTF-8';
+        add_header 'Content-Length' '0';
+        return 204;
+    }
+
+    # Handle Actual Request
+    add_header 'Access-Control-Allow-Origin' 'https://app.example.com' always;
+    add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
+    add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, X-API-Key' always;
+    add_header 'Access-Control-Expose-Headers' 'X-Request-ID, X-RateLimit-Remaining' always;
+
+    proxy_pass http://backend;
+}
+```
+
+**Mit OpenResty (Lua):**
+```nginx
+location /api {
+    access_by_lua_block {
+        local origin = ngx.var.http_origin
+        local allowed_origins = {
+            ["https://app.example.com"] = true,
+            ["https://admin.example.com"] = true
+        }
+
+        if allowed_origins[origin] then
+            ngx.header["Access-Control-Allow-Origin"] = origin
+            ngx.header["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+            ngx.header["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+            ngx.header["Access-Control-Allow-Credentials"] = "true"
+            ngx.header["Access-Control-Max-Age"] = "86400"
+
+            if ngx.var.request_method == "OPTIONS" then
+                ngx.exit(204)
+            end
+        end
+    }
+
+    proxy_pass http://backend;
+}
+```
+
+**Nginx Besonderheiten**:
+- ✅ Native `add_header` Support für CORS Headers
+- ✅ `if ($request_method = 'OPTIONS')` für Preflight Handling
+- ✅ `always` Flag wichtig (Header auch bei Errors)
+- ✅ OpenResty/Lua für dynamische Origin-Validierung
+- ⚠️ Viele Origins = Viele `if`-Blocks (nicht optimal)
+- ⚠️ Lua-basierte Lösung empfohlen für Production
+
+**Testing:**
+```bash
+# Preflight Request
+curl -X OPTIONS \
+  -H "Origin: https://app.example.com" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: Content-Type" \
+  -v \
+  http://nginx-host/api
+
+# Response:
+# HTTP/1.1 204 No Content
+# Access-Control-Allow-Origin: https://app.example.com
+# Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
+# Access-Control-Allow-Headers: Content-Type, Authorization, X-API-Key
+# Access-Control-Max-Age: 86400
+```
+
+---
+
+### HAProxy (http-response set-header)
+
+HAProxy implementiert CORS mit `http-response set-header` Directives:
+
+```haproxy
+# GAL generiert HAProxy-Config
+frontend api_front
+    bind *:80
+
+    # CORS Headers für alle Responses
+    http-response set-header Access-Control-Allow-Origin "https://app.example.com"
+    http-response set-header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    http-response set-header Access-Control-Allow-Headers "Content-Type, Authorization, X-API-Key"
+    http-response set-header Access-Control-Expose-Headers "X-Request-ID, X-RateLimit-Remaining"
+    http-response set-header Access-Control-Max-Age "86400"
+
+    # Handle OPTIONS (Preflight) Request
+    acl is_options method OPTIONS
+    http-request deny deny_status 204 if is_options
+
+    default_backend api_backend
+
+backend api_backend
+    server backend1 backend.example.com:8080
+```
+
+**Mit Multiple Origins (ACL-basiert):**
+```haproxy
+frontend api_front
+    bind *:80
+
+    # Define allowed origins
+    acl origin_app hdr(origin) -i https://app.example.com
+    acl origin_admin hdr(origin) -i https://admin.example.com
+    acl valid_origin or origin_app origin_admin
+
+    # Set CORS headers only for valid origins
+    http-response set-header Access-Control-Allow-Origin %[req.hdr(Origin)] if valid_origin
+    http-response set-header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS" if valid_origin
+    http-response set-header Access-Control-Allow-Headers "Content-Type, Authorization" if valid_origin
+    http-response set-header Access-Control-Allow-Credentials "true" if valid_origin
+    http-response set-header Access-Control-Max-Age "86400" if valid_origin
+
+    # Handle OPTIONS preflight
+    acl is_options method OPTIONS
+    http-request return status 204 if is_options valid_origin
+
+    default_backend api_backend
+```
+
+**HAProxy Besonderheiten**:
+- ✅ `http-response set-header` für CORS Headers
+- ✅ ACL-basierte Origin-Validierung (sehr performant)
+- ✅ `http-request return status 204` für Preflight (HAProxy 2.2+)
+- ✅ `%[req.hdr(Origin)]` für dynamische Origin-Reflection
+- ⚠️ Ältere HAProxy Versionen (<2.2): `http-request deny deny_status 204` statt `return`
+- ✅ ACL-Validierung verhindert offene CORS-Policies
+
+**Testing:**
+```bash
+# Preflight Request
+curl -X OPTIONS \
+  -H "Origin: https://app.example.com" \
+  -H "Access-Control-Request-Method: POST" \
+  -v \
+  http://haproxy-host/api
+
+# Response:
+# HTTP/1.1 204 No Content
+# Access-Control-Allow-Origin: https://app.example.com
+# Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
+# Access-Control-Allow-Headers: Content-Type, Authorization
+# Access-Control-Max-Age: 86400
+
+# Actual Request
+curl -X GET \
+  -H "Origin: https://app.example.com" \
+  http://haproxy-host/api
+
+# Response Headers include:
+# Access-Control-Allow-Origin: https://app.example.com
+```
+
+**HAProxy CORS Best Practices:**
+1. Verwende ACLs für Origin-Validierung (nicht `*` Wildcard)
+2. Nutze `%[req.hdr(Origin)]` für dynamische Origin-Reflection
+3. HAProxy 2.2+: Verwende `http-request return status 204` für Preflight
+4. Setze `Access-Control-Max-Age` hoch (86400 = 24h) für Performance
+5. Teste immer Preflight (OPTIONS) und Actual Request separat
+
+---
+
 ### GCP API Gateway (OPTIONS methods)
 
 GCP API Gateway implementiert CORS mit expliziten OPTIONS Methods in OpenAPI 2.0:
