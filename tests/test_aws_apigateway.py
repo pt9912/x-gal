@@ -34,11 +34,18 @@ class TestAWSAPIGatewayProvider:
         provider = AWSAPIGatewayProvider()
         assert provider.name() == "aws_apigateway"
 
-    def test_parse_not_implemented(self):
-        """Test parse method raises NotImplementedError"""
+    def test_parse_implemented(self):
+        """Test parse method is now implemented"""
         provider = AWSAPIGatewayProvider()
-        with pytest.raises(NotImplementedError):
-            provider.parse("dummy openapi spec")
+        # Parse method is now implemented, should accept valid OpenAPI
+        openapi_spec = json.dumps({
+            "openapi": "3.0.1",
+            "info": {"title": "Test", "version": "1.0"},
+            "paths": {}
+        })
+        config = provider.parse(openapi_spec)
+        assert config is not None
+        assert config.version == "1.0"
 
 
 class TestAWSAPIGatewayValidation:
