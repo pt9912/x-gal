@@ -387,6 +387,78 @@ Azure APIM unterstützt auch Quota Policies für längere Zeitfenster (nicht in 
 
 **Hinweis:** Azure APIM eignet sich besonders für API Monetization mit unterschiedlichen Subscription Tiers.
 
+### GCP API Gateway
+
+GCP API Gateway implementiert Rate Limiting nicht nativ auf Gateway-Ebene. Stattdessen stehen alternative Ansätze zur Verfügung.
+
+**Rate Limiting Optionen:**
+- Mechanismus: Cloud Endpoints Quotas (falls Cloud Endpoints aktiviert)
+- Alternativen: Backend Rate Limiting, Apigee (Enterprise API Management)
+- Hinweis: Keine native Gateway-Level Rate Limits in GCP API Gateway
+
+**Alternative: Cloud Endpoints Quotas:**
+```yaml
+swagger: "2.0"
+info:
+  title: "API with Quotas"
+  version: "1.0.0"
+x-google-management:
+  metrics:
+    - name: "api-requests"
+      valueType: INT64
+      metricKind: DELTA
+  quota:
+    limits:
+      - name: "requests-per-minute-per-user"
+        metric: api-requests
+        unit: "1/min/{project}"
+        values:
+          STANDARD: 100
+```
+
+**Backend Rate Limiting (Empfohlen):**
+```bash
+# Deployment mit Backend-seitigem Rate Limiting
+gcloud api-gateway api-configs create config-v1 \
+  --api=my-api \
+  --openapi-spec=openapi.yaml \
+  --project=my-project \
+  --backend-auth-service-account=backend@my-project.iam.gserviceaccount.com
+
+# Backend implementiert Rate Limiting (z.B. mit Flask-Limiter, Express Rate Limit)
+```
+
+**GCP API Gateway Besonderheiten:**
+- ❌ Kein natives Gateway-Level Rate Limiting
+- ⚠️ Cloud Endpoints Quotas (nur mit Cloud Endpoints Integration)
+- ✅ Backend Rate Limiting (empfohlener Ansatz)
+- ✅ Apigee für Enterprise-Grade Rate Limiting
+- ✅ Cloud Armor für DDoS Protection
+
+**Alternative: Apigee (Enterprise):**
+Für fortgeschrittenes Rate Limiting empfiehlt Google die Verwendung von Apigee:
+```xml
+<!-- Apigee Quota Policy -->
+<Quota name="QuotaPolicy">
+  <Allow count="100" countRef="verifyapikey.VerifyAPIKey.apiproduct.developer.quota.limit"/>
+  <Interval ref="verifyapikey.VerifyAPIKey.apiproduct.developer.quota.interval">1</Interval>
+  <TimeUnit ref="verifyapikey.VerifyAPIKey.apiproduct.developer.quota.timeunit">minute</TimeUnit>
+</Quota>
+```
+
+**Monitoring mit Cloud Monitoring:**
+```bash
+# Rate Metrics überwachen
+gcloud monitoring time-series list \
+  --filter='metric.type="serviceruntime.googleapis.com/api/request_count"' \
+  --project=my-project
+```
+
+**Hinweis:** Für Production-Grade Rate Limiting mit GCP empfiehlt sich die Verwendung von:
+1. **Backend Rate Limiting** (einfachste Lösung)
+2. **Cloud Armor** (für DDoS Protection)
+3. **Apigee** (für Enterprise API Management mit umfassenden Rate Limiting Features)
+
 ## Best Practices
 
 ### 1. Burst-Dimensionierung

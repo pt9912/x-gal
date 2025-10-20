@@ -373,6 +373,142 @@ Azure API Management uses Policy XML for header manipulation:
 - `request_remove` → `<inbound>` `exists-action="delete"`
 - `response_remove` → `<outbound>` `exists-action="delete"`
 
+### GCP API Gateway
+
+GCP API Gateway unterstützt Header Manipulation über OpenAPI 2.0 und x-google-backend Extensions.
+
+**Header-Features:**
+- Mechanismus: OpenAPI 2.0 `parameters` und `x-google-backend`
+- Forwarded Headers: X-Forwarded-For, X-Forwarded-Proto automatisch gesetzt
+- Custom Headers: Via Backend Service konfigurierbar
+- Hinweis: Keine native Response Header Manipulation
+
+**Standard Forwarded Headers:**
+GCP API Gateway fügt automatisch folgende Headers hinzu:
+
+```yaml
+# Automatisch gesetzte Headers (nicht konfigurierbar)
+X-Forwarded-For: <client-ip>
+X-Forwarded-Proto: https
+X-Forwarded-Host: <gateway-hostname>
+X-Cloud-Trace-Context: <trace-id>/<span-id>;<trace-options>
+```
+
+**Request Header Injection via OpenAPI:**
+```yaml
+swagger: "2.0"
+info:
+  title: "API with Custom Headers"
+  version: "1.0.0"
+
+x-google-backend:
+  address: https://backend.example.com
+  deadline: 30.0
+
+paths:
+  /api/users:
+    get:
+      parameters:
+        - name: X-API-Version
+          in: header
+          required: true
+          type: string
+          default: "v1"
+        - name: X-Request-ID
+          in: header
+          required: false
+          type: string
+      x-google-backend:
+        address: https://backend.example.com
+        jwt_audience: backend-service
+```
+
+**Backend Header Transformation:**
+```python
+# Backend Service (Cloud Run/Cloud Functions/GKE)
+# Empfang der Gateway-Headers
+
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route('/api/users')
+def users():
+    # Gateway-Headers empfangen
+    client_ip = request.headers.get('X-Forwarded-For')
+    trace_context = request.headers.get('X-Cloud-Trace-Context')
+    api_version = request.headers.get('X-API-Version', 'v1')
+
+    # Custom Response Headers setzen
+    response = {'users': [...]}
+    headers = {
+        'X-API-Version': api_version,
+        'X-Response-Time': '45ms',
+        'X-Trace-ID': trace_context
+    }
+
+    return response, 200, headers
+```
+
+**Cloud Logging für Header Debugging:**
+```bash
+# Header-Logs anzeigen
+gcloud logging read "resource.type=api AND httpRequest.requestUrl=~\"/api\"" \
+  --project=my-project \
+  --format=json \
+  --limit=10 | jq '.[] | {url: .httpRequest.requestUrl, headers: .httpRequest.requestHeaders}'
+```
+
+**Deployment:**
+```bash
+# API Gateway Config mit Header-Konfiguration deployen
+gcloud api-gateway api-configs create config-v1 \
+  --api=my-api \
+  --openapi-spec=openapi.yaml \
+  --project=my-project
+
+# Gateway erstellen
+gcloud api-gateway gateways create my-gateway \
+  --api=my-api \
+  --api-config=config-v1 \
+  --location=us-central1 \
+  --project=my-project
+```
+
+**GCP API Gateway Besonderheiten:**
+- ✅ Automatische X-Forwarded-* Headers
+- ✅ X-Cloud-Trace-Context für Distributed Tracing
+- ✅ Request Header Validation via OpenAPI Schema
+- ⚠️ Response Header Manipulation nur via Backend
+- ⚠️ Keine native Header Removal auf Gateway-Ebene
+- ✅ Integration mit Cloud Trace und Cloud Logging
+
+**Beispiel: CORS Headers (Backend-seitig):**
+Da GCP API Gateway keine nativen Response Headers manipulieren kann, müssen CORS-Headers vom Backend gesetzt werden:
+
+```python
+# Cloud Run Backend mit CORS
+from flask import Flask
+from flask_cors import CORS
+
+app = Flask(__name__)
+CORS(app,
+     origins=['https://example.com'],
+     allow_headers=['Content-Type', 'Authorization'],
+     expose_headers=['X-Request-ID', 'X-API-Version'],
+     max_age=3600)
+
+@app.route('/api/users')
+def users():
+    # CORS Headers werden automatisch von flask_cors gesetzt
+    return {'users': [...]}
+```
+
+**Hinweis:** Für umfassende Header Manipulation empfiehlt Google:
+1. **Backend-seitige Header-Logik** (empfohlen)
+2. **Cloud Endpoints** (erweiterte API Management Features)
+3. **Apigee** (Enterprise API Gateway mit vollständiger Header-Kontrolle)
+
 ---
 
 ## Common Use Cases

@@ -684,6 +684,144 @@ Azure API Management implementiert Authentication mit Policy XML.
 - **Azure AD Integration:** Native Integration ohne Custom Code
 - **Named Values:** Sichere Storage für Secrets (Azure Key Vault Integration)
 
+### GCP API Gateway
+
+GCP API Gateway implementiert Authentication mit OpenAPI 2.0 Security Definitions und x-google-* Extensions.
+
+**JWT Authentication:**
+- Mechanismus: `x-google-issuer`, `x-google-jwks_uri`, `x-google-audiences` in securityDefinitions
+- Features: Google Sign-In, Firebase Auth, Custom JWT Issuer, JWKS-basierte Validierung, Audience-Verifizierung
+- Hinweis: Nur JWT wird nativ unterstützt, OpenAPI 2.0 (Swagger) erforderlich
+
+**API Key Authentication:**
+- Mechanismus: OpenAPI 2.0 `apiKey` securityDefinition mit `x-google-allow` Extension
+- Features: Header-basierte API Keys, Query-Parameter-basierte API Keys
+- Hinweis: Für Production wird OAuth2/JWT empfohlen
+
+**Service Account Authentication (Backend):**
+- Mechanismus: `x-google-backend` mit `jwt_audience` für Cloud Run/Cloud Functions
+- Features: Automatische Service Account Token-Generierung, Backend-zu-Backend Auth
+- Hinweis: Transparent für Clients, nur Backend-Authentifizierung
+
+**Generiertes Config-Beispiel (JWT):**
+```yaml
+swagger: "2.0"
+info:
+  title: "Secure API"
+  version: "1.0.0"
+
+# JWT Security Definition
+securityDefinitions:
+  google_jwt:
+    authorizationUrl: ""
+    flow: "implicit"
+    type: "oauth2"
+    x-google-issuer: "https://accounts.google.com"
+    x-google-jwks_uri: "https://www.googleapis.com/oauth2/v3/certs"
+    x-google-audiences: "https://my-project.example.com"
+
+# Global Security Requirement
+security:
+  - google_jwt: []
+
+# Backend mit Service Account Auth
+x-google-backend:
+  address: "https://backend-xyz.run.app"
+  jwt_audience: "https://backend-xyz.run.app"
+  deadline: 30.0
+
+paths:
+  /api/users:
+    get:
+      summary: "Get users (JWT required)"
+      operationId: "getUsers"
+      responses:
+        200:
+          description: "Success"
+        401:
+          description: "Unauthorized - Invalid or missing JWT"
+```
+
+**Generiertes Config-Beispiel (API Key):**
+```yaml
+swagger: "2.0"
+info:
+  title: "API Key Protected API"
+  version: "1.0.0"
+
+securityDefinitions:
+  api_key:
+    type: "apiKey"
+    name: "X-API-Key"
+    in: "header"
+
+security:
+  - api_key: []
+
+paths:
+  /api/data:
+    get:
+      summary: "Get data (API Key required)"
+      operationId: "getData"
+      responses:
+        200:
+          description: "Success"
+        401:
+          description: "Unauthorized - Invalid or missing API key"
+```
+
+**Deployment:**
+```bash
+# API erstellen
+gcloud api-gateway apis create secure-api \
+  --project=my-gcp-project
+
+# API Config mit JWT Authentication deployen
+gcloud api-gateway api-configs create secure-api-config \
+  --api=secure-api \
+  --openapi-spec=openapi.yaml \
+  --project=my-gcp-project
+
+# Gateway erstellen
+gcloud api-gateway gateways create secure-gateway \
+  --api=secure-api \
+  --api-config=secure-api-config \
+  --location=us-central1 \
+  --project=my-gcp-project
+
+# Gateway URL abrufen
+gcloud api-gateway gateways describe secure-gateway \
+  --location=us-central1 \
+  --project=my-gcp-project \
+  --format="value(defaultHostname)"
+```
+
+**JWT Token Testen:**
+```bash
+# Google Sign-In Token verwenden (für x-google-issuer: accounts.google.com)
+curl -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+  https://secure-gateway-xyz.apigateway.my-gcp-project.cloud.goog/api/users
+
+# Custom JWT Token verwenden
+curl -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  https://secure-gateway-xyz.apigateway.my-gcp-project.cloud.goog/api/users
+```
+
+**GCP API Gateway-spezifische Features:**
+- **Google Sign-In:** Native Integration ohne zusätzliche Konfiguration (x-google-issuer: accounts.google.com)
+- **Firebase Authentication:** Direkte Unterstützung für Firebase Auth Tokens
+- **Custom JWT Issuer:** Beliebige JWKS-kompatible Issuer (Auth0, Okta, Keycloak, etc.)
+- **Audience Validation:** Strikte Audience-Prüfung für zusätzliche Sicherheit
+- **Service Account Auth:** Automatische Backend-Authentifizierung für Cloud Run/Cloud Functions
+- **Cloud Logging:** Automatisches Logging aller Auth-Failures (401 Unauthorized)
+- **Cloud Monitoring:** Metrics für Auth Success/Failure Rates
+
+**Limitierungen:**
+- Nur OpenAPI 2.0 (Swagger) wird unterstützt, kein OpenAPI 3.0
+- OAuth2 Authorization Code Flow wird nicht direkt unterstützt (nur Implicit Flow für JWT)
+- Basic Auth wird nicht nativ unterstützt (Workaround: Backend-basierte Basic Auth)
+- API Key Authentication ist limitiert (für Production wird JWT empfohlen)
+
 ## Best Practices
 
 ### Allgemeine Sicherheit

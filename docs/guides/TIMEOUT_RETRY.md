@@ -485,6 +485,193 @@ Azure APIM bietet keine native Retry-Policy. Workarounds:
 
 **Hinweis**: Für Production-Retries empfiehlt Azure die Verwendung von Azure Functions oder Logic Apps mit eingebauter Retry-Logik.
 
+### GCP API Gateway
+
+GCP API Gateway konfiguriert Timeouts via `x-google-backend` Extension im OpenAPI 2.0 Spec.
+
+**Timeout-Konfiguration:**
+```yaml
+swagger: "2.0"
+info:
+  title: "API with Timeouts"
+  version: "1.0.0"
+
+x-google-backend:
+  address: https://backend.example.com
+  deadline: 30.0  # Timeout in Sekunden (5-300s)
+  path_translation: APPEND_PATH_TO_ADDRESS
+
+paths:
+  /api/fast:
+    get:
+      summary: "Fast endpoint"
+      x-google-backend:
+        address: https://backend.example.com
+        deadline: 5.0  # 5 Sekunden Timeout
+
+  /api/slow:
+    get:
+      summary: "Slow endpoint (long-running)"
+      x-google-backend:
+        address: https://backend.example.com
+        deadline: 120.0  # 2 Minuten Timeout
+```
+
+**Backend Deadline Parameter:**
+- Parameter: `deadline` (in Sekunden)
+- Minimum: 5 Sekunden
+- Maximum: 300 Sekunden (5 Minuten)
+- Standard: 15 Sekunden
+- Typ: Float (z.B. `30.0`, `5.5`)
+
+**Retry-Konfiguration:**
+GCP API Gateway bietet **keine native Retry-Konfiguration**. Alternativen:
+
+1. **Backend-seitige Retries** (empfohlen):
+```python
+# Cloud Run Backend mit Retries
+import requests
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=0.5, max=5)
+)
+def call_downstream_service():
+    response = requests.get('https://downstream-api.com/data', timeout=10)
+    response.raise_for_status()
+    return response.json()
+
+@app.route('/api/data')
+def api_data():
+    try:
+        data = call_downstream_service()
+        return {'data': data}, 200
+    except Exception as e:
+        return {'error': str(e)}, 503
+```
+
+2. **Cloud Tasks für asynchrone Retries**:
+```python
+from google.cloud import tasks_v2
+
+def create_task_with_retry(project, location, queue, url, payload):
+    client = tasks_v2.CloudTasksClient()
+    parent = client.queue_path(project, location, queue)
+
+    task = {
+        'http_request': {
+            'http_method': tasks_v2.HttpMethod.POST,
+            'url': url,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps(payload).encode()
+        },
+        'retry_config': {
+            'max_attempts': 5,
+            'max_retry_duration': '3600s',
+            'min_backoff': '0.1s',
+            'max_backoff': '10s',
+            'max_doublings': 5
+        }
+    }
+
+    return client.create_task(request={'parent': parent, 'task': task})
+```
+
+**Deployment:**
+```bash
+# API Config mit Timeout-Konfiguration erstellen
+gcloud api-gateway api-configs create config-v1 \
+  --api=my-api \
+  --openapi-spec=openapi-with-timeouts.yaml \
+  --project=my-project \
+  --backend-auth-service-account=backend@my-project.iam.gserviceaccount.com
+
+# Gateway erstellen
+gcloud api-gateway gateways create my-gateway \
+  --api=my-api \
+  --api-config=config-v1 \
+  --location=us-central1 \
+  --project=my-project
+
+# Timeout-Metriken überwachen
+gcloud monitoring time-series list \
+  --filter='metric.type="serviceruntime.googleapis.com/api/request_latencies"' \
+  --project=my-project
+```
+
+**Cloud Monitoring für Timeout-Analyse:**
+```bash
+# Requests mit Timeouts anzeigen
+gcloud logging read "resource.type=api AND httpRequest.status=504" \
+  --project=my-project \
+  --limit=50 \
+  --format=json
+
+# Latency-Metriken abrufen
+gcloud monitoring time-series list \
+  --filter='metric.type="serviceruntime.googleapis.com/api/request_latencies"' \
+  --project=my-project \
+  --format=json
+```
+
+**GCP API Gateway Besonderheiten:**
+- ✅ Timeout-Konfiguration via `deadline` (5-300s)
+- ✅ Per-Path Timeout-Konfiguration
+- ✅ Global Default Timeout (15s)
+- ❌ Keine nativen Retry-Policies
+- ⚠️ Backend-seitige Retries erforderlich
+- ✅ Integration mit Cloud Tasks für asynchrone Retries
+- ✅ Cloud Monitoring für Timeout-Metriken
+
+**GAL-Mapping:**
+- `timeout.read: "30s"` → `deadline: 30.0`
+- `timeout.connect` → Nicht unterstützt (Backend-Verantwortung)
+- `retry.*` → Nicht unterstützt (Backend-Implementierung erforderlich)
+
+**Beispiel: Complete Timeout Configuration:**
+```yaml
+swagger: "2.0"
+info:
+  title: "Production API with Timeouts"
+  version: "1.0.0"
+
+# Global default timeout
+x-google-backend:
+  address: https://api-backend.example.com
+  deadline: 30.0
+
+paths:
+  /api/health:
+    get:
+      summary: "Health check (fast)"
+      x-google-backend:
+        deadline: 2.0
+
+  /api/users:
+    get:
+      summary: "List users (normal)"
+      x-google-backend:
+        deadline: 10.0
+
+  /api/reports:
+    post:
+      summary: "Generate report (slow)"
+      x-google-backend:
+        deadline: 120.0
+
+  /api/batch:
+    post:
+      summary: "Batch processing (very slow)"
+      x-google-backend:
+        deadline: 300.0  # Maximum: 5 Minuten
+```
+
+**Hinweis:** Für Production-Grade Timeout & Retry Management empfiehlt Google:
+1. **Backend-seitige Retry-Logik** (z.B. mit Tenacity, Backoff)
+2. **Cloud Tasks** für asynchrone Workflows mit Retries
+3. **Apigee** (Enterprise API Gateway mit nativen Retry Policies)
+
 ---
 
 ## Häufige Anwendungsfälle

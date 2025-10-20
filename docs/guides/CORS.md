@@ -334,6 +334,109 @@ routes:
 - ✅ Regex-Support für Origins
 - ⚠️ Wildcard `*` wird zu `safe_regex: '.*'` konvertiert
 
+### GCP API Gateway (OPTIONS methods)
+
+GCP API Gateway implementiert CORS mit expliziten OPTIONS Methods in OpenAPI 2.0:
+
+```yaml
+# GAL Konfiguration
+cors:
+  enabled: true
+  allowed_origins: ["https://app.example.com", "*"]
+  allowed_methods: [GET, POST, PUT]
+  allowed_headers: [Content-Type, Authorization]
+  allow_credentials: false
+  max_age: 3600
+
+# Wird zu OpenAPI 2.0 Config:
+swagger: "2.0"
+paths:
+  /api/users:
+    # Actual endpoint
+    get:
+      summary: "Get users"
+      responses:
+        200:
+          description: "Success"
+
+    # CORS Preflight (OPTIONS)
+    options:
+      summary: "CORS preflight"
+      operationId: "corsUsers"
+      responses:
+        200:
+          description: "CORS headers"
+          headers:
+            Access-Control-Allow-Origin:
+              type: "string"
+              description: "https://app.example.com"
+            Access-Control-Allow-Methods:
+              type: "string"
+              description: "GET, POST, PUT, OPTIONS"
+            Access-Control-Allow-Headers:
+              type: "string"
+              description: "Content-Type, Authorization"
+            Access-Control-Max-Age:
+              type: "string"
+              description: "3600"
+```
+
+**Deployment:**
+```bash
+# OpenAPI Spec mit CORS OPTIONS methods deployen
+gcloud api-gateway api-configs create cors-api-config \
+  --api=my-api \
+  --openapi-spec=openapi-cors.yaml \
+  --project=my-gcp-project
+
+# Gateway aktualisieren
+gcloud api-gateway gateways update my-gateway \
+  --api=my-api \
+  --api-config=cors-api-config \
+  --location=us-central1 \
+  --project=my-gcp-project
+```
+
+**CORS Testen:**
+```bash
+# Preflight Request (OPTIONS)
+curl -X OPTIONS \
+  -H "Origin: https://app.example.com" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: Content-Type, Authorization" \
+  https://my-gateway-xyz.apigateway.my-gcp-project.cloud.goog/api/users
+
+# Erwartete Response Headers:
+# Access-Control-Allow-Origin: https://app.example.com
+# Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS
+# Access-Control-Allow-Headers: Content-Type, Authorization
+# Access-Control-Max-Age: 3600
+
+# Actual Request mit CORS
+curl -X GET \
+  -H "Origin: https://app.example.com" \
+  -H "Authorization: Bearer <JWT>" \
+  https://my-gateway-xyz.apigateway.my-gcp-project.cloud.goog/api/users
+
+# Response Headers enthalten:
+# Access-Control-Allow-Origin: https://app.example.com
+```
+
+**GCP API Gateway Besonderheiten**:
+- ✅ CORS wird durch explizite OPTIONS Methods implementiert
+- ✅ Access-Control-* Headers werden automatisch in Responses hinzugefügt
+- ✅ Wildcard `*` für allowed_origins wird unterstützt
+- ⚠️ OPTIONS Methods müssen für **jeden** Pfad explizit definiert werden
+- ⚠️ CORS-Konfiguration erfolgt auf OpenAPI-Ebene, nicht auf Gateway-Ebene
+- ✅ Preflight-Caching mit `Access-Control-Max-Age` wird unterstützt
+- ✅ Credentials (`Access-Control-Allow-Credentials`) werden unterstützt
+
+**Wichtige Hinweise:**
+- GCP API Gateway hat **keine** native CORS-Konfiguration wie Kong/APISIX
+- CORS wird durch **OpenAPI 2.0 OPTIONS Methods** implementiert
+- GAL generiert automatisch OPTIONS Methods für alle Routen mit `cors.enabled: true`
+- Für Production: Verwende spezifische Origins statt Wildcard `*` mit Credentials
+
 ---
 
 ## Häufige Anwendungsfälle

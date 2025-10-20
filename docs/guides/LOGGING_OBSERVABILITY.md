@@ -459,6 +459,323 @@ haproxy_exporter --haproxy.scrape-uri="http://localhost:8404/stats;csv"
 curl http://localhost:9101/metrics
 ```
 
+### GCP API Gateway
+
+GCP API Gateway bietet native Integration mit Cloud Logging, Cloud Monitoring und Cloud Trace.
+
+**Logging:**
+- Cloud Logging Integration (automatisch aktiviert)
+- Strukturierte JSON Logs
+- Request/Response Logging
+- Trace Context für Distributed Tracing
+
+**Metriken:**
+- Cloud Monitoring Metriken (automatisch)
+- Request Rate, Error Rate, Latency
+- Custom Metrics via Backend Services
+- Prometheus-Export via Cloud Monitoring
+
+**Cloud Logging (automatisch aktiviert):**
+```yaml
+swagger: "2.0"
+info:
+  title: "API with Logging"
+  version: "1.0.0"
+
+x-google-backend:
+  address: https://backend.example.com
+  deadline: 30.0
+
+paths:
+  /api/users:
+    get:
+      summary: "List users"
+      operationId: listUsers
+```
+
+**Cloud Logging Log-Einträge:**
+```json
+{
+  "httpRequest": {
+    "requestMethod": "GET",
+    "requestUrl": "https://my-gateway-xyz.uc.gateway.dev/api/users",
+    "status": 200,
+    "responseSize": "1234",
+    "userAgent": "Mozilla/5.0...",
+    "remoteIp": "203.0.113.42",
+    "latency": "0.123s"
+  },
+  "timestamp": "2025-10-20T10:30:00.123456Z",
+  "severity": "INFO",
+  "trace": "projects/my-project/traces/abc123...",
+  "spanId": "def456...",
+  "resource": {
+    "type": "api",
+    "labels": {
+      "project_id": "my-project",
+      "service": "my-gateway-xyz.uc.gateway.dev",
+      "method": "google.api.gateway.v1.ApiGatewayService.HandleRequest"
+    }
+  }
+}
+```
+
+**Logs abfragen mit gcloud:**
+```bash
+# Alle API Gateway Logs
+gcloud logging read "resource.type=api" \
+  --project=my-project \
+  --limit=100 \
+  --format=json
+
+# Fehler-Logs (4xx/5xx)
+gcloud logging read "resource.type=api AND httpRequest.status>=400" \
+  --project=my-project \
+  --limit=50
+
+# Logs für spezifischen Endpoint
+gcloud logging read "resource.type=api AND httpRequest.requestUrl=~\"/api/users\"" \
+  --project=my-project \
+  --limit=20
+
+# Logs mit Latency > 1s
+gcloud logging read "resource.type=api AND httpRequest.latency>\"1s\"" \
+  --project=my-project \
+  --limit=30
+
+# JSON-formatierte Logs mit jq parsen
+gcloud logging read "resource.type=api" \
+  --project=my-project \
+  --format=json \
+  --limit=10 | jq '.[] | {time: .timestamp, method: .httpRequest.requestMethod, url: .httpRequest.requestUrl, status: .httpRequest.status, latency: .httpRequest.latency}'
+```
+
+**Cloud Monitoring Metriken:**
+```bash
+# Request Count Metrik
+gcloud monitoring time-series list \
+  --filter='metric.type="serviceruntime.googleapis.com/api/request_count"' \
+  --project=my-project \
+  --format=json
+
+# Request Latency (P50, P95, P99)
+gcloud monitoring time-series list \
+  --filter='metric.type="serviceruntime.googleapis.com/api/request_latencies"' \
+  --project=my-project \
+  --format=json
+
+# Error Rate
+gcloud monitoring time-series list \
+  --filter='metric.type="serviceruntime.googleapis.com/api/request_count" AND metric.label.response_code_class="5xx"' \
+  --project=my-project \
+  --format=json
+```
+
+**Cloud Trace für Distributed Tracing:**
+```bash
+# Traces abrufen
+gcloud trace traces list \
+  --project=my-project \
+  --limit=10
+
+# Trace Details anzeigen
+gcloud trace traces describe TRACE_ID \
+  --project=my-project
+```
+
+**Cloud Console Log Explorer:**
+```
+# Log Explorer Query Language
+resource.type="api"
+httpRequest.requestUrl=~"/api/users"
+severity>=ERROR
+timestamp>"2025-10-20T00:00:00Z"
+```
+
+**Cloud Monitoring Dashboards:**
+```bash
+# Dashboard mit API Metriken erstellen
+cat > dashboard.json <<EOF
+{
+  "displayName": "API Gateway Metrics",
+  "mosaicLayout": {
+    "columns": 12,
+    "tiles": [
+      {
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Request Rate",
+          "xyChart": {
+            "dataSets": [{
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "metric.type=\"serviceruntime.googleapis.com/api/request_count\" resource.type=\"api\"",
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_RATE"
+                  }
+                }
+              }
+            }]
+          }
+        }
+      },
+      {
+        "xPos": 6,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Error Rate",
+          "xyChart": {
+            "dataSets": [{
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "metric.type=\"serviceruntime.googleapis.com/api/request_count\" resource.type=\"api\" metric.label.response_code_class=\"5xx\"",
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_RATE"
+                  }
+                }
+              }
+            }]
+          }
+        }
+      }
+    ]
+  }
+}
+EOF
+
+# Dashboard erstellen
+gcloud monitoring dashboards create --config-from-file=dashboard.json \
+  --project=my-project
+```
+
+**Alerting Policies:**
+```bash
+# Alert bei hoher Error Rate
+gcloud alpha monitoring policies create \
+  --notification-channels=CHANNEL_ID \
+  --display-name="API Gateway High Error Rate" \
+  --condition-display-name="Error Rate > 5%" \
+  --condition-threshold-value=5 \
+  --condition-threshold-duration=300s \
+  --condition-filter='metric.type="serviceruntime.googleapis.com/api/request_count" resource.type="api" metric.label.response_code_class="5xx"' \
+  --project=my-project
+
+# Alert bei hoher Latency
+gcloud alpha monitoring policies create \
+  --notification-channels=CHANNEL_ID \
+  --display-name="API Gateway High Latency" \
+  --condition-display-name="P95 Latency > 1s" \
+  --condition-threshold-value=1000 \
+  --condition-threshold-duration=300s \
+  --condition-filter='metric.type="serviceruntime.googleapis.com/api/request_latencies"' \
+  --project=my-project
+```
+
+**Log-basierte Metriken:**
+```bash
+# Custom Log-basierte Metrik erstellen
+gcloud logging metrics create api_custom_metric \
+  --description="Custom API metric" \
+  --log-filter='resource.type="api" AND httpRequest.requestUrl=~"/api/critical"' \
+  --value-extractor='EXTRACT(httpRequest.latency)' \
+  --metric-kind=DELTA \
+  --value-type=DISTRIBUTION \
+  --project=my-project
+```
+
+**Deployment mit Logging:**
+```bash
+# API Gateway deployen (Logging automatisch aktiviert)
+gcloud api-gateway api-configs create config-v1 \
+  --api=my-api \
+  --openapi-spec=openapi.yaml \
+  --project=my-project
+
+gcloud api-gateway gateways create my-gateway \
+  --api=my-api \
+  --api-config=config-v1 \
+  --location=us-central1 \
+  --project=my-project
+
+# Logs in Echtzeit verfolgen
+gcloud logging tail "resource.type=api" \
+  --project=my-project
+```
+
+**GCP API Gateway Besonderheiten:**
+- ✅ Cloud Logging automatisch aktiviert (keine Konfiguration erforderlich)
+- ✅ Strukturierte JSON Logs mit Request/Response Details
+- ✅ Cloud Trace Integration für Distributed Tracing
+- ✅ Cloud Monitoring Metriken (Request Rate, Error Rate, Latency)
+- ✅ X-Cloud-Trace-Context Header automatisch gesetzt
+- ✅ Log-basierte Metriken und Alerting
+- ✅ Integration mit Cloud Operations Suite
+- ⚠️ Keine Log Sampling-Konfiguration (alle Requests werden geloggt)
+- ⚠️ Keine Custom Log Fields auf Gateway-Ebene (nur via Backend)
+
+**Beispiel: Complete Observability Setup:**
+```bash
+# 1. API Gateway deployen
+gcloud api-gateway gateways create prod-gateway \
+  --api=my-api \
+  --api-config=config-v1 \
+  --location=us-central1 \
+  --project=my-project
+
+# 2. Log Sink für BigQuery erstellen (Long-term Storage)
+gcloud logging sinks create api-gateway-bq-sink \
+  bigquery.googleapis.com/projects/my-project/datasets/api_logs \
+  --log-filter='resource.type="api"' \
+  --project=my-project
+
+# 3. Alerting Policy erstellen
+gcloud alpha monitoring policies create \
+  --notification-channels=EMAIL_CHANNEL_ID \
+  --display-name="API Gateway Error Rate Alert" \
+  --condition-threshold-value=1 \
+  --condition-filter='metric.type="serviceruntime.googleapis.com/api/request_count" resource.type="api" metric.label.response_code_class="5xx"' \
+  --project=my-project
+
+# 4. Uptime Check erstellen
+gcloud monitoring uptime create api-gateway-health \
+  --resource-type=uptime-url \
+  --host=my-gateway-xyz.uc.gateway.dev \
+  --path=/health \
+  --project=my-project
+
+# 5. Logs analysieren
+gcloud logging read "resource.type=api" \
+  --project=my-project \
+  --limit=100 \
+  --format=json | jq '[.[] | {status: .httpRequest.status, latency: .httpRequest.latency}] | group_by(.status) | map({status: .[0].status, count: length})'
+```
+
+**Grafana Cloud Integration:**
+```yaml
+# Prometheus-kompatible Metriken via Cloud Monitoring API
+# Grafana Data Source konfigurieren:
+# Type: Google Cloud Monitoring
+# Project: my-project
+# Service: API Gateway
+
+# PromQL-ähnliche Queries:
+fetch api
+| metric 'serviceruntime.googleapis.com/api/request_count'
+| group_by 1m, [value_request_count_mean: mean(value.request_count)]
+| every 1m
+```
+
+**Hinweis:** GCP API Gateway bietet out-of-the-box Observability ohne zusätzliche Konfiguration. Für erweiterte Features:
+1. **Cloud Logging** für strukturierte Logs und Log-Analyse
+2. **Cloud Monitoring** für Metriken und Alerting
+3. **Cloud Trace** für Distributed Tracing
+4. **BigQuery** für Long-term Log Storage und Analytics
+5. **Grafana Cloud** für Dashboards und Visualisierung
+
 ## Häufige Anwendungsfälle
 
 ### 1. Production API mit vollständigem Logging
