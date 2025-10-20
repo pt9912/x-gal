@@ -3,7 +3,7 @@
 import json
 import pytest
 
-from gal.config import AuthenticationType
+# No need to import AuthenticationType, it's just a string
 from gal.parsers.azure_apim_parser import AzureAPIMParser
 from gal.providers.azure_apim import AzureAPIMProvider
 
@@ -290,7 +290,7 @@ class TestAzureAPIMProviderImport:
         assert route.path_prefix == "/api/users"
         assert set(route.http_methods) == {"GET", "POST"}
         assert route.authentication is not None
-        assert route.authentication.type == AuthenticationType.API_KEY
+        assert route.authentication.type == "api_key"
         assert route.authentication.api_key.key_name == "Ocp-Apim-Subscription-Key"
         assert route.authentication.api_key.in_location == "header"
 
@@ -303,8 +303,8 @@ class TestAzureAPIMProviderImport:
         route = service.routes[0]
 
         assert route.authentication is not None
-        assert route.authentication.type == AuthenticationType.JWT
-        assert "login.microsoftonline.com" in route.authentication.jwt_config.issuer
+        assert route.authentication.type == "jwt"
+        assert "login.microsoftonline.com" in route.authentication.jwt.issuer
 
     def test_import_complex_openapi(self):
         """Test importing complex OpenAPI with multiple paths."""
@@ -394,4 +394,4 @@ class TestAzureAPIMImportIntegration:
         # Verify authentication is correctly converted
         route = config.services[0].routes[0]
         assert route.authentication is not None
-        assert route.authentication.type == AuthenticationType.API_KEY
+        assert route.authentication.type == "api_key"

@@ -11,14 +11,13 @@ from typing import Any, Dict
 from urllib.parse import urlparse
 
 from ..config import (
+    ApiKeyConfig,
     AuthenticationConfig,
-    AuthenticationType,
-    APIKeyAuthConfig,
-    JWTAuthConfig,
     AzureAPIMConfig,
     AzureAPIMGlobalConfig,
     Config,
     GlobalConfig,
+    JwtConfig,
     Route,
     Service,
     Upstream,
@@ -135,8 +134,8 @@ class AzureAPIMProvider(Provider):
                 auth_type = auth_config.get("type")
                 if auth_type == "api_key":
                     authentication = AuthenticationConfig(
-                        type=AuthenticationType.API_KEY,
-                        api_key=APIKeyAuthConfig(
+                        type="api_key",
+                        api_key=ApiKeyConfig(
                             key_name=auth_config.get(
                                 "key_name", "Ocp-Apim-Subscription-Key"
                             ),
@@ -145,8 +144,8 @@ class AzureAPIMProvider(Provider):
                     )
                 elif auth_type == "jwt":
                     authentication = AuthenticationConfig(
-                        type=AuthenticationType.JWT,
-                        jwt_config=JWTAuthConfig(
+                        type="jwt",
+                        jwt=JwtConfig(
                             issuer=auth_config.get("issuer", ""),
                             audience=auth_config.get("audience"),
                         ),
