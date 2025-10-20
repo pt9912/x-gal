@@ -240,6 +240,8 @@ class Route:
         body_transformation: Optional request/response body transformation configuration
         timeout: Optional timeout configuration for this route
         retry: Optional retry policy configuration for this route
+        grpc_transformation: Optional gRPC transformation configuration
+        traffic_split: Optional traffic splitting configuration for A/B testing
 
     Example:
         >>> route = Route(path_prefix="/api/users", methods=["GET", "POST"])
@@ -259,6 +261,7 @@ class Route:
     timeout: Optional["TimeoutConfig"] = None
     retry: Optional["RetryConfig"] = None
     grpc_transformation: Optional["GrpcTransformation"] = None
+    traffic_split: Optional["TrafficSplitConfig"] = None
 
 
 @dataclass
@@ -1343,6 +1346,191 @@ class GrpcTransformation:
                 raise ValueError("request_type is required when enabled=True")
             if not self.response_type:
                 raise ValueError("response_type is required when enabled=True")
+
+
+@dataclass
+class HeaderMatchRule:
+    """Header-based routing rule for traffic splitting.
+
+    Routes traffic based on HTTP header values.
+
+    Attributes:
+        header_name: HTTP header name to match (e.g., "X-Version", "X-User-Segment")
+        header_value: Header value to match (exact match)
+        target_name: Name of the upstream target to route to when matched
+
+    Example:
+        >>> rule = HeaderMatchRule(
+        ...     header_name="X-Version",
+        ...     header_value="beta",
+        ...     target_name="backend_beta"
+        ... )
+        >>> rule.header_name
+        'X-Version'
+    """
+
+    header_name: str
+    header_value: str
+    target_name: str
+
+
+@dataclass
+class CookieMatchRule:
+    """Cookie-based routing rule for traffic splitting.
+
+    Routes traffic based on cookie values for user-based canary testing.
+
+    Attributes:
+        cookie_name: Cookie name to match (e.g., "canary_user", "beta_tester")
+        cookie_value: Cookie value to match (exact match)
+        target_name: Name of the upstream target to route to when matched
+
+    Example:
+        >>> rule = CookieMatchRule(
+            cookie_name="canary_user",
+            cookie_value="true",
+            target_name="canary_backend"
+        ... )
+        >>> rule.cookie_name
+        'canary_user'
+    """
+
+    cookie_name: str
+    cookie_value: str
+    target_name: str
+
+
+@dataclass
+class SplitTarget:
+    """Weighted traffic split target configuration.
+
+    Defines a backend target with its traffic weight for A/B testing and canary deployments.
+
+    Attributes:
+        name: Unique identifier for this target
+        weight: Traffic weight (0-100). Weights across all targets should sum to 100.
+        upstream: Backend target configuration
+        description: Optional human-readable description
+
+    Example:
+        >>> target = SplitTarget(
+        ...     name="version_a",
+        ...     weight=70,
+        ...     upstream=UpstreamTarget(host="api-v1.internal", port=8080)
+        ... )
+        >>> target.weight
+        70
+    """
+
+    name: str
+    weight: int
+    upstream: UpstreamTarget
+    description: Optional[str] = None
+
+    def __post_init__(self):
+        """Validate split target configuration."""
+        if not 0 <= self.weight <= 100:
+            raise ValueError(f"Weight must be between 0 and 100, got {self.weight}")
+
+
+@dataclass
+class RoutingRules:
+    """Advanced routing rules for traffic splitting.
+
+    Combines header-based and cookie-based routing rules.
+    Rules are evaluated in order: header rules first, then cookie rules.
+
+    Attributes:
+        header_rules: List of header-based routing rules
+        cookie_rules: List of cookie-based routing rules
+
+    Example:
+        >>> rules = RoutingRules(
+        ...     header_rules=[
+        ...         HeaderMatchRule("X-Version", "beta", "backend_beta")
+        ...     ],
+        ...     cookie_rules=[
+        ...         CookieMatchRule("canary_user", "true", "canary_backend")
+        ...     ]
+        ... )
+        >>> len(rules.header_rules)
+        1
+    """
+
+    header_rules: List[HeaderMatchRule] = field(default_factory=list)
+    cookie_rules: List[CookieMatchRule] = field(default_factory=list)
+
+
+@dataclass
+class TrafficSplitConfig:
+    """Traffic splitting configuration for A/B testing and canary deployments.
+
+    Enables weight-based traffic distribution and rule-based routing across
+    multiple backend targets.
+
+    Attributes:
+        enabled: Whether traffic splitting is enabled
+        targets: List of weighted backend targets
+        routing_rules: Optional header/cookie-based routing rules
+        fallback_target: Optional fallback target name if no rules match
+
+    Example (Weight-based):
+        >>> config = TrafficSplitConfig(
+        ...     enabled=True,
+        ...     targets=[
+        ...         SplitTarget("stable", 90, UpstreamTarget("api-v1", 8080)),
+        ...         SplitTarget("canary", 10, UpstreamTarget("api-v2", 8080))
+        ...     ]
+        ... )
+        >>> sum(t.weight for t in config.targets)
+        100
+
+    Example (Header-based):
+        >>> config = TrafficSplitConfig(
+        ...     enabled=True,
+        ...     targets=[
+        ...         SplitTarget("stable", 100, UpstreamTarget("api-v1", 8080)),
+        ...         SplitTarget("beta", 0, UpstreamTarget("api-v2-beta", 8080))
+        ...     ],
+        ...     routing_rules=RoutingRules(
+        ...         header_rules=[HeaderMatchRule("X-Version", "beta", "beta")]
+        ...     ),
+        ...     fallback_target="stable"
+        ... )
+    """
+
+    enabled: bool = False
+    targets: List[SplitTarget] = field(default_factory=list)
+    routing_rules: Optional[RoutingRules] = None
+    fallback_target: Optional[str] = None
+
+    def __post_init__(self):
+        """Validate traffic split configuration."""
+        if self.enabled:
+            if not self.targets:
+                raise ValueError("At least one target is required when enabled=True")
+
+            # Validate total weight sums to 100 (or 0 for rule-based routing)
+            total_weight = sum(t.weight for t in self.targets)
+            has_rules = self.routing_rules and (
+                self.routing_rules.header_rules or self.routing_rules.cookie_rules
+            )
+
+            if not has_rules and total_weight != 100:
+                raise ValueError(
+                    f"Total weight must sum to 100 for weight-based routing, got {total_weight}"
+                )
+
+            # Validate unique target names
+            names = [t.name for t in self.targets]
+            if len(names) != len(set(names)):
+                raise ValueError("Target names must be unique")
+
+            # Validate fallback target exists
+            if self.fallback_target and self.fallback_target not in names:
+                raise ValueError(
+                    f"Fallback target '{self.fallback_target}' not found in targets"
+                )
 
 
 @dataclass

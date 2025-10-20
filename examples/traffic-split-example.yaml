@@ -1,0 +1,198 @@
+# GAL Traffic Splitting Examples
+# Feature 5: A/B Testing & Traffic Splitting
+
+version: "1.0"
+provider: envoy
+
+global:
+  port: 8080
+
+services:
+  # Example 1: Weight-based Canary Deployment
+  # 90% traffic to stable, 10% to canary
+  - name: canary_deployment_api
+    type: rest
+    protocol: http
+    upstream:
+      host: placeholder  # Will be overridden by traffic_split targets
+      port: 8080
+    routes:
+      - path_prefix: /api/v1
+        methods: [GET, POST, PUT, DELETE]
+        traffic_split:
+          enabled: true
+          targets:
+            - name: stable
+              weight: 90
+              upstream:
+                host: api-v1-stable
+                port: 8080
+              description: "Stable production version"
+            - name: canary
+              weight: 10
+              upstream:
+                host: api-v1-canary
+                port: 8080
+              description: "Canary deployment for testing"
+
+  # Example 2: A/B Testing with 50/50 Split
+  - name: ab_testing_api
+    type: rest
+    protocol: http
+    upstream:
+      host: placeholder
+      port: 8080
+    routes:
+      - path_prefix: /api/v2
+        methods: [GET, POST]
+        traffic_split:
+          enabled: true
+          targets:
+            - name: version_a
+              weight: 50
+              upstream:
+                host: api-v2-a
+                port: 8080
+              description: "Version A - existing algorithm"
+            - name: version_b
+              weight: 50
+              upstream:
+                host: api-v2-b
+                port: 8080
+              description: "Version B - new algorithm"
+
+  # Example 3: Header-based Routing (Beta Users)
+  # Traffic with "X-Version: beta" header goes to beta backend
+  - name: beta_testing_api
+    type: rest
+    protocol: http
+    upstream:
+      host: placeholder
+      port: 8080
+    routes:
+      - path_prefix: /api/beta
+        methods: [GET, POST, PUT, DELETE]
+        traffic_split:
+          enabled: true
+          targets:
+            - name: production
+              weight: 100
+              upstream:
+                host: api-prod
+                port: 8080
+              description: "Production backend"
+            - name: beta
+              weight: 0  # Only via header routing
+              upstream:
+                host: api-beta
+                port: 8080
+              description: "Beta backend for testing"
+          routing_rules:
+            header_rules:
+              - header_name: "X-Version"
+                header_value: "beta"
+                target_name: "beta"
+          fallback_target: "production"
+
+  # Example 4: Cookie-based Canary (User Segments)
+  # Users with "canary_user=true" cookie go to canary
+  - name: user_segment_api
+    type: rest
+    protocol: http
+    upstream:
+      host: placeholder
+      port: 8080
+    routes:
+      - path_prefix: /api/users
+        methods: [GET, POST, PUT, DELETE]
+        traffic_split:
+          enabled: true
+          targets:
+            - name: stable
+              weight: 100
+              upstream:
+                host: api-stable
+                port: 8080
+              description: "Stable backend"
+            - name: canary_users
+              weight: 0  # Only via cookie routing
+              upstream:
+                host: api-canary
+                port: 8080
+              description: "Canary for selected users"
+          routing_rules:
+            cookie_rules:
+              - cookie_name: "canary_user"
+                cookie_value: "true"
+                target_name: "canary_users"
+          fallback_target: "stable"
+
+  # Example 5: Combined Header + Cookie Routing
+  # Priority: Headers first, then cookies, then weights
+  - name: multi_rule_api
+    type: rest
+    protocol: http
+    upstream:
+      host: placeholder
+      port: 8080
+    routes:
+      - path_prefix: /api/multi
+        methods: [GET, POST]
+        traffic_split:
+          enabled: true
+          targets:
+            - name: stable
+              weight: 70
+              upstream:
+                host: api-stable
+                port: 8080
+            - name: beta
+              weight: 20
+              upstream:
+                host: api-beta
+                port: 8080
+            - name: canary
+              weight: 10
+              upstream:
+                host: api-canary
+                port: 8080
+          routing_rules:
+            header_rules:
+              - header_name: "X-Version"
+                header_value: "beta"
+                target_name: "beta"
+              - header_name: "X-Version"
+                header_value: "canary"
+                target_name: "canary"
+            cookie_rules:
+              - cookie_name: "user_tier"
+                cookie_value: "premium"
+                target_name: "beta"
+          fallback_target: "stable"
+
+  # Example 6: Multi-Stage Canary Rollout
+  # Start with 5%, then 25%, then 50%, then 100%
+  - name: gradual_rollout_api
+    type: rest
+    protocol: http
+    upstream:
+      host: placeholder
+      port: 8080
+    routes:
+      - path_prefix: /api/rollout
+        methods: [GET, POST]
+        traffic_split:
+          enabled: true
+          targets:
+            - name: current_version
+              weight: 95  # Stage 1: 95/5 split
+              upstream:
+                host: api-v1
+                port: 8080
+              description: "Current stable version"
+            - name: new_version
+              weight: 5   # Stage 1: 5% canary
+              upstream:
+                host: api-v2
+                port: 8080
+              description: "New version being rolled out"
