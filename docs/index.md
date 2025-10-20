@@ -2,7 +2,7 @@
 
 **Provider-agnostisches Konfigurationssystem für API-Gateways**
 
-GAL ermöglicht es Ihnen, API-Gateway-Konfigurationen einmal zu definieren und für verschiedene Provider (Nginx, Envoy, Kong, APISIX, Traefik, HAProxy, Azure APIM) zu generieren.
+GAL ermöglicht es Ihnen, API-Gateway-Konfigurationen einmal zu definieren und für verschiedene Provider (Nginx, Envoy, Kong, APISIX, Traefik, HAProxy, Azure APIM, GCP API Gateway, AWS API Gateway) zu generieren.
 
 ---
 
@@ -28,6 +28,12 @@ services:
 gal generate -c config.yaml -p nginx
 gal generate -c config.yaml -p envoy
 gal generate -c config.yaml -p kong
+gal generate -c config.yaml -p apisix
+gal generate -c config.yaml -p traefik
+gal generate -c config.yaml -p haproxy
+gal generate -c config.yaml -p azure_apim
+gal generate -c config.yaml -p gcp_apigateway
+gal generate -c config.yaml -p aws_apigateway
 ```
 
 [Zur Schnellstart-Anleitung →](guides/QUICKSTART.md){ .md-button .md-button--primary }
@@ -89,8 +95,13 @@ gal generate -c config.yaml -p kong
 | [Traefik](guides/TRAEFIK.md) | :white_check_mark: | YAML/TOML | Middleware | :white_check_mark: / :white_check_mark: | Self-Hosted |
 | [HAProxy](guides/HAPROXY.md) | :white_check_mark: | haproxy.cfg | Lua | :warning: / :white_check_mark: | Self-Hosted |
 | **[Azure APIM](guides/AZURE_APIM.md)** | :white_check_mark: | **ARM/JSON** | **Policy XML** | :white_check_mark: / :white_check_mark: | **Azure Cloud** |
+| **[GCP API Gateway](guides/GCP_APIGATEWAY.md)** | :white_check_mark: | **OpenAPI 2.0** | **Backend** | :white_check_mark: / :white_check_mark: | **Google Cloud** |
+| **[AWS API Gateway](guides/AWS_APIGATEWAY.md)** | :white_check_mark: | **OpenAPI 3.0** | **VTL** | :white_check_mark: / :white_check_mark: | **AWS Cloud** |
 
-**Import-Hinweis:** Azure APIM Import erfolgt über **OpenAPI 3.0 Export** (`az apim api export`). ARM Templates werden nicht geparst. Policies (Rate Limiting, etc.) müssen manuell in GAL konfiguriert werden. Siehe [Azure APIM Import Guide](import/azure-apim.md).
+**Import-Hinweise:**
+- **Azure APIM:** Import erfolgt über OpenAPI 3.0 Export (`az apim api export`). ARM Templates werden nicht geparst. Policies müssen manuell in GAL konfiguriert werden. Siehe [Azure APIM Import Guide](import/azure-apim.md).
+- **GCP API Gateway:** Import erfolgt über OpenAPI 2.0 Export (`gcloud api-gateway api-configs describe`). Siehe [GCP Import Guide](import/gcp-apigateway.md).
+- **AWS API Gateway:** Import erfolgt über OpenAPI 3.0 Export (`aws apigateway get-export`). Usage Plans müssen separat konfiguriert werden. Siehe [AWS Import Guide](import/aws-apigateway.md).
 
 ---
 
@@ -102,7 +113,7 @@ Praktische Anleitungen für häufige Aufgaben:
 
 - **[Schnellstart](guides/QUICKSTART.md)** - Installation und erste Schritte in 5 Minuten
 - **[Provider-Übersicht](guides/PROVIDERS.md)** - Vergleich aller Gateway-Provider
-- **Provider-spezifisch**: [Nginx](guides/NGINX.md) | [Envoy](guides/ENVOY.md) | [Kong](guides/KONG.md) | [APISIX](guides/APISIX.md) | [Traefik](guides/TRAEFIK.md) | [HAProxy](guides/HAPROXY.md) | [Azure APIM](guides/AZURE_APIM.md)
+- **Provider-spezifisch**: [Nginx](guides/NGINX.md) | [Envoy](guides/ENVOY.md) | [Kong](guides/KONG.md) | [APISIX](guides/APISIX.md) | [Traefik](guides/TRAEFIK.md) | [HAProxy](guides/HAPROXY.md) | [Azure APIM](guides/AZURE_APIM.md) | [GCP API Gateway](guides/GCP_APIGATEWAY.md) | [AWS API Gateway](guides/AWS_APIGATEWAY.md)
 - **[Transformationen](guides/TRANSFORMATIONS.md)** - Request-Transformationen und Best Practices
 - **[Entwicklung](guides/DEVELOPMENT.md)** - Zum Projekt beitragen
 
