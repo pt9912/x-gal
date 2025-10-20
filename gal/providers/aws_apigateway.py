@@ -221,7 +221,7 @@ class AWSAPIGatewayProvider(Provider):
 
     def _get_aws_config(self, global_config: Optional[GlobalConfig]) -> AWSAPIGatewayConfig:
         """Extract or create AWS API Gateway configuration."""
-        if global_config and hasattr(global_config, 'aws_apigateway'):
+        if global_config and hasattr(global_config, 'aws_apigateway') and global_config.aws_apigateway:
             return global_config.aws_apigateway
         return AWSAPIGatewayConfig()
 

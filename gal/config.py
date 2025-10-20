@@ -23,6 +23,7 @@ class GlobalConfig:
         logging: Optional logging configuration
         metrics: Optional metrics configuration
         azure_apim: Optional Azure API Management global configuration
+        aws_apigateway: Optional AWS API Gateway global configuration
 
     Example:
         >>> config = GlobalConfig(host="127.0.0.1", port=8080)
@@ -37,6 +38,7 @@ class GlobalConfig:
     logging: Optional["LoggingConfig"] = None
     metrics: Optional["MetricsConfig"] = None
     azure_apim: Optional["AzureAPIMGlobalConfig"] = None
+    aws_apigateway: Optional["AWSAPIGatewayConfig"] = None
 
 
 @dataclass
