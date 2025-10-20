@@ -509,6 +509,205 @@ def users():
 2. **Cloud Endpoints** (erweiterte API Management Features)
 3. **Apigee** (Enterprise API Gateway mit vollständiger Header-Kontrolle)
 
+### AWS API Gateway
+
+AWS API Gateway implementiert Header Manipulation über `x-amazon-apigateway-integration` Extensions in OpenAPI 3.0.
+
+**Request Headers (Integration Request):**
+- Mechanismus: `requestParameters` im `x-amazon-apigateway-integration` Block
+- Mapping: `integration.request.header.X-Custom` ← `method.request.header.User-Agent`
+- Static Values: Direkte String-Werte mit einfachen Quotes
+- Hinweis: Header-Mapping erfolgt während Integration Request Phase
+
+**Response Headers (Integration Response):**
+- Mechanismus: `responseParameters` im `x-amazon-apigateway-integration` Block
+- Mapping: `method.response.header.X-Custom` ← `integration.response.header.X-Backend`
+- CORS Headers: Automatisch via `cors_enabled: true` oder manuell konfiguriert
+- Gateway Response Headers: DEFAULT_4XX, DEFAULT_5XX für Error Responses
+
+**Generiertes OpenAPI Config-Beispiel:**
+```json
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "API with Headers",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/users": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-API-Version": {
+                "schema": {"type": "string"}
+              },
+              "X-Request-ID": {
+                "schema": {"type": "string"}
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "GET",
+          "uri": "https://backend.example.com/api/users",
+          "requestParameters": {
+            "integration.request.header.X-API-Version": "'v1'",
+            "integration.request.header.X-Gateway": "'AWS-API-Gateway'",
+            "integration.request.header.X-Request-ID": "context.requestId"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200",
+              "responseParameters": {
+                "method.response.header.X-API-Version": "'v1'",
+                "method.response.header.X-Request-ID": "context.requestId",
+                "method.response.header.Access-Control-Allow-Origin": "'*'"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**Context Variables:**
+AWS API Gateway bietet `$context` Variablen für dynamische Headers:
+
+```json
+{
+  "requestParameters": {
+    "integration.request.header.X-Request-ID": "context.requestId",
+    "integration.request.header.X-Request-Time": "context.requestTime",
+    "integration.request.header.X-Source-IP": "context.identity.sourceIp",
+    "integration.request.header.X-User-Agent": "context.identity.userAgent"
+  }
+}
+```
+
+**Deployment:**
+```bash
+# 1. OpenAPI mit Header-Konfiguration generieren
+gal generate -c config.yaml -p aws_apigateway -o api.json
+
+# 2. API erstellen/updaten
+aws apigateway import-rest-api --body file://api.json
+
+# 3. Deployment
+aws apigateway create-deployment \
+  --rest-api-id abc123xyz \
+  --stage-name prod
+
+# 4. Gateway Response Headers (für Errors)
+aws apigateway put-gateway-response \
+  --rest-api-id abc123xyz \
+  --response-type DEFAULT_4XX \
+  --response-parameters \
+    gatewayresponse.header.Access-Control-Allow-Origin="'*'" \
+    gatewayresponse.header.X-Error-Type="'Client-Error'"
+
+aws apigateway put-gateway-response \
+  --rest-api-id abc123xyz \
+  --response-type DEFAULT_5XX \
+  --response-parameters \
+    gatewayresponse.header.Access-Control-Allow-Origin="'*'" \
+    gatewayresponse.header.X-Error-Type="'Server-Error'"
+```
+
+**Testing:**
+```bash
+# Request Headers testen
+curl -v https://abc123.execute-api.us-east-1.amazonaws.com/prod/api/users \
+  -H "User-Agent: TestClient/1.0" \
+  2>&1 | grep ">"
+
+# Response Headers prüfen
+curl -I https://abc123.execute-api.us-east-1.amazonaws.com/prod/api/users
+
+# Erwartete Response Headers:
+# X-API-Version: v1
+# X-Request-ID: abc123-def456-...
+# Access-Control-Allow-Origin: *
+```
+
+**CORS Headers (automatisch):**
+```yaml
+# GAL Config
+global_config:
+  aws_apigateway:
+    cors_enabled: true
+    cors_allow_origins: ["https://app.example.com"]
+    cors_allow_methods: ["GET", "POST", "PUT", "DELETE"]
+    cors_allow_headers: ["Content-Type", "Authorization"]
+```
+
+**Generierte CORS Headers:**
+```json
+{
+  "options": {
+    "x-amazon-apigateway-integration": {
+      "type": "mock",
+      "responses": {
+        "default": {
+          "statusCode": "200",
+          "responseParameters": {
+            "method.response.header.Access-Control-Allow-Origin": "'https://app.example.com'",
+            "method.response.header.Access-Control-Allow-Methods": "'GET,POST,PUT,DELETE'",
+            "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization'",
+            "method.response.header.Access-Control-Max-Age": "'86400'"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**AWS API Gateway-spezifische Features:**
+- ✅ Request Parameter Mapping (Header, Query, Path)
+- ✅ Response Parameter Mapping
+- ✅ Context Variables ($context.requestId, $context.identity.sourceIp)
+- ✅ Gateway Response Headers (DEFAULT_4XX, DEFAULT_5XX)
+- ✅ CORS Headers (automatisch via cors_enabled)
+- ✅ Static + Dynamic Headers
+- ⚠️ Keine Header Removal (nur Mapping)
+
+**Limitierungen:**
+- ⚠️ Keine native "Remove Header" Operation (nur Nicht-Mappen)
+- ⚠️ Header-Mapping ist deklarativ (kein Scripting wie bei Kong/APISIX)
+- ⚠️ Komplexe Transformationen benötigen Lambda Integration
+- ❌ Keine Conditional Header Logic (benötigt Lambda Authorizer)
+
+**Advanced: Lambda Integration für komplexe Header-Logik:**
+```python
+# Lambda Function für Custom Header-Logik
+def lambda_handler(event, context):
+    headers = event['headers']
+
+    # Custom Header Logic
+    custom_headers = {
+        'X-Processed-By': 'Lambda',
+        'X-Request-ID': event['requestContext']['requestId'],
+        'X-User-Tier': 'Premium' if 'x-api-key' in headers else 'Free',
+        'X-Rate-Limit-Remaining': '1000'
+    }
+
+    # Backend Request (optional)
+    # response = requests.get(backend_url, headers=headers)
+
+    return {
+        'statusCode': 200,
+        'headers': custom_headers,
+        'body': json.dumps({'message': 'Success'})
+    }
+```
+
+**Hinweis:** Für komplexe Header-Manipulationen (Conditional Logic, Regex, etc.) empfiehlt sich die Verwendung von **AWS_PROXY Integration mit Lambda** statt HTTP_PROXY.
+
 ---
 
 ## Common Use Cases

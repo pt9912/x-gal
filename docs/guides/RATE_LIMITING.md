@@ -459,6 +459,143 @@ gcloud monitoring time-series list \
 2. **Cloud Armor** (für DDoS Protection)
 3. **Apigee** (für Enterprise API Management mit umfassenden Rate Limiting Features)
 
+### AWS API Gateway
+
+AWS API Gateway implementiert Rate Limiting über Usage Plans mit API Keys, getrennt von der OpenAPI-Konfiguration.
+
+**Usage Plans (Throttling & Quotas):**
+- Mechanismus: Usage Plans mit `burstLimit` und `rateLimit` pro API Key
+- Throttling: Requests per Second + Burst Capacity (Stage-Level & Method-Level)
+- Quotas: Daily/Weekly/Monthly Request Limits
+- Hinweis: Rate Limiting wird NICHT in OpenAPI konfiguriert, sondern via AWS CLI/Console
+
+**Stage-Level Throttling:**
+```bash
+# Standard Throttling Settings für alle Methods
+aws apigateway update-stage \
+  --rest-api-id abc123xyz \
+  --stage-name prod \
+  --patch-operations \
+    op=replace,path=/throttle/burstLimit,value=1000 \
+    op=replace,path=/throttle/rateLimit,value=500
+```
+
+**Method-Level Throttling:**
+```bash
+# Spezifische Limits für einzelne Methods
+aws apigateway update-stage \
+  --rest-api-id abc123xyz \
+  --stage-name prod \
+  --patch-operations \
+    op=replace,path=/*/GET/throttle/burstLimit,value=2000 \
+    op=replace,path=/*/GET/throttle/rateLimit,value=1000
+```
+
+**Usage Plans mit Quotas:**
+```bash
+# Free Tier Usage Plan
+aws apigateway create-usage-plan \
+  --name "FreeTier" \
+  --throttle burstLimit=100,rateLimit=10 \
+  --quota limit=10000,period=MONTH
+
+# Premium Tier Usage Plan
+aws apigateway create-usage-plan \
+  --name "PremiumTier" \
+  --throttle burstLimit=5000,rateLimit=1000 \
+  --quota limit=1000000,period=MONTH
+
+# API Key erstellen und zu Usage Plan hinzufügen
+API_KEY_ID=$(aws apigateway create-api-key \
+  --name "Customer-ABC" \
+  --enabled \
+  --query 'id' --output text)
+
+aws apigateway create-usage-plan-key \
+  --usage-plan-id <plan-id> \
+  --key-id $API_KEY_ID \
+  --key-type API_KEY
+```
+
+**Testing:**
+```bash
+# Request mit API Key
+curl -H "x-api-key: <api-key-value>" \
+  https://abc123.execute-api.us-east-1.amazonaws.com/prod/api/users
+
+# Throttling Metriken überwachen
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ApiGateway \
+  --metric-name Count \
+  --dimensions Name=ApiName,Value=MyAPI \
+  --start-time 2025-10-20T00:00:00Z \
+  --end-time 2025-10-20T23:59:59Z \
+  --period 300 \
+  --statistics Sum
+
+# 429 Errors (Too Many Requests) überwachen
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ApiGateway \
+  --metric-name 4XXError \
+  --dimensions Name=ApiName,Value=MyAPI \
+  --start-time 2025-10-20T00:00:00Z \
+  --end-time 2025-10-20T23:59:59Z \
+  --period 300 \
+  --statistics Sum
+```
+
+**AWS API Gateway-spezifische Features:**
+- ✅ Usage Plans mit Throttling + Quotas
+- ✅ Stage-Level + Method-Level Rate Limits
+- ✅ Per-API-Key Rate Limiting
+- ✅ Daily/Weekly/Monthly Quotas
+- ✅ CloudWatch Integration für Monitoring
+- ⚠️ Keine native OpenAPI-Konfiguration (nur AWS CLI/SDK)
+- ⚠️ API Keys erforderlich für Per-User Rate Limiting
+
+**Limitierungen:**
+- ⚠️ Rate Limiting nicht in OpenAPI definierbar
+- ⚠️ Manuelle Konfiguration via AWS CLI/Console erforderlich
+- ⚠️ API Keys müssen separat verwaltet werden
+- ❌ Kein Header-basiertes oder JWT-basiertes Rate Limiting ohne Custom Authorizer
+
+**Multi-Tier Rate Limiting Beispiel:**
+```bash
+# 1. Free Tier (10 req/s, 100 burst, 10k/Monat)
+FREE_PLAN=$(aws apigateway create-usage-plan \
+  --name "Free-Tier" \
+  --throttle burstLimit=100,rateLimit=10 \
+  --quota limit=10000,period=MONTH,offset=0 \
+  --query 'id' --output text)
+
+# 2. Basic Tier (100 req/s, 1000 burst, 100k/Monat)
+BASIC_PLAN=$(aws apigateway create-usage-plan \
+  --name "Basic-Tier" \
+  --throttle burstLimit=1000,rateLimit=100 \
+  --quota limit=100000,period=MONTH,offset=0 \
+  --query 'id' --output text)
+
+# 3. Premium Tier (1000 req/s, 5000 burst, unlimited)
+PREMIUM_PLAN=$(aws apigateway create-usage-plan \
+  --name "Premium-Tier" \
+  --throttle burstLimit=5000,rateLimit=1000 \
+  --query 'id' --output text)
+
+# Usage Plans zu API Stage verknüpfen
+aws apigateway update-usage-plan \
+  --usage-plan-id $FREE_PLAN \
+  --patch-operations \
+    op=add,path=/apiStages,value=abc123:prod
+
+# Customer API Key zu Plan hinzufügen
+aws apigateway create-usage-plan-key \
+  --usage-plan-id $FREE_PLAN \
+  --key-id $API_KEY_ID \
+  --key-type API_KEY
+```
+
+**Hinweis:** AWS API Gateway's Rate Limiting erfordert **API Keys** und **Usage Plans**. Für feingranulare Kontrolle (z.B. per User ID) muss ein **Lambda Authorizer** mit DynamoDB verwendet werden.
+
 ## Best Practices
 
 ### 1. Burst-Dimensionierung

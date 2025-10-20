@@ -822,6 +822,215 @@ curl -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..." \
 - Basic Auth wird nicht nativ unterstützt (Workaround: Backend-basierte Basic Auth)
 - API Key Authentication ist limitiert (für Production wird JWT empfohlen)
 
+### AWS API Gateway
+
+AWS API Gateway implementiert Authentication mit OpenAPI 3.0 Security Schemes und x-amazon-apigateway Extensions.
+
+**API Keys:**
+- Mechanismus: OpenAPI 3.0 `apiKey` security scheme mit `x-amazon-apigateway-api-key-source`
+- Features: Usage Plans, Rate Limiting pro API Key, Subscription Management, Primary/Secondary Keys
+- Hinweis: Ideal für Partner-APIs, Pay-per-Use-Modelle
+
+**Lambda Authorizer (Custom JWT):**
+- Mechanismus: `x-amazon-apigateway-authorizer` mit Lambda Function für Custom Authorization Logic
+- Features: Custom JWT Validation, Claims-basierte Authorization, Context-Weitergabe, Caching (TTL)
+- Hinweis: Vollständige Kontrolle über Authorization-Logik
+
+**Cognito User Pools (OAuth2/OIDC):**
+- Mechanismus: AWS Cognito Integration via `x-amazon-apigateway-authorizer` (type: `cognito_user_pools`)
+- Features: OAuth2/OIDC Standard, Multi-Factor Authentication (MFA), Social Identity Providers (Google, Facebook), Managed User Pools
+- Hinweis: Empfohlene Methode für User-basierte APIs
+
+**IAM Authorization:**
+- Mechanismus: AWS Signature Version 4 (SigV4) für Service-to-Service Communication
+- Features: IAM Roles, IAM Policies, Cross-Account Access, Temporary Credentials (STS)
+- Hinweis: Ideal für Service-to-Service Authentication innerhalb AWS
+
+**Generiertes Config-Beispiel (API Keys):**
+```json
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Secure API",
+    "version": "1.0.0"
+  },
+  "components": {
+    "securitySchemes": {
+      "api_key": {
+        "type": "apiKey",
+        "name": "x-api-key",
+        "in": "header",
+        "x-amazon-apigateway-api-key-source": "HEADER"
+      }
+    }
+  },
+  "security": [
+    {
+      "api_key": []
+    }
+  ],
+  "paths": {
+    "/secure": {
+      "get": {
+        "summary": "Protected endpoint",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized - Missing or invalid API key"
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "GET",
+          "uri": "https://backend.example.com/secure"
+        }
+      }
+    }
+  }
+}
+```
+
+**Generiertes Config-Beispiel (Lambda Authorizer - JWT):**
+```json
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "JWT Protected API",
+    "version": "1.0.0"
+  },
+  "components": {
+    "securitySchemes": {
+      "lambda_authorizer": {
+        "type": "apiKey",
+        "name": "Authorization",
+        "in": "header",
+        "x-amazon-apigateway-authtype": "custom",
+        "x-amazon-apigateway-authorizer": {
+          "type": "token",
+          "authorizerUri": "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:123456789012:function:my-authorizer/invocations",
+          "authorizerCredentials": "arn:aws:iam::123456789012:role/api-gateway-invoke-lambda",
+          "authorizerResultTtlInSeconds": 300,
+          "identitySource": "method.request.header.Authorization"
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "lambda_authorizer": []
+    }
+  ]
+}
+```
+
+**Generiertes Config-Beispiel (Cognito User Pools):**
+```json
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Cognito Protected API",
+    "version": "1.0.0"
+  },
+  "components": {
+    "securitySchemes": {
+      "cognito_authorizer": {
+        "type": "apiKey",
+        "name": "Authorization",
+        "in": "header",
+        "x-amazon-apigateway-authtype": "cognito_user_pools",
+        "x-amazon-apigateway-authorizer": {
+          "type": "cognito_user_pools",
+          "providerARNs": [
+            "arn:aws:cognito-idp:us-east-1:123456789012:userpool/us-east-1_AbCdEfGhI"
+          ]
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "cognito_authorizer": []
+    }
+  ]
+}
+```
+
+**Deployment:**
+```bash
+# OpenAPI generieren
+gal generate -c config.yaml -p aws_apigateway -o api.json
+
+# API erstellen
+API_ID=$(aws apigateway import-rest-api \
+  --body file://api.json \
+  --query 'id' --output text)
+
+# API Key erstellen (für API Key Authentication)
+aws apigateway create-api-key \
+  --name "MyAppKey" \
+  --enabled
+
+# Usage Plan erstellen (Rate Limiting)
+aws apigateway create-usage-plan \
+  --name "BasicPlan" \
+  --throttle burstLimit=1000,rateLimit=500 \
+  --api-stages apiId=$API_ID,stage=prod
+
+# Deployment erstellen
+aws apigateway create-deployment \
+  --rest-api-id $API_ID \
+  --stage-name prod
+
+# API URL anzeigen
+echo "https://${API_ID}.execute-api.us-east-1.amazonaws.com/prod"
+```
+
+**API Key Testen:**
+```bash
+# API Key Request
+curl -H "x-api-key: your-api-key-here" \
+  https://${API_ID}.execute-api.us-east-1.amazonaws.com/prod/secure
+```
+
+**Lambda Authorizer Testen:**
+```bash
+# JWT Token Request (Lambda validiert das Token)
+curl -H "Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  https://${API_ID}.execute-api.us-east-1.amazonaws.com/prod/protected
+```
+
+**Cognito Token Testen:**
+```bash
+# Cognito User Login
+aws cognito-idp initiate-auth \
+  --auth-flow USER_PASSWORD_AUTH \
+  --client-id <client-id> \
+  --auth-parameters USERNAME=user@example.com,PASSWORD=SecurePass123
+
+# Cognito ID Token verwenden
+curl -H "Authorization: Bearer <id-token>" \
+  https://${API_ID}.execute-api.us-east-1.amazonaws.com/prod/profile
+```
+
+**AWS API Gateway-spezifische Features:**
+- **Usage Plans:** API Key-basierte Subscription-Modelle mit Rate Limiting & Quotas
+- **Lambda Authorizer:** Vollständige Kontrolle über Authorization-Logik (JWT, OAuth2, Custom)
+- **Cognito Integration:** Managed User Pools, OAuth2/OIDC, MFA, Social Logins
+- **IAM Authorization:** Service-to-Service Auth mit AWS Signature v4
+- **API Key Rotation:** Primary/Secondary Keys für Zero-Downtime Key-Rotation
+- **CloudWatch Logs:** Automatisches Logging aller Auth-Failures (401 Unauthorized)
+- **CloudWatch Metrics:** Auth Success/Failure Rates, Latency-Metriken
+- **X-Ray Tracing:** Distributed Tracing für Authorization-Flow
+
+**Limitierungen:**
+- ⚠️ Lambda Authorizer: Cold Start bei erstem Request (Warmup empfohlen)
+- ⚠️ Lambda Authorizer: 29 Sekunden Timeout-Limit (API Gateway Maximum)
+- ⚠️ API Gateway Timeout: Max 29 Sekunden für gesamten Request (inkl. Authorization)
+- ⚠️ Cognito: AWS Lock-in, Kosten pro Monthly Active User (MAU)
+- ❌ Basic Auth: Nicht nativ unterstützt (Workaround: Lambda Authorizer)
+
 ## Best Practices
 
 ### Allgemeine Sicherheit

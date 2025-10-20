@@ -672,6 +672,330 @@ paths:
 2. **Cloud Tasks** für asynchrone Workflows mit Retries
 3. **Apigee** (Enterprise API Gateway mit nativen Retry Policies)
 
+### AWS API Gateway
+
+AWS API Gateway implementiert Timeouts über `timeoutInMillis` in `x-amazon-apigateway-integration`. Retry-Logik erfolgt client-seitig via AWS SDK.
+
+**Integration Timeout:**
+- Parameter: `timeoutInMillis` im `x-amazon-apigateway-integration` Block
+- Minimum: 50ms
+- Maximum: 29000ms (29 Sekunden) - **Hard Limit!**
+- Standard: 29000ms
+- Mechanismus: Gilt für gesamten Backend-Request (Connection + Response)
+- Hinweis: 29 Sekunden ist AWS API Gateway's absolutes Maximum
+
+**Generiertes OpenAPI Config-Beispiel:**
+```json
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "API with Timeouts",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/fast": {
+      "get": {
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "GET",
+          "uri": "https://backend.example.com/api/fast",
+          "timeoutInMillis": 5000,
+          "connectionType": "INTERNET"
+        }
+      }
+    },
+    "/api/slow": {
+      "get": {
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "GET",
+          "uri": "https://backend.example.com/api/slow",
+          "timeoutInMillis": 29000,
+          "connectionType": "INTERNET"
+        }
+      }
+    }
+  }
+}
+```
+
+**Retry Strategie:**
+AWS API Gateway bietet **keine nativen Retry-Policies**. Alternativen:
+
+1. **AWS SDK Exponential Backoff (Client-Side):**
+```python
+import boto3
+from botocore.config import Config
+from botocore.exceptions import ClientError
+
+# AWS SDK mit Retry-Config
+config = Config(
+    retries={
+        'max_attempts': 3,
+        'mode': 'adaptive'  # adaptive, standard, legacy
+    }
+)
+
+client = boto3.client('apigateway', config=config)
+
+# API Request mit automatischen Retries
+try:
+    response = client.get_rest_api(restApiId='abc123xyz')
+except ClientError as e:
+    print(f"Error: {e}")
+```
+
+2. **Circuit Breaker Pattern (Lambda + DynamoDB):**
+```python
+import json
+import boto3
+from datetime import datetime, timedelta
+
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('circuit-breaker-state')
+
+def lambda_handler(event, context):
+    endpoint = event['requestContext']['path']
+
+    # Check Circuit Breaker State
+    state = get_circuit_state(endpoint)
+
+    if state == 'OPEN':
+        return {
+            'statusCode': 503,
+            'body': json.dumps({'error': 'Circuit breaker open'})
+        }
+
+    # Make Backend Request with Retry
+    try:
+        response = make_backend_request_with_retry(endpoint)
+        record_success(endpoint)
+        return response
+    except Exception as e:
+        record_failure(endpoint)
+        return {
+            'statusCode': 503,
+            'body': json.dumps({'error': str(e)})
+        }
+
+def get_circuit_state(endpoint):
+    # DynamoDB lookup
+    item = table.get_item(Key={'endpoint': endpoint})
+    if 'Item' not in item:
+        return 'CLOSED'
+
+    failures = item['Item'].get('failures', 0)
+    if failures > 5:
+        return 'OPEN'
+    return 'CLOSED'
+
+def make_backend_request_with_retry(endpoint, max_retries=3):
+    import requests
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(f'https://backend.com{endpoint}', timeout=10)
+            response.raise_for_status()
+            return {
+                'statusCode': 200,
+                'body': response.text
+            }
+        except requests.exceptions.RequestException as e:
+            if attempt == max_retries - 1:
+                raise
+            time.sleep(2 ** attempt)  # Exponential backoff
+```
+
+3. **AWS Step Functions für Long-Running Tasks:**
+```json
+{
+  "Comment": "Retry State Machine",
+  "StartAt": "CallBackend",
+  "States": {
+    "CallBackend": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:backend-call",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "HandleError"
+        }
+      ],
+      "End": true
+    },
+    "HandleError": {
+      "Type": "Fail",
+      "Error": "BackendCallFailed",
+      "Cause": "Backend call failed after retries"
+    }
+  }
+}
+```
+
+**Deployment:**
+```bash
+# OpenAPI mit Timeout-Konfiguration
+gal generate -c config.yaml -p aws_apigateway -o api.json
+
+# API erstellen
+aws apigateway import-rest-api --body file://api.json
+
+# Deployment
+aws apigateway create-deployment \
+  --rest-api-id abc123xyz \
+  --stage-name prod
+
+# Timeout-Metriken überwachen
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ApiGateway \
+  --metric-name IntegrationLatency \
+  --dimensions Name=ApiName,Value=MyAPI \
+  --start-time 2025-10-20T00:00:00Z \
+  --end-time 2025-10-20T23:59:59Z \
+  --period 300 \
+  --statistics Average,Maximum
+```
+
+**Testing:**
+```bash
+# Backend mit künstlichem Delay
+# backend-server.py
+from flask import Flask
+import time
+
+app = Flask(__name__)
+
+@app.route('/api/slow')
+def slow():
+    time.sleep(30)  # 30 Sekunden - überschreitet API Gateway Limit
+    return {'message': 'This will timeout'}
+
+@app.route('/api/fast')
+def fast():
+    time.sleep(2)  # 2 Sekunden - innerhalb Limit
+    return {'message': 'Success'}
+
+# Test mit curl
+curl --max-time 30 https://abc123.execute-api.us-east-1.amazonaws.com/prod/api/slow
+# Erwartung: 504 Gateway Timeout nach 29 Sekunden
+
+curl --max-time 30 https://abc123.execute-api.us-east-1.amazonaws.com/prod/api/fast
+# Erwartung: 200 OK
+
+# CloudWatch Logs prüfen
+aws logs filter-log-events \
+  --log-group-name /aws/apigateway/MyAPI \
+  --filter-pattern "504" \
+  --start-time $(date -u -d '1 hour ago' +%s)000
+```
+
+**AWS API Gateway-spezifische Features:**
+- ✅ Integration Timeout (50ms - 29000ms)
+- ✅ Per-Method Timeout-Konfiguration
+- ✅ CloudWatch Metrics (IntegrationLatency, Latency)
+- ✅ X-Ray Tracing für Timeout-Analyse
+- ⚠️ 29 Sekunden Hard Limit (nicht konfigurierbar)
+- ❌ Keine nativen Retry-Policies auf Gateway-Ebene
+- ❌ Kein Connection Timeout (separat)
+- ❌ Kein Circuit Breaker (benötigt Lambda + DynamoDB)
+
+**Limitierungen:**
+- ⚠️ **29 Sekunden Maximum Timeout** - nicht erweiterbar!
+- ⚠️ Keine separaten Connection/Send/Read Timeouts
+- ⚠️ Retry-Logik muss client-seitig (AWS SDK) oder backend-seitig implementiert werden
+- ❌ Keine Exponential Backoff auf Gateway-Ebene
+- ❌ Keine Status Code-basierte Retries
+
+**Workarounds für Long-Running Tasks:**
+
+1. **Asynchrone Patterns mit SQS:**
+```python
+import boto3
+
+sqs = boto3.client('sqs')
+queue_url = 'https://sqs.us-east-1.amazonaws.com/123456789012/my-queue'
+
+def lambda_handler(event, context):
+    # Task in Queue stellen (sofortige Response)
+    sqs.send_message(
+        QueueUrl=queue_url,
+        MessageBody=json.dumps({'task': 'long-running-job'})
+    )
+
+    return {
+        'statusCode': 202,
+        'body': json.dumps({
+            'message': 'Job queued',
+            'job_id': 'job-12345'
+        })
+    }
+```
+
+2. **Polling Pattern:**
+```bash
+# 1. Job starten (sofortige Response)
+JOB_ID=$(curl -X POST https://api.example.com/jobs | jq -r '.job_id')
+
+# 2. Status abfragen (mehrmals)
+while true; do
+  STATUS=$(curl https://api.example.com/jobs/$JOB_ID | jq -r '.status')
+  if [ "$STATUS" = "completed" ]; then
+    echo "Job completed"
+    break
+  fi
+  sleep 5
+done
+```
+
+3. **WebSocket API für Real-Time Updates:**
+```python
+# Lambda für WebSocket Connection
+def lambda_handler(event, context):
+    connection_id = event['requestContext']['connectionId']
+
+    # Long-Running Task starten
+    start_long_running_task(connection_id)
+
+    return {'statusCode': 200}
+
+def send_progress_update(connection_id, progress):
+    apigatewaymanagementapi = boto3.client('apigatewaymanagementapi')
+    apigatewaymanagementapi.post_to_connection(
+        ConnectionId=connection_id,
+        Data=json.dumps({'progress': progress})
+    )
+```
+
+**CloudWatch Alarms für Timeouts:**
+```bash
+# Alarm bei hoher Timeout-Rate
+aws cloudwatch put-metric-alarm \
+  --alarm-name "API-Gateway-High-Timeout-Rate" \
+  --alarm-description "Alert when timeout rate > 5%" \
+  --metric-name 5XXError \
+  --namespace AWS/ApiGateway \
+  --statistic Sum \
+  --period 300 \
+  --evaluation-periods 2 \
+  --threshold 50 \
+  --comparison-operator GreaterThanThreshold \
+  --dimensions Name=ApiName,Value=MyAPI \
+  --alarm-actions arn:aws:sns:us-east-1:123456789012:alerts
+```
+
+**Hinweis:** AWS API Gateway ist für **Request-Response APIs** optimiert (< 29 Sekunden). Für Long-Running Tasks verwenden Sie:
+1. **SQS + Lambda** (Asynchrone Verarbeitung)
+2. **Step Functions** (Orchestrierung mit Retries)
+3. **WebSocket API** (Real-Time Updates)
+4. **Polling Pattern** (Job Status Abfrage)
+
 ---
 
 ## Häufige Anwendungsfälle

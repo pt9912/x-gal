@@ -439,6 +439,263 @@ curl -X GET \
 
 ---
 
+### AWS API Gateway (OPTIONS methods mit Mock Integration)
+
+AWS API Gateway implementiert CORS mit expliziten OPTIONS Methods und Mock Integrations in OpenAPI 3.0:
+
+**AWS API Gateway CORS-Mechanismus:**
+- Mechanismus: OpenAPI 3.0 OPTIONS Methods mit `x-amazon-apigateway-integration` (type: `mock`)
+- Features: Automatic OPTIONS Method Generation, Gateway Responses (DEFAULT_4XX, DEFAULT_5XX), Response Headers Mapping
+- Hinweis: CORS wird durch explizite OPTIONS Methods implementiert, **keine** native Gateway-Level CORS-Config
+
+**Generiertes Config-Beispiel:**
+```json
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "CORS API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/users": {
+      "get": {
+        "summary": "Get users",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "headers": {
+              "Access-Control-Allow-Origin": {
+                "schema": {"type": "string"}
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "GET",
+          "uri": "https://backend.example.com/api/users",
+          "responses": {
+            "default": {
+              "statusCode": "200",
+              "responseParameters": {
+                "method.response.header.Access-Control-Allow-Origin": "'https://app.example.com'"
+              }
+            }
+          }
+        }
+      },
+      "options": {
+        "summary": "CORS preflight",
+        "responses": {
+          "200": {
+            "description": "CORS preflight response",
+            "headers": {
+              "Access-Control-Allow-Origin": {"schema": {"type": "string"}},
+              "Access-Control-Allow-Methods": {"schema": {"type": "string"}},
+              "Access-Control-Allow-Headers": {"schema": {"type": "string"}},
+              "Access-Control-Max-Age": {"schema": {"type": "string"}}
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "mock",
+          "requestTemplates": {
+            "application/json": "{\"statusCode\": 200}"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200",
+              "responseParameters": {
+                "method.response.header.Access-Control-Allow-Origin": "'https://app.example.com'",
+                "method.response.header.Access-Control-Allow-Methods": "'GET,POST,PUT,DELETE,OPTIONS'",
+                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Api-Key'",
+                "method.response.header.Access-Control-Max-Age": "'86400'"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**Deployment:**
+```bash
+# OpenAPI mit CORS generieren
+gal generate -c config.yaml -p aws_apigateway -o api.json
+
+# API erstellen/updaten
+API_ID=$(aws apigateway import-rest-api \
+  --body file://api.json \
+  --query 'id' --output text)
+
+# Gateway Responses für 4XX/5XX CORS Headers erstellen
+aws apigateway put-gateway-response \
+  --rest-api-id $API_ID \
+  --response-type DEFAULT_4XX \
+  --response-parameters \
+    "gatewayresponse.header.Access-Control-Allow-Origin='https://app.example.com'" \
+    "gatewayresponse.header.Access-Control-Allow-Methods='GET,POST,PUT,DELETE,OPTIONS'" \
+    "gatewayresponse.header.Access-Control-Allow-Headers='Content-Type,Authorization'"
+
+aws apigateway put-gateway-response \
+  --rest-api-id $API_ID \
+  --response-type DEFAULT_5XX \
+  --response-parameters \
+    "gatewayresponse.header.Access-Control-Allow-Origin='https://app.example.com'"
+
+# Deployment erstellen
+aws apigateway create-deployment \
+  --rest-api-id $API_ID \
+  --stage-name prod
+
+# API URL anzeigen
+echo "https://${API_ID}.execute-api.us-east-1.amazonaws.com/prod"
+```
+
+**CORS Testen:**
+```bash
+# Preflight Request (OPTIONS)
+curl -X OPTIONS \
+  -H "Origin: https://app.example.com" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: Content-Type, Authorization" \
+  -v \
+  https://${API_ID}.execute-api.us-east-1.amazonaws.com/prod/api/users
+
+# Erwartete Response Headers:
+# HTTP/1.1 200 OK
+# Access-Control-Allow-Origin: https://app.example.com
+# Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS
+# Access-Control-Allow-Headers: Content-Type,Authorization,X-Api-Key
+# Access-Control-Max-Age: 86400
+
+# Actual Request mit CORS
+curl -X GET \
+  -H "Origin: https://app.example.com" \
+  -H "Authorization: Bearer <token>" \
+  https://${API_ID}.execute-api.us-east-1.amazonaws.com/prod/api/users
+
+# Response Headers enthalten:
+# Access-Control-Allow-Origin: https://app.example.com
+```
+
+**Browser Preflight Ablauf:**
+```
+1. Browser sendet OPTIONS Request:
+   OPTIONS /api/users HTTP/1.1
+   Origin: https://app.example.com
+   Access-Control-Request-Method: POST
+   Access-Control-Request-Headers: Content-Type, Authorization
+
+2. API Gateway Mock Integration antwortet:
+   HTTP/1.1 200 OK
+   Access-Control-Allow-Origin: https://app.example.com
+   Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS
+   Access-Control-Allow-Headers: Content-Type,Authorization,X-Api-Key
+   Access-Control-Max-Age: 86400
+
+3. Browser cached Preflight für 86400 Sekunden (24 Stunden)
+
+4. Browser sendet Actual Request:
+   POST /api/users HTTP/1.1
+   Origin: https://app.example.com
+   Content-Type: application/json
+   Authorization: Bearer <token>
+
+5. API Gateway fügt CORS Headers zu Response hinzu:
+   HTTP/1.1 200 OK
+   Access-Control-Allow-Origin: https://app.example.com
+   Content-Type: application/json
+```
+
+**AWS API Gateway CORS-spezifische Features:**
+- ✅ OPTIONS Methods mit Mock Integration (keine Backend-Calls für Preflight)
+- ✅ Gateway Responses für 4XX/5XX Error CORS Headers
+- ✅ Response Parameters Mapping für dynamische CORS Headers
+- ✅ Wildcard `*` für allowed_origins unterstützt
+- ✅ Credentials (`Access-Control-Allow-Credentials: true`) unterstützt
+- ✅ Preflight-Caching mit `Access-Control-Max-Age`
+- ✅ CloudWatch Logs für CORS Preflight Requests
+
+**AWS-spezifische CORS-Konfigurationen:**
+```yaml
+# GAL Config für AWS CORS
+services:
+  - name: api
+    routes:
+      - path_prefix: /api/users
+        methods: [GET, POST, PUT, DELETE]
+        cors:
+          enabled: true
+          allowed_origins:
+            - "https://app.example.com"
+            - "https://admin.example.com"
+          allowed_methods: [GET, POST, PUT, DELETE, OPTIONS]
+          allowed_headers: [Content-Type, Authorization, X-Api-Key]
+          expose_headers: [X-Request-ID, X-RateLimit-Remaining]
+          allow_credentials: true
+          max_age: 86400  # 24 Stunden
+
+# GAL generiert automatisch:
+# - OPTIONS Method für /api/users mit Mock Integration
+# - Response Parameters für alle CORS Headers
+# - Gateway Responses für 4XX/5XX CORS Headers
+```
+
+**Troubleshooting:**
+
+**Problem 1: CORS Headers fehlen bei 4XX/5XX Errors**
+```bash
+# Lösung: Gateway Responses konfigurieren
+aws apigateway put-gateway-response \
+  --rest-api-id $API_ID \
+  --response-type DEFAULT_4XX \
+  --response-parameters \
+    "gatewayresponse.header.Access-Control-Allow-Origin='*'"
+```
+
+**Problem 2: Preflight Request schlägt fehl (OPTIONS 403)**
+```bash
+# Prüfe: OPTIONS Method ist in OpenAPI definiert
+# Prüfe: OPTIONS Method hat Mock Integration (type: "mock")
+# Prüfe: API Key Required ist false für OPTIONS (api_key_required: false)
+```
+
+**Problem 3: Wildcard `*` funktioniert nicht mit Credentials**
+```yaml
+# Falsch:
+cors:
+  allowed_origins: ["*"]
+  allow_credentials: true  # ❌ Nicht erlaubt!
+
+# Richtig:
+cors:
+  allowed_origins: ["https://app.example.com"]  # ✅ Spezifische Origin
+  allow_credentials: true
+```
+
+**AWS API Gateway Besonderheiten:**
+- ✅ CORS wird durch explizite OPTIONS Methods implementiert (wie GCP API Gateway)
+- ✅ Mock Integration für OPTIONS (keine Backend-Calls, sehr schnell)
+- ✅ Gateway Responses für Error CORS Headers (wichtig für Auth-Fehler!)
+- ⚠️ OPTIONS Methods müssen für **jeden** Pfad explizit definiert werden
+- ⚠️ CORS-Konfiguration erfolgt auf OpenAPI-Ebene, **keine** native Gateway-Config
+- ⚠️ Gateway Responses müssen separat für 4XX/5XX konfiguriert werden (nicht in OpenAPI)
+- ✅ Preflight-Caching reduziert OPTIONS Requests (max_age)
+- ✅ Wildcard `*` wird unterstützt (aber nicht mit Credentials!)
+
+**Best Practices:**
+1. Verwende Mock Integration für OPTIONS Methods (kein Backend-Call nötig)
+2. Konfiguriere Gateway Responses für 4XX/5XX CORS Headers (wichtig für Auth-Fehler!)
+3. Setze max_age auf 86400 (24 Stunden) für Preflight-Caching
+4. Verwende spezifische Origins statt Wildcard `*` mit Credentials
+5. Teste Preflight mit `curl -X OPTIONS -v` vor Production-Deployment
+6. Prüfe CloudWatch Logs für CORS-Fehler (OPTIONS 403, 401)
+
+---
+
 ## Häufige Anwendungsfälle
 
 ### 1. Single-Page Application (SPA)

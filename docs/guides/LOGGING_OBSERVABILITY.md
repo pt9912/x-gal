@@ -776,6 +776,337 @@ fetch api
 4. **BigQuery** für Long-term Log Storage und Analytics
 5. **Grafana Cloud** für Dashboards und Visualisierung
 
+### AWS API Gateway
+
+AWS API Gateway bietet native Integration mit CloudWatch Logs, CloudWatch Metrics und X-Ray Tracing für vollständige Observability.
+
+**CloudWatch Logs (Access & Execution Logs):**
+- Access Logs: HTTP Request/Response Details (JSON Format)
+- Execution Logs: API Gateway Workflow Details (Debug-Level)
+- Log Format: JSON mit `$context` Variablen
+- Mechanismus: Stage-Level `accessLogSettings` + `methodSettings`
+- CloudWatch Log Groups: Automatisch erstellt oder manuell definiert
+
+**CloudWatch Metrics:**
+- Count: Anzahl API-Requests
+- 4XXError: Client Errors (400-499)
+- 5XXError: Server Errors (500-599)
+- Latency: End-to-End Response Time
+- IntegrationLatency: Backend Response Time (ohne API Gateway Overhead)
+- CacheHitCount / CacheMissCount: API Caching Metriken
+
+**X-Ray Tracing:**
+- Distributed Tracing für gesamten Request-Flow
+- Integration mit Lambda, DynamoDB, SNS, SQS
+- Trace-ID propagiert via `X-Amzn-Trace-Id` Header
+- Service Map für Visualisierung der Microservices-Architektur
+
+**Access Logs Konfiguration:**
+```bash
+# 1. CloudWatch Log Group erstellen
+aws logs create-log-group \
+  --log-group-name /aws/apigateway/my-api
+
+# 2. Log Group ARN abrufen
+LOG_GROUP_ARN=$(aws logs describe-log-groups \
+  --log-group-name-prefix /aws/apigateway/my-api \
+  --query 'logGroups[0].arn' --output text)
+
+# 3. Stage mit Access Logs konfigurieren
+aws apigateway update-stage \
+  --rest-api-id abc123xyz \
+  --stage-name prod \
+  --patch-operations \
+    op=replace,path=/accessLogSettings/destinationArn,value=$LOG_GROUP_ARN \
+    op=replace,path=/accessLogSettings/format,value='$context.requestId $context.status $context.latency'
+```
+
+**JSON Log Format (empfohlen):**
+```bash
+# Vollständiges JSON Format mit allen Context-Variablen
+LOG_FORMAT='{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","path":"$context.path","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength","latency":"$context.responseLatency","integrationLatency":"$context.integrationLatency","userAgent":"$context.identity.userAgent","errorMessage":"$context.error.message"}'
+
+aws apigateway update-stage \
+  --rest-api-id abc123xyz \
+  --stage-name prod \
+  --patch-operations \
+    op=replace,path=/accessLogSettings/format,value="$LOG_FORMAT"
+```
+
+**Execution Logs aktivieren (Debug):**
+```bash
+# Execution Logs für detailliertes Debugging
+aws apigateway update-stage \
+  --rest-api-id abc123xyz \
+  --stage-name prod \
+  --patch-operations \
+    op=replace,path=/*/*/logging/loglevel,value=INFO \
+    op=replace,path=/*/*/logging/dataTrace,value=true
+```
+
+**X-Ray Tracing aktivieren:**
+```bash
+# X-Ray Tracing für Distributed Tracing
+aws apigateway update-stage \
+  --rest-api-id abc123xyz \
+  --stage-name prod \
+  --patch-operations \
+    op=replace,path=/tracingEnabled,value=true
+```
+
+**Logs abfragen mit AWS CLI:**
+```bash
+# Access Logs anzeigen
+aws logs tail /aws/apigateway/my-api --follow
+
+# Filter: Nur Fehler (4xx/5xx)
+aws logs filter-log-events \
+  --log-group-name /aws/apigateway/my-api \
+  --filter-pattern '{ $.status >= 400 }' \
+  --start-time $(date -u -d '1 hour ago' +%s)000
+
+# Filter: Latency > 1 Sekunde
+aws logs filter-log-events \
+  --log-group-name /aws/apigateway/my-api \
+  --filter-pattern '{ $.latency > 1000 }' \
+  --start-time $(date -u -d '1 hour ago' +%s)000
+
+# JSON Parsing mit jq
+aws logs filter-log-events \
+  --log-group-name /aws/apigateway/my-api \
+  --start-time $(date -u -d '1 hour ago' +%s)000 \
+  --output json | jq '.events[] | fromjson | {status, latency, path}'
+```
+
+**CloudWatch Metrics abfragen:**
+```bash
+# Request Count (letzte Stunde)
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ApiGateway \
+  --metric-name Count \
+  --dimensions Name=ApiName,Value=MyAPI \
+  --start-time $(date -u -d '1 hour ago' --iso-8601) \
+  --end-time $(date -u --iso-8601) \
+  --period 300 \
+  --statistics Sum
+
+# Error Rate (4xx + 5xx)
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ApiGateway \
+  --metric-name 4XXError \
+  --dimensions Name=ApiName,Value=MyAPI \
+  --start-time $(date -u -d '1 hour ago' --iso-8601) \
+  --end-time $(date -u --iso-8601) \
+  --period 300 \
+  --statistics Sum
+
+# Latency (Average, P95, P99)
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ApiGateway \
+  --metric-name Latency \
+  --dimensions Name=ApiName,Value=MyAPI \
+  --start-time $(date -u -d '1 hour ago' --iso-8601) \
+  --end-time $(date -u --iso-8601) \
+  --period 300 \
+  --statistics Average,Maximum \
+  --extended-statistics p95,p99
+```
+
+**X-Ray Traces analysieren:**
+```bash
+# Traces abrufen
+aws xray get-trace-summaries \
+  --start-time $(date -u -d '1 hour ago' +%s) \
+  --end-time $(date -u +%s)
+
+# Trace Details
+aws xray batch-get-traces \
+  --trace-ids <trace-id-1> <trace-id-2>
+```
+
+**CloudWatch Insights Queries:**
+```bash
+# CloudWatch Logs Insights Query
+aws logs start-query \
+  --log-group-name /aws/apigateway/my-api \
+  --start-time $(date -u -d '1 hour ago' +%s) \
+  --end-time $(date -u +%s) \
+  --query-string 'fields @timestamp, requestId, status, latency
+| filter status >= 500
+| sort latency desc
+| limit 20'
+
+# Query-Ergebnisse abrufen
+aws logs get-query-results --query-id <query-id>
+```
+
+**CloudWatch Dashboard erstellen:**
+```bash
+# Dashboard JSON Definition
+cat > dashboard.json <<EOF
+{
+  "widgets": [
+    {
+      "type": "metric",
+      "properties": {
+        "metrics": [
+          ["AWS/ApiGateway", "Count", {"stat": "Sum", "label": "Total Requests"}],
+          [".", "4XXError", {"stat": "Sum", "label": "Client Errors"}],
+          [".", "5XXError", {"stat": "Sum", "label": "Server Errors"}]
+        ],
+        "period": 300,
+        "stat": "Sum",
+        "region": "us-east-1",
+        "title": "API Gateway Requests"
+      }
+    },
+    {
+      "type": "metric",
+      "properties": {
+        "metrics": [
+          ["AWS/ApiGateway", "Latency", {"stat": "Average", "label": "Avg Latency"}],
+          ["...", {"stat": "p99", "label": "P99 Latency"}]
+        ],
+        "period": 300,
+        "region": "us-east-1",
+        "title": "API Gateway Latency"
+      }
+    }
+  ]
+}
+EOF
+
+# Dashboard erstellen
+aws cloudwatch put-dashboard \
+  --dashboard-name MyAPI-Dashboard \
+  --dashboard-body file://dashboard.json
+```
+
+**CloudWatch Alarms:**
+```bash
+# Alarm bei hoher Error Rate
+aws cloudwatch put-metric-alarm \
+  --alarm-name "API-High-Error-Rate" \
+  --alarm-description "Alert when error rate > 5%" \
+  --metric-name 5XXError \
+  --namespace AWS/ApiGateway \
+  --statistic Sum \
+  --period 300 \
+  --evaluation-periods 2 \
+  --threshold 50 \
+  --comparison-operator GreaterThanThreshold \
+  --dimensions Name=ApiName,Value=MyAPI \
+  --alarm-actions arn:aws:sns:us-east-1:123456789012:alerts
+
+# Alarm bei hoher Latency
+aws cloudwatch put-metric-alarm \
+  --alarm-name "API-High-Latency" \
+  --alarm-description "Alert when P99 latency > 1s" \
+  --metric-name Latency \
+  --namespace AWS/ApiGateway \
+  --statistic Average \
+  --period 300 \
+  --evaluation-periods 2 \
+  --threshold 1000 \
+  --comparison-operator GreaterThanThreshold \
+  --dimensions Name=ApiName,Value=MyAPI \
+  --alarm-actions arn:aws:sns:us-east-1:123456789012:alerts
+```
+
+**Testing:**
+```bash
+# API Request mit X-Ray Trace-ID
+curl -H "X-Amzn-Trace-Id: Root=1-67a12345-12345678901234567890abcd" \
+  https://abc123.execute-api.us-east-1.amazonaws.com/prod/api/users
+
+# Logs in Echtzeit verfolgen
+aws logs tail /aws/apigateway/my-api --follow --format short
+
+# Metriken live abfragen (alle 30 Sekunden)
+watch -n 30 'aws cloudwatch get-metric-statistics \
+  --namespace AWS/ApiGateway \
+  --metric-name Count \
+  --dimensions Name=ApiName,Value=MyAPI \
+  --start-time $(date -u -d "5 minutes ago" --iso-8601) \
+  --end-time $(date -u --iso-8601) \
+  --period 300 \
+  --statistics Sum'
+```
+
+**AWS API Gateway-spezifische Features:**
+- ✅ CloudWatch Access Logs (JSON Format mit $context Variables)
+- ✅ CloudWatch Execution Logs (Debug-Level API Gateway Workflow)
+- ✅ CloudWatch Metrics (Count, 4XXError, 5XXError, Latency, IntegrationLatency)
+- ✅ X-Ray Distributed Tracing
+- ✅ CloudWatch Insights für Log-Analyse
+- ✅ CloudWatch Dashboards und Alarms
+- ✅ Stage-Level Logging-Konfiguration
+- ✅ Method-Level Logging Override
+
+**Limitierungen:**
+- ⚠️ Access Logs müssen manuell konfiguriert werden (nicht automatisch)
+- ⚠️ CloudWatch Log Groups müssen vorab erstellt werden
+- ⚠️ Log Format ist statisch (keine dynamischen Felder wie bei Lambda)
+- ⚠️ X-Ray Sampling Rate nicht konfigurierbar (1 Request/Second + 5%)
+- ❌ Keine native Log Sampling (alle Requests werden geloggt)
+
+**Complete Observability Setup:**
+```bash
+#!/bin/bash
+# Complete AWS API Gateway Observability Setup
+
+API_ID="abc123xyz"
+STAGE_NAME="prod"
+REGION="us-east-1"
+
+# 1. CloudWatch Log Group erstellen
+aws logs create-log-group \
+  --log-group-name "/aws/apigateway/$API_ID-$STAGE_NAME"
+
+# 2. Log Retention setzen (7 Tage)
+aws logs put-retention-policy \
+  --log-group-name "/aws/apigateway/$API_ID-$STAGE_NAME" \
+  --retention-in-days 7
+
+# 3. Stage mit Access Logs + Execution Logs + X-Ray konfigurieren
+LOG_GROUP_ARN="arn:aws:logs:$REGION:$(aws sts get-caller-identity --query Account --output text):log-group:/aws/apigateway/$API_ID-$STAGE_NAME"
+
+LOG_FORMAT='{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","path":"$context.path","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength","latency":"$context.responseLatency","integrationLatency":"$context.integrationLatency"}'
+
+aws apigateway update-stage \
+  --rest-api-id $API_ID \
+  --stage-name $STAGE_NAME \
+  --patch-operations \
+    op=replace,path=/accessLogSettings/destinationArn,value=$LOG_GROUP_ARN \
+    op=replace,path=/accessLogSettings/format,value="$LOG_FORMAT" \
+    op=replace,path=/tracingEnabled,value=true \
+    op=replace,path=/*/*/logging/loglevel,value=INFO
+
+# 4. CloudWatch Alarms erstellen
+aws cloudwatch put-metric-alarm \
+  --alarm-name "$API_ID-High-Error-Rate" \
+  --metric-name 5XXError \
+  --namespace AWS/ApiGateway \
+  --statistic Sum \
+  --period 300 \
+  --evaluation-periods 2 \
+  --threshold 10 \
+  --comparison-operator GreaterThanThreshold \
+  --dimensions Name=ApiName,Value=$API_ID
+
+echo "Observability setup complete!"
+echo "Access Logs: /aws/apigateway/$API_ID-$STAGE_NAME"
+echo "X-Ray Tracing: Enabled"
+echo "CloudWatch Alarms: Created"
+```
+
+**Hinweis:** AWS API Gateway bietet vollständige Observability mit CloudWatch (Logs + Metrics) und X-Ray (Distributed Tracing). Für Production-Deployments:
+1. **CloudWatch Logs** für Access/Execution Logs
+2. **CloudWatch Metrics** für Monitoring und Alerting
+3. **X-Ray Tracing** für Distributed Tracing
+4. **CloudWatch Insights** für Log-Analyse
+5. **CloudWatch Dashboards** für Visualisierung
+
 ## Häufige Anwendungsfälle
 
 ### 1. Production API mit vollständigem Logging
