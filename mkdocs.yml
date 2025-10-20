@@ -70,6 +70,7 @@ nav:
     - gRPC Transformations: guides/GRPC_TRANSFORMATIONS.md
     - AWS API Gateway: guides/AWS_APIGATEWAY.md
     - Azure API Management: guides/AZURE_APIM.md
+    - GCP API Gateway: guides/GCP_APIGATEWAY.md
     - WebSocket: guides/WEBSOCKET.md
     - Timeout & Retry: guides/TIMEOUT_RETRY.md
   - Config Import & Migration:
@@ -82,6 +83,7 @@ nav:
     - HAProxy Import: import/haproxy.md
     - AWS API Gateway Import: import/aws-apigateway.md
     - Azure APIM Import: import/azure-apim.md
+    - GCP API Gateway Import: import/gcp-apigateway.md
     - Compatibility: import/compatibility.md
   - API-Referenz:
     - CLI: api/CLI_REFERENCE.md

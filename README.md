@@ -14,7 +14,7 @@ Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong
 ## Features
 
 - ✅ **Einheitliche YAML-Konfiguration** für mehrere API-Gateway-Provider
-- ✅ **Unterstützung für 7 Provider:** Envoy, Kong, APISIX, Traefik, Nginx, HAProxy, Azure APIM
+- ✅ **Unterstützung für 9 Provider:** Envoy, Kong, APISIX, Traefik, Nginx, HAProxy, AWS API Gateway, Azure APIM, GCP API Gateway
 - ✅ **Automatische Payload-Transformationsgenerierung**
 - ✅ **REST- und gRPC-Service-Unterstützung**
 - ✅ **Default-Wert-Injektion**
@@ -32,6 +32,8 @@ Definiere deine API-Gateway-Konfiguration einmal und deploye sie auf Envoy, Kong
 - ✅ **Logging & Observability** - Strukturiertes Logging (JSON), Prometheus/OpenTelemetry-Metriken, Log-Sampling, benutzerdefinierte Felder
 - ✅ **gRPC Transformations** (v1.4.0) - Protobuf-basierte Request/Response-Transformationen für gRPC mit Proto-Descriptor-Management (file/inline/url), Trace-ID-Injection, Feld-Manipulation (add/remove/rename), Provider-Support (Envoy, Nginx, APISIX)
 - ✅ **Azure API Management** (v1.4.0) - Cloud Provider Support für Azure APIM mit ARM Template Generation, Policy XML (rate-limit, validate-jwt, headers), Subscription Keys, Azure AD Integration, OpenAPI 3.0 Export
+- ✅ **AWS API Gateway** (v1.4.0) - Cloud Provider Support für AWS API Gateway mit OpenAPI 3.0 Export/Import, x-amazon-apigateway Extensions, Lambda/HTTP_PROXY Integration, Cognito/Lambda Authorizers, API Keys
+- ✅ **GCP API Gateway** (v1.4.0) - Cloud Provider Support für GCP API Gateway mit OpenAPI 2.0 Export/Import, x-google-backend Extensions, JWT Authentication, Cloud Run/Functions Integration, Service Account Auth
 - ✅ **Config-Import** (v1.3.0) - Importiere bestehende Envoy, Kong, APISIX, Traefik, Nginx, HAProxy Configs ins GAL-Format (`gal import-config`)
 - ✅ **Compatibility Checker** (v1.3.0) - Prüfe Provider-Kompatibilität und vergleiche Feature-Unterstützung (`gal check-compatibility`, `gal compare-providers`)
 - ✅ **Migration Assistant** (v1.3.0) - Interaktiver Migrations-Workflow mit Compatibility-Validierung und Migration Reports (`gal migrate`)
