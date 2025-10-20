@@ -67,6 +67,13 @@ services:
         """Test generating config to stdout"""
         result = runner.invoke(cli, ["generate", "-c", config_file])
 
+        if result.exit_code != 0:
+            print(f"\nTest failed with exit code: {result.exit_code}")
+            print(f"Output:\n{result.output}")
+            if result.exception:
+                import traceback
+                traceback.print_exception(type(result.exception), result.exception, result.exception.__traceback__)
+
         assert result.exit_code == 0
         assert "Generating configuration for: envoy" in result.output
         assert "Services: 1" in result.output

@@ -22,7 +22,7 @@ class TestGCPAPIGatewayProvider:
     def test_provider_initialization(self):
         """Test provider can be initialized."""
         provider = GCPAPIGatewayProvider()
-        assert provider.name == "gcp_apigateway"
+        assert provider.name() == "gcp_apigateway"
 
     def test_generate_basic_config(self):
         """Test generating basic OpenAPI 2.0 spec."""
