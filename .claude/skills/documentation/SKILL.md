@@ -380,19 +380,108 @@ Dokumentation Update Checklist:
    - Provider-Guide zur Navigation unter `Features:` hinzufügen
    - Import-Guide zur Navigation unter `Config Import & Migration:` hinzufügen
 
-13. **Alle Feature-Guides aktualisieren** - **KRITISCH!**:
-   - **docs/guides/AUTHENTICATION.md**: Provider-Beispiele hinzufügen
-   - **docs/guides/CORS.md**: Provider-Beispiele hinzufügen
-   - **docs/guides/RATE_LIMITING.md**: Provider-Beispiele hinzufügen
-   - **docs/guides/HEADERS.md**: Provider-Beispiele hinzufügen
-   - **docs/guides/TIMEOUT_RETRY.md**: Provider-Beispiele hinzufügen
-   - **docs/guides/LOGGING_OBSERVABILITY.md**: Provider-Monitoring hinzufügen
-   - **docs/guides/BODY_TRANSFORMATION.md**: Provider-Transformation hinzufügen (falls unterstützt)
-   - **docs/guides/CIRCUIT_BREAKER.md**: Provider-Beispiele hinzufügen (falls unterstützt)
-   - **docs/guides/HEALTH_CHECKS.md**: Provider-Health-Checks hinzufügen (falls unterstützt)
-   - **docs/guides/GRPC_TRANSFORMATIONS.md**: Provider-gRPC-Support hinzufügen (falls unterstützt)
-   - **docs/guides/WEBSOCKET.md**: Provider-WebSocket-Support hinzufügen (falls unterstützt)
-   - Jeder Guide hat eine Provider-Implementierungs-Sektion!
+13. **Alle Feature-Guides aktualisieren** - **KRITISCH & ZEITAUFWÄNDIG!**:
+
+   **WICHTIG:** Jeder Feature-Guide hat eine "Provider-spezifische Implementierungen" Sektion!
+   Für JEDEN neuen Provider muss eine NEUE Untersektion hinzugefügt werden!
+
+   **Format der Provider-Sektion in Feature-Guides:**
+   ```markdown
+   ## Provider-spezifische Implementierungen
+
+   ### Kong
+   [Kong-spezifische Implementation...]
+
+   ### APISIX
+   [APISIX-spezifische Implementation...]
+
+   ### GCP API Gateway  ← NEU HINZUFÜGEN!
+
+   GCP API Gateway implementiert [Feature] mit [Mechanismus].
+
+   **[Feature-Typ]:**
+   - Mechanismus: [x-google-* Extension / OpenAPI 2.0 / etc.]
+   - Features: [Spezifische Features]
+   - Hinweis: [GCP-spezifische Limitierungen]
+
+   **Generiertes Config-Beispiel:**
+   ```yaml
+   swagger: "2.0"
+   # ... OpenAPI 2.0 Beispiel
+   ```
+
+   **Deployment:**
+   ```bash
+   gcloud api-gateway apis create API_ID ...
+   ```
+   ```
+
+   **Feature-Guides die aktualisiert werden müssen:**
+
+   - **docs/guides/AUTHENTICATION.md**:
+     * Füge "### GCP API Gateway" Sektion nach anderen Providern hinzu
+     * Dokumentiere JWT Authentication (x-google-issuer, x-google-jwks_uri)
+     * Dokumentiere API Key Support (falls implementiert)
+     * Zeige OpenAPI 2.0 securityDefinitions Beispiel
+     * Zeige gcloud Deployment-Befehle
+
+   - **docs/guides/CORS.md**:
+     * Füge "### GCP API Gateway" Sektion hinzu
+     * Dokumentiere OPTIONS Methods für CORS Preflight
+     * Zeige Access-Control-* Headers in Responses
+     * Zeige cors_allow_origins, cors_allow_methods Config
+
+   - **docs/guides/RATE_LIMITING.md**:
+     * Füge "### GCP API Gateway" Sektion hinzu
+     * Dokumentiere GCP API Gateway Quotas & Rate Limits
+     * Zeige Cloud Endpoints Quota-Konfiguration (falls unterstützt)
+     * Oder: Dokumentiere "Nicht nativ unterstützt, nutze Backend-Rate-Limiting"
+
+   - **docs/guides/HEADERS.md**:
+     * Füge "### GCP API Gateway" Sektion hinzu
+     * Dokumentiere X-Forwarded-* Headers
+     * Dokumentiere Custom Header Injection (falls unterstützt)
+     * Zeige Backend-Header-Transformation
+
+   - **docs/guides/TIMEOUT_RETRY.md**:
+     * Füge "### GCP API Gateway" Sektion hinzu
+     * Dokumentiere backend_deadline Parameter
+     * Dokumentiere Timeout-Konfiguration in x-google-backend
+     * Zeige Retry-Strategien (falls unterstützt)
+
+   - **docs/guides/LOGGING_OBSERVABILITY.md**:
+     * Füge "### GCP API Gateway" Sektion hinzu
+     * Dokumentiere Cloud Logging Integration
+     * Dokumentiere Cloud Monitoring Metrics
+     * Dokumentiere Cloud Trace für Distributed Tracing
+     * Zeige Log-Analyse-Beispiele
+
+   - **docs/guides/BODY_TRANSFORMATION.md** (falls unterstützt):
+     * Füge "### GCP API Gateway" Sektion hinzu ODER
+     * Dokumentiere "Nicht unterstützt - nutze Backend-Transformation"
+
+   - **docs/guides/CIRCUIT_BREAKER.md** (falls unterstützt):
+     * Füge "### GCP API Gateway" Sektion hinzu ODER
+     * Dokumentiere "Nicht nativ unterstützt - nutze Backend Circuit Breaker"
+
+   - **docs/guides/HEALTH_CHECKS.md** (falls unterstützt):
+     * Füge "### GCP API Gateway" Sektion hinzu
+     * Dokumentiere Backend Health Checks (falls unterstützt)
+     * Oder: Dokumentiere Cloud Load Balancer Health Checks
+
+   - **docs/guides/GRPC_TRANSFORMATIONS.md** (falls unterstützt):
+     * Füge "### GCP API Gateway" Sektion hinzu
+     * Dokumentiere gRPC-JSON Transcoding (falls unterstützt)
+
+   - **docs/guides/WEBSOCKET.md** (falls unterstützt):
+     * Füge "### GCP API Gateway" Sektion hinzu
+     * Dokumentiere WebSocket-Support (falls unterstützt)
+
+   **Für jeden Guide:**
+   - Suche nach "## Provider-spezifische Implementierungen"
+   - Füge neue "### [Provider-Name]" Sektion hinzu
+   - Format: Beschreibung → Features → Generiertes Config-Beispiel → Deployment
+   - Sortierung: Alphabetisch ODER nach Reihenfolge der bestehenden Provider
 
 14. **docs/import/migration.md**:
    - Provider zur Migration-Matrix hinzufügen
