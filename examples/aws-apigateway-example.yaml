@@ -1,0 +1,356 @@
+# AWS API Gateway Configuration Examples
+# Version: 1.4.0
+# Date: 2025-10-20
+# Description: Comprehensive examples for AWS API Gateway provider
+
+# ==============================================================================
+# Example 1: Basic HTTP Proxy (Public API)
+# ==============================================================================
+# Use Case: Simple REST API with HTTP backend
+# Integration: HTTP_PROXY (direct proxy to backend)
+# Security: Public (no authentication)
+---
+version: "1.0"
+provider: aws_apigateway
+
+global_config:
+  aws_apigateway:
+    api_name: "PetStore-API"
+    api_description: "Pet Store REST API"
+    endpoint_type: "REGIONAL"
+    stage_name: "prod"
+    integration_type: "HTTP_PROXY"
+    cors_enabled: true
+
+services:
+  - name: petstore
+    type: rest
+    protocol: https
+    upstream:
+      host: petstore.example.com
+      port: 443
+    routes:
+      - path_prefix: /pets
+        methods:
+          - GET
+          - POST
+      - path_prefix: /pets/{id}
+        methods:
+          - GET
+          - PUT
+          - DELETE
+
+# ==============================================================================
+# Example 2: Lambda Integration with API Keys
+# ==============================================================================
+# Use Case: Serverless API with Lambda functions
+# Integration: AWS_PROXY (Lambda)
+# Security: API Keys required
+---
+version: "1.0"
+provider: aws_apigateway
+
+global_config:
+  aws_apigateway:
+    api_name: "Serverless-API"
+    api_description: "Serverless Lambda API"
+    endpoint_type: "REGIONAL"
+    stage_name: "prod"
+    integration_type: "AWS_PROXY"
+    lambda_function_arn: "arn:aws:lambda:us-east-1:123456789012:function:my-function"
+    api_key_required: true
+    api_key_source: "HEADER"
+    cors_enabled: true
+
+services:
+  - name: user_service
+    type: rest
+    protocol: https
+    upstream:
+      host: lambda  # Placeholder for Lambda
+      port: 443
+    routes:
+      - path_prefix: /users
+        methods:
+          - GET
+          - POST
+      - path_prefix: /users/{id}
+        methods:
+          - GET
+          - PUT
+          - DELETE
+
+# ==============================================================================
+# Example 3: Cognito User Pool Authorization
+# ==============================================================================
+# Use Case: B2C API with user authentication
+# Integration: HTTP_PROXY
+# Security: AWS Cognito User Pools (JWT tokens)
+---
+version: "1.0"
+provider: aws_apigateway
+
+global_config:
+  aws_apigateway:
+    api_name: "B2C-API"
+    api_description: "B2C API with Cognito Auth"
+    endpoint_type: "REGIONAL"
+    stage_name: "prod"
+    integration_type: "HTTP_PROXY"
+    authorizer_type: "cognito"
+    cognito_user_pool_arns:
+      - "arn:aws:cognito-idp:us-east-1:123456789012:userpool/us-east-1_AbCdEfGhI"
+    cors_enabled: true
+
+  authentication:
+    type: jwt
+    jwt:
+      issuer: "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_AbCdEfGhI"
+      audience: "my-app-client-id"
+
+services:
+  - name: user_profile
+    type: rest
+    protocol: https
+    upstream:
+      host: backend.example.com
+      port: 443
+    routes:
+      - path_prefix: /profile
+        methods:
+          - GET
+          - PUT
+        authentication:
+          type: jwt
+          jwt:
+            issuer: "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_AbCdEfGhI"
+            audience: "my-app-client-id"
+
+# ==============================================================================
+# Example 4: Lambda Authorizer (Custom Authorization)
+# ==============================================================================
+# Use Case: Custom authorization logic via Lambda
+# Integration: HTTP_PROXY
+# Security: Lambda Authorizer (Token-based)
+---
+version: "1.0"
+provider: aws_apigateway
+
+global_config:
+  aws_apigateway:
+    api_name: "Custom-Auth-API"
+    api_description: "API with custom Lambda authorizer"
+    endpoint_type: "REGIONAL"
+    stage_name: "prod"
+    integration_type: "HTTP_PROXY"
+    authorizer_type: "lambda"
+    lambda_authorizer_arn: "arn:aws:lambda:us-east-1:123456789012:function:my-authorizer"
+    lambda_authorizer_ttl: 300
+    cors_enabled: true
+
+services:
+  - name: protected_api
+    type: rest
+    protocol: https
+    upstream:
+      host: api.example.com
+      port: 443
+    routes:
+      - path_prefix: /protected
+        methods:
+          - GET
+          - POST
+        authentication:
+          type: jwt  # Lambda authorizer validates JWT
+          jwt:
+            issuer: "https://auth.example.com"
+            audience: "my-api"
+
+# ==============================================================================
+# Example 5: Multi-Backend with Rate Limiting
+# ==============================================================================
+# Use Case: Multiple microservices behind one API Gateway
+# Integration: HTTP_PROXY
+# Features: Rate limiting, CORS, API Keys
+---
+version: "1.0"
+provider: aws_apigateway
+
+global_config:
+  aws_apigateway:
+    api_name: "Microservices-Gateway"
+    api_description: "API Gateway for Microservices"
+    endpoint_type: "REGIONAL"
+    stage_name: "prod"
+    integration_type: "HTTP_PROXY"
+    api_key_required: true
+    cors_enabled: true
+    cors_allow_origins:
+      - "https://app.example.com"
+      - "https://admin.example.com"
+    cors_allow_methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - OPTIONS
+    cors_allow_headers:
+      - Content-Type
+      - Authorization
+      - X-Api-Key
+
+  rate_limiting:
+    requests_per_second: 100
+    burst: 200
+
+services:
+  - name: user_service
+    type: rest
+    protocol: https
+    upstream:
+      host: users.internal.example.com
+      port: 443
+    routes:
+      - path_prefix: /api/users
+        methods:
+          - GET
+          - POST
+      - path_prefix: /api/users/{id}
+        methods:
+          - GET
+          - PUT
+          - DELETE
+
+  - name: order_service
+    type: rest
+    protocol: https
+    upstream:
+      host: orders.internal.example.com
+      port: 443
+    routes:
+      - path_prefix: /api/orders
+        methods:
+          - GET
+          - POST
+      - path_prefix: /api/orders/{id}
+        methods:
+          - GET
+          - PUT
+          - DELETE
+
+  - name: product_service
+    type: rest
+    protocol: https
+    upstream:
+      host: products.internal.example.com
+      port: 443
+    routes:
+      - path_prefix: /api/products
+        methods:
+          - GET
+          - POST
+      - path_prefix: /api/products/{id}
+        methods:
+          - GET
+          - PUT
+          - DELETE
+
+# ==============================================================================
+# Example 6: EDGE Endpoint with Global Distribution
+# ==============================================================================
+# Use Case: Global API with CloudFront distribution
+# Integration: HTTP_PROXY
+# Endpoint: EDGE (global via CloudFront)
+---
+version: "1.0"
+provider: aws_apigateway
+
+global_config:
+  aws_apigateway:
+    api_name: "Global-API"
+    api_description: "Global API via CloudFront"
+    endpoint_type: "EDGE"  # CloudFront distribution
+    stage_name: "prod"
+    integration_type: "HTTP_PROXY"
+    integration_timeout_ms: 29000
+    cors_enabled: true
+
+services:
+  - name: global_service
+    type: rest
+    protocol: https
+    upstream:
+      host: api.global.example.com
+      port: 443
+    routes:
+      - path_prefix: /api
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+
+# ==============================================================================
+# Example 7: Mock Integration (Development/Testing)
+# ==============================================================================
+# Use Case: Mock API for frontend development
+# Integration: MOCK
+# Security: None (development only)
+---
+version: "1.0"
+provider: aws_apigateway
+
+global_config:
+  aws_apigateway:
+    api_name: "Mock-API"
+    api_description: "Mock API for testing"
+    endpoint_type: "REGIONAL"
+    stage_name: "dev"
+    integration_type: "MOCK"
+    cors_enabled: true
+
+services:
+  - name: mock_service
+    type: rest
+    protocol: https
+    upstream:
+      host: mock
+      port: 443
+    routes:
+      - path_prefix: /users
+        methods:
+          - GET
+          - POST
+      - path_prefix: /products
+        methods:
+          - GET
+          - POST
+
+# ==============================================================================
+# Provider-Specific Features
+# ==============================================================================
+# AWS API Gateway Features:
+# - Integration Types: HTTP_PROXY, AWS_PROXY (Lambda), MOCK
+# - Authorizers: Lambda, Cognito User Pools, IAM
+# - API Keys: Header-based (x-api-key)
+# - CORS: Automatic OPTIONS method generation
+# - Rate Limiting: Via Usage Plans (configured separately)
+# - Deployment: OpenAPI 3.0 import via AWS Console/CLI
+# - Monitoring: CloudWatch integration automatic
+#
+# Limitations (v1.4.0):
+# - No VTL (Velocity Template Language) templates
+# - No request/response mapping templates
+# - No WAF integration
+# - No private API configuration
+# - Usage Plans must be configured separately
+#
+# Deployment:
+# 1. Generate OpenAPI spec: gal generate -c config.yaml -p aws_apigateway -o api.json
+# 2. Import to AWS:
+#    aws apigateway import-rest-api --body file://api.json
+# 3. Create deployment:
+#    aws apigateway create-deployment --rest-api-id <api-id> --stage-name prod
+# 4. (Optional) Configure Usage Plans for rate limiting
+#
+# For more details, see: docs/guides/AWS_APIGATEWAY.md

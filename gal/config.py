@@ -975,6 +975,89 @@ class AzureAPIMConfig:
 
 
 @dataclass
+class AWSAPIGatewayConfig:
+    """AWS API Gateway specific configuration.
+
+    Configuration for AWS API Gateway REST API provider, including
+    integration types, authorizers, and stage settings.
+
+    Attributes:
+        api_name: API Gateway API name (default: "GAL-API")
+        api_description: API description
+        endpoint_type: Endpoint type - REGIONAL, EDGE, or PRIVATE (default: "REGIONAL")
+        stage_name: Deployment stage name (default: "prod")
+        stage_description: Stage description
+        integration_type: Backend integration type (default: "HTTP_PROXY")
+        integration_timeout_ms: Integration timeout in milliseconds (default: 29000, max: 29000)
+        lambda_function_arn: Lambda function ARN (for AWS_PROXY integration)
+        lambda_invoke_role_arn: IAM role ARN for Lambda invocation
+        authorizer_type: Authorizer type - "lambda", "cognito", "iam", or None
+        lambda_authorizer_arn: Lambda authorizer function ARN
+        lambda_authorizer_ttl: Authorizer result TTL in seconds (default: 300)
+        cognito_user_pool_arns: List of Cognito User Pool ARNs
+        api_key_required: Require API key for requests (default: False)
+        api_key_source: API key source - HEADER or AUTHORIZER (default: "HEADER")
+        cors_enabled: Enable CORS (default: True)
+        cors_allow_origins: Allowed origins for CORS (default: ["*"])
+        cors_allow_methods: Allowed HTTP methods for CORS
+        cors_allow_headers: Allowed headers for CORS
+        openapi_version: OpenAPI specification version (default: "3.0.1")
+        export_format: Export format - oas30 (OpenAPI 3.0) (default: "oas30")
+
+    Example:
+        >>> aws_config = AWSAPIGatewayConfig(
+        ...     api_name="UserAPI",
+        ...     stage_name="prod",
+        ...     integration_type="HTTP_PROXY",
+        ...     authorizer_type="cognito"
+        ... )
+        >>> aws_config.endpoint_type
+        'REGIONAL'
+    """
+
+    # API Configuration
+    api_name: str = "GAL-API"
+    api_description: str = "API managed by GAL"
+    endpoint_type: str = "REGIONAL"  # REGIONAL, EDGE, PRIVATE
+
+    # Stage Configuration
+    stage_name: str = "prod"
+    stage_description: str = ""
+
+    # Integration Configuration
+    integration_type: str = "HTTP_PROXY"  # HTTP_PROXY, AWS_PROXY, MOCK
+    integration_timeout_ms: int = 29000  # Max 29 seconds
+
+    # Lambda Integration (if integration_type == "AWS_PROXY")
+    lambda_function_arn: Optional[str] = None
+    lambda_invoke_role_arn: Optional[str] = None
+
+    # Authorization
+    authorizer_type: Optional[str] = None  # "lambda", "cognito", "iam"
+    lambda_authorizer_arn: Optional[str] = None
+    lambda_authorizer_ttl: int = 300  # seconds
+    cognito_user_pool_arns: List[str] = field(default_factory=list)
+
+    # API Keys
+    api_key_required: bool = False
+    api_key_source: str = "HEADER"  # HEADER, AUTHORIZER
+
+    # CORS
+    cors_enabled: bool = True
+    cors_allow_origins: List[str] = field(default_factory=lambda: ["*"])
+    cors_allow_methods: List[str] = field(
+        default_factory=lambda: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    )
+    cors_allow_headers: List[str] = field(
+        default_factory=lambda: ["Content-Type", "Authorization", "X-Api-Key"]
+    )
+
+    # OpenAPI Export
+    openapi_version: str = "3.0.1"
+    export_format: str = "oas30"  # oas30 (OpenAPI 3.0)
+
+
+@dataclass
 class Service:
     """Backend service configuration.
 
