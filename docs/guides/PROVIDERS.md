@@ -2,7 +2,7 @@
 
 ## Übersicht
 
-GAL unterstützt neun führende API-Gateway-Provider - sechs selbst-gehostete und drei Cloud-native Provider. Jeder Provider hat spezifische Eigenschaften, Stärken und ideale Use Cases.
+GAL unterstützt zehn führende API-Gateway-Provider - sechs selbst-gehostete und vier Cloud-native Provider. Jeder Provider hat spezifische Eigenschaften, Stärken und ideale Use Cases.
 
 ## Unterstützte Provider
 
@@ -16,6 +16,7 @@ GAL unterstützt neun führende API-Gateway-Provider - sechs selbst-gehostete un
 | HAProxy | CFG | ACLs + Lua | ✅ | ✅ | ✅ File + reload | Self-Hosted |
 | **Azure APIM** | **ARM+JSON** | **Policy XML** | **✅** | **✅** | **✅ ARM Deploy** | **Azure Cloud** |
 | **GCP API Gateway** | **OpenAPI 2.0** | **Backend-basiert** | **⚠️** | **✅** | **✅ gcloud CLI** | **Google Cloud** |
+| **AWS API Gateway** | **OpenAPI 3.0** | **VTL Mapping** | **⚠️** | **✅** | **✅ AWS CLI** | **AWS Cloud** |
 
 ## Envoy Proxy
 
@@ -1186,6 +1187,291 @@ gcloud logging read "resource.type=api AND httpRequest.latency>1s" \
 
 ---
 
+## AWS API Gateway (Cloud Provider)
+
+### Übersicht
+
+AWS API Gateway ist ein vollständig verwalteter Service von Amazon Web Services für REST APIs, HTTP APIs und WebSocket APIs.
+
+> **💡 API-Referenz:** Für technische Details zur Implementierung siehe `gal/providers/aws_apigateway.py:12-68` (AWSAPIGatewayProvider Klassen-Docstring)
+
+**Stärken:**
+- Vollständig verwaltet (AWS-managed)
+- Serverless-Integration (AWS Lambda)
+- OpenAPI 3.0 basiert
+- Automatische Skalierung
+- Native AWS-Services-Integration (Cognito, IAM, CloudWatch, WAF)
+- Multi-Region mit CloudFront (EDGE Endpoints)
+
+**Ideal für:**
+- AWS-basierte Microservices
+- Serverless Architectures (Lambda)
+- Pay-per-Use-Modelle
+- Multi-Region Deployments
+- Enterprise APIs mit Cognito/IAM
+
+### GAL-Generierung
+
+**Output:** `api.json` (OpenAPI 3.0 with x-amazon-apigateway extensions)
+
+**Struktur:**
+
+```json
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "My API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/users": {
+      "get": {
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "GET",
+          "uri": "https://backend.example.com/users"
+        }
+      }
+    }
+  }
+}
+```
+
+### Transformationen
+
+AWS API Gateway nutzt **VTL (Velocity Template Language)** für Request/Response Transformationen:
+
+```json
+{
+  "x-amazon-apigateway-integration": {
+    "type": "aws_proxy",
+    "uri": "arn:aws:apigateway:region:lambda:path/...",
+    "requestTemplates": {
+      "application/json": "{\"user_id\": \"$input.params('id')\"}"
+    },
+    "responses": {
+      "default": {
+        "statusCode": "200",
+        "responseTemplates": {
+          "application/json": "{\"result\": $input.json('$.body')}"
+        }
+      }
+    }
+  }
+}
+```
+
+**Features:**
+- VTL-basierte Request/Response Mapping
+- Lambda Proxy Integration (automatisches Mapping)
+- HTTP Proxy Integration
+- Mock Integration für Testing
+
+### gRPC-Support
+
+⚠️ **Eingeschränkt:** gRPC wird nicht nativ unterstützt.
+
+**Alternativen:**
+- REST-to-gRPC Translation via Lambda
+- HTTP/2 for REST APIs (aber kein natives gRPC)
+- AWS App Mesh für gRPC Service Mesh
+
+### Authentifizierung
+
+AWS API Gateway unterstützt **vier Authentication-Mechanismen**:
+
+**1. API Keys (Subscription-basiert):**
+```json
+{
+  "components": {
+    "securitySchemes": {
+      "api_key": {
+        "type": "apiKey",
+        "name": "x-api-key",
+        "in": "header"
+      }
+    }
+  }
+}
+```
+
+**2. Lambda Authorizer (Custom JWT):**
+```json
+{
+  "x-amazon-apigateway-authorizer": {
+    "type": "token",
+    "authorizerUri": "arn:aws:apigateway:...:lambda:...",
+    "authorizerResultTtlInSeconds": 300
+  }
+}
+```
+
+**3. Cognito User Pools (OAuth2/OIDC):**
+```json
+{
+  "x-amazon-apigateway-authorizer": {
+    "type": "cognito_user_pools",
+    "providerARNs": [
+      "arn:aws:cognito-idp:us-east-1:...:userpool/..."
+    ]
+  }
+}
+```
+
+**4. IAM Authorization (AWS Signature v4):**
+- Für Service-to-Service Communication
+- AWS Credentials (Access Key + Secret Key)
+- Temporary Credentials via STS
+
+### Rate Limiting
+
+AWS API Gateway implementiert Rate Limiting via **Usage Plans**:
+
+```bash
+# Usage Plan erstellen
+aws apigateway create-usage-plan \
+  --name "BasicPlan" \
+  --throttle burstLimit=1000,rateLimit=500 \
+  --quota limit=100000,period=MONTH
+
+# API Key zu Usage Plan hinzufügen
+aws apigateway create-usage-plan-key \
+  --usage-plan-id <plan-id> \
+  --key-id <key-id> \
+  --key-type API_KEY
+```
+
+**Features:**
+- **Throttling:** Requests per second (Rate Limit + Burst Limit)
+- **Quotas:** Daily/Weekly/Monthly Limits
+- **Multi-Tier:** Free/Basic/Premium Plans
+- **Per API Key:** Individuelle Limits pro Subscription
+
+**Hinweis:** Rate Limiting wird NICHT in OpenAPI konfiguriert, sondern via AWS CLI/Console!
+
+### Circuit Breaker
+
+❌ **Nicht nativ unterstützt.**
+
+**Workarounds:**
+- Lambda Function mit Circuit Breaker Pattern
+- DynamoDB für Circuit Breaker State
+- AWS Step Functions für komplexe Retry-Logic
+
+### Health Checks
+
+⚠️ **Indirekt via Backend Health Checks:**
+
+- **Lambda:** Health Check via CloudWatch Alarms
+- **HTTP Backend:** Health Check via Route 53 Health Checks
+- **ECS/EKS:** Target Group Health Checks
+
+### Deployment-Befehle
+
+```bash
+# OpenAPI generieren
+gal generate -c config.yaml -p aws_apigateway -o api.json
+
+# API erstellen
+API_ID=$(aws apigateway import-rest-api \
+  --body file://api.json \
+  --query 'id' --output text)
+
+# API Key erstellen (für API Key Authentication)
+aws apigateway create-api-key \
+  --name "MyAppKey" \
+  --enabled
+
+# Usage Plan erstellen
+aws apigateway create-usage-plan \
+  --name "BasicPlan" \
+  --throttle burstLimit=1000,rateLimit=500 \
+  --api-stages apiId=$API_ID,stage=prod
+
+# Deployment erstellen
+aws apigateway create-deployment \
+  --rest-api-id $API_ID \
+  --stage-name prod
+
+# API URL anzeigen
+echo "https://${API_ID}.execute-api.us-east-1.amazonaws.com/prod"
+```
+
+### Monitoring & Observability
+
+**CloudWatch Logs:**
+```bash
+# CloudWatch Logs aktivieren
+aws apigateway update-stage \
+  --rest-api-id $API_ID \
+  --stage-name prod \
+  --patch-operations \
+    op=replace,path=/accessLogSettings/destinationArn,value=arn:aws:logs:... \
+    op=replace,path=/accessLogSettings/format,value='$context.requestId'
+```
+
+**CloudWatch Metrics:**
+- **Count:** Anzahl API Requests
+- **4XXError:** Client Errors (401, 403, 429)
+- **5XXError:** Server Errors (500, 502, 503)
+- **Latency:** Gesamte Response-Zeit
+- **IntegrationLatency:** Backend-Response-Zeit
+
+**X-Ray Tracing:**
+```bash
+# X-Ray aktivieren
+aws apigateway update-stage \
+  --rest-api-id $API_ID \
+  --stage-name prod \
+  --patch-operations op=replace,path=/tracingEnabled,value=true
+```
+
+### Best Practices
+
+**1. API-Design:**
+- ✅ Verwende REST-konforme Resource-Namen (`/users`, `/products`)
+- ✅ Versioniere deine API (`/v1/users`, `/v2/users`)
+- ✅ Implementiere Health Check Endpoints (`/health`)
+
+**2. Security:**
+- ✅ HTTPS Only (Standard)
+- ✅ API Keys für öffentliche APIs
+- ✅ Cognito/Lambda Authorizer für User-APIs
+- ✅ IAM Authorization für Service-to-Service
+- ✅ AWS WAF für DDoS-Schutz
+
+**3. Cost Optimization:**
+- ✅ Verwende HTTP APIs statt REST APIs (günstiger: $1.00/Million vs $3.50/Million)
+- ✅ Nutze Caching für Read-Heavy APIs
+- ✅ Implementiere CloudFront für EDGE Endpoints (reduziert Data Transfer Costs)
+
+**4. Performance:**
+- ✅ Setze Integration Timeout auf 29000ms (Maximum)
+- ✅ Nutze Lambda Provisioned Concurrency für Cold Start Reduction
+- ✅ Aktiviere Response Caching (TTL: 300-3600s)
+
+**5. Monitoring:**
+- ✅ Aktiviere CloudWatch Logs (Access & Execution Logs)
+- ✅ Aktiviere X-Ray Tracing für Distributed Tracing
+- ✅ Erstelle CloudWatch Alarms für 5XXError Rate
+
+### Limitierungen
+
+- ⚠️ **29 Sekunden Timeout:** Integration Timeout max 29000ms (Hard Limit!)
+- ⚠️ **Payload Size:** Max 10MB Request/Response Payload
+- ⚠️ **Rate Limiting:** Nur via Usage Plans (nicht in OpenAPI)
+- ❌ **gRPC:** Kein natives gRPC-Support
+- ❌ **WebSocket:** Nur via separate WebSocket API (nicht REST API)
+- ❌ **Circuit Breaker:** Nicht nativ unterstützt
+- ⚠️ **Cold Start:** Lambda Integration hat Cold Start Latenz
+
+**Workarounds:**
+- **Long-Running Tasks:** SQS + Lambda + Polling Pattern
+- **Large Payloads:** S3 Pre-Signed URLs
+- **gRPC:** REST-to-gRPC Translation via Lambda
+
+---
+
 ## Provider-Vergleich
 
 ### Performance
@@ -1200,21 +1486,22 @@ gcloud logging read "resource.type=api AND httpRequest.latency>1s" \
 | Traefik | ~40k | 3ms | 20ms | Self-Hosted |
 | Azure APIM | Varies* | Varies* | Varies* | Azure Cloud |
 | GCP API Gateway | Varies* | Varies* | Varies* | Google Cloud |
+| AWS API Gateway | Varies* | Varies* | Varies* | AWS Cloud |
 
-*Benchmark-Werte sind Richtwerte und variieren je nach Setup. Azure APIM Performance hängt von SKU ab (Developer < Basic < Standard < Premium). GCP API Gateway Performance variiert je nach Region und Backend-Typ.*
+*Benchmark-Werte sind Richtwerte und variieren je nach Setup. Azure APIM Performance hängt von SKU ab (Developer < Basic < Standard < Premium). GCP/AWS API Gateway Performance variiert je nach Region, Endpoint-Typ (REGIONAL/EDGE) und Backend-Typ.*
 
 ### Transformations-Vergleich
 
-| Feature | Envoy | Kong | APISIX | Traefik | Nginx | HAProxy | Azure APIM | GCP API Gateway |
-|---------|-------|------|--------|---------|-------|---------|------------|-----------------|
-| Defaults | ✅ Lua | ✅ Headers | ✅ Lua | ⚠️ Plugins | ✅ ngx | ⚠️ Limited | ✅ Policy XML | ❌ Backend |
-| Computed Fields | ✅ Lua | ❌ | ✅ Lua | ❌ | ✅ ngx | ❌ | ⚠️ Limited | ❌ Backend |
-| UUID Generation | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ⚠️ Custom | ❌ Backend |
-| Timestamp | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ⚠️ Custom | ❌ Backend |
-| Validation | ⚠️ Limited | ⚠️ Limited | ✅ Full | ❌ | ⚠️ Limited | ⚠️ Limited | ✅ Policy | ⚠️ OpenAPI |
-| Rate Limiting | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Built-in | ❌ Backend |
-| JWT Auth | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ Azure AD | ✅ Google JWT |
-| Header Manipulation | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Policy | ⚠️ Limited |
+| Feature | Envoy | Kong | APISIX | Traefik | Nginx | HAProxy | Azure APIM | GCP API Gateway | AWS API Gateway |
+|---------|-------|------|--------|---------|-------|---------|------------|-----------------|-----------------|
+| Defaults | ✅ Lua | ✅ Headers | ✅ Lua | ⚠️ Plugins | ✅ ngx | ⚠️ Limited | ✅ Policy XML | ❌ Backend | ⚠️ VTL |
+| Computed Fields | ✅ Lua | ❌ | ✅ Lua | ❌ | ✅ ngx | ❌ | ⚠️ Limited | ❌ Backend | ⚠️ VTL |
+| UUID Generation | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ⚠️ Custom | ❌ Backend | ⚠️ Lambda |
+| Timestamp | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ⚠️ Custom | ❌ Backend | ⚠️ Lambda |
+| Validation | ⚠️ Limited | ⚠️ Limited | ✅ Full | ❌ | ⚠️ Limited | ⚠️ Limited | ✅ Policy | ⚠️ OpenAPI | ⚠️ OpenAPI |
+| Rate Limiting | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Built-in | ❌ Backend | ✅ Usage Plans |
+| JWT Auth | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ Azure AD | ✅ Google JWT | ✅ Cognito/Lambda |
+| Header Manipulation | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Policy | ⚠️ Limited | ✅ Mapping |
 
 ### Use Case Matrix
 
@@ -1228,9 +1515,11 @@ gcloud logging read "resource.type=api AND httpRequest.latency>1s" \
 | Multi-Cloud | Kong, APISIX | Provider-agnostic |
 | **Azure Cloud-Native** | **Azure APIM** | **Fully Managed, Azure AD** |
 | **GCP Cloud-Native** | **GCP API Gateway** | **Serverless, Cloud Run/Functions** |
+| **AWS Cloud-Native** | **AWS API Gateway** | **Lambda, Cognito, CloudWatch** |
 | **Developer Portal** | **Azure APIM, Kong** | **Built-in Portal** |
 | **Hybrid Cloud** | **Azure APIM, Kong** | **On-Prem + Cloud** |
-| **Serverless Backends** | **GCP API Gateway** | **Cloud Run, Cloud Functions** |
+| **Serverless Backends** | **GCP API Gateway, AWS API Gateway** | **Cloud Run/Functions, Lambda** |
+| **Pay-per-Request** | **AWS API Gateway** | **No upfront costs, scale to zero** |
 
 ## Provider-Wechsel
 
