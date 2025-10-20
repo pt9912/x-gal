@@ -88,7 +88,9 @@ gal generate -c config.yaml -p kong
 | [APISIX](guides/APISIX.md) | :white_check_mark: | JSON/YAML | Lua Serverless | :white_check_mark: / :white_check_mark: | Self-Hosted |
 | [Traefik](guides/TRAEFIK.md) | :white_check_mark: | YAML/TOML | Middleware | :white_check_mark: / :white_check_mark: | Self-Hosted |
 | [HAProxy](guides/HAPROXY.md) | :white_check_mark: | haproxy.cfg | Lua | :warning: / :white_check_mark: | Self-Hosted |
-| **[Azure APIM](guides/AZURE_APIM.md)** | :white_check_mark: | **ARM/JSON** | **Policy XML** | :x: / :white_check_mark: | **Azure Cloud** |
+| **[Azure APIM](guides/AZURE_APIM.md)** | :white_check_mark: | **ARM/JSON** | **Policy XML** | :white_check_mark: / :white_check_mark: | **Azure Cloud** |
+
+**Import-Hinweis:** Azure APIM Import erfolgt über **OpenAPI 3.0 Export** (`az apim api export`). ARM Templates werden nicht geparst. Policies (Rate Limiting, etc.) müssen manuell in GAL konfiguriert werden. Siehe [Azure APIM Import Guide](import/azure-apim.md).
 
 ---
 
