@@ -18,7 +18,7 @@ MINIMAL_OPENAPI = """
     "description": "A simple Pet Store API"
   },
   "servers": [
-    {"url": "https://pet store.example.com"}
+    {"url": "https://petstore.example.com"}
   ],
   "paths": {
     "/pets": {
@@ -276,7 +276,7 @@ class TestAzureAPIMProviderImport:
 
         route = service.routes[0]
         assert route.path_prefix == "/pets"
-        assert route.http_methods == ["GET"]
+        assert route.methods == ["GET"]
 
     def test_import_with_apikey(self):
         """Test importing OpenAPI with API Key security."""
@@ -288,7 +288,7 @@ class TestAzureAPIMProviderImport:
 
         route = service.routes[0]
         assert route.path_prefix == "/api/users"
-        assert set(route.http_methods) == {"GET", "POST"}
+        assert set(route.methods) == {"GET", "POST"}
         assert route.authentication is not None
         assert route.authentication.type == "api_key"
         assert route.authentication.api_key.key_name == "Ocp-Apim-Subscription-Key"

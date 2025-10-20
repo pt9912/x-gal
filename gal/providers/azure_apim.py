@@ -153,7 +153,7 @@ class AzureAPIMProvider(Provider):
 
             route = Route(
                 path_prefix=route_data["path"],
-                http_methods=route_data["methods"],
+                methods=route_data["methods"],
                 authentication=authentication,
             )
             routes.append(route)
