@@ -289,52 +289,169 @@ Dokumentation Update Checklist:
 11. **CHANGELOG.md**:
    - Unter "Added" eintragen
 
-### Neuer Provider hinzugefügt (z.B. Nginx)
+### Neuer Provider hinzugefügt (z.B. GCP API Gateway)
 
-1. **Provider-Klasse** (`gal/providers/nginx.py`):
+**WICHTIG:** Bei neuen Providern müssen VIELE Dokumente aktualisiert werden!
+
+1. **Provider-Klasse** (`gal/providers/<provider>.py`):
    - Vollständige Docstrings für Klasse und alle Methoden
    - Dokumentiere Provider-spezifische Besonderheiten
+   - parse() und generate() Methoden dokumentieren
 
-2. **Config-Factory** (`gal/config_factory.py`):
-   - Provider-Registrierung dokumentieren
+2. **Parser-Klasse** (`gal/parsers/<provider>_parser.py`) (falls Import unterstützt):
+   - Vollständige Docstrings für Parser-Klasse
+   - Dokumentiere Import-Format (OpenAPI, Terraform, etc.)
+   - Dokumentiere Limitierungen beim Import
 
-3. **README.md**:
+3. **Config-Modelle** (`gal/config.py`):
+   - Provider-spezifische Config-Klasse dokumentieren (z.B. `GCPAPIGatewayConfig`)
+   - Alle Parameter mit Docstrings versehen
+   - Beispiele in Docstrings
+
+4. **CLI-Integration** (`gal-cli.py`):
+   - Provider in allen Commands registrieren (generate, validate, import, etc.)
+   - Dokumentiere CLI-Verwendung
+
+5. **README.md**:
+   - Provider-Anzahl aktualisieren ("7 Provider" → "9 Provider")
    - Provider zur unterstützten Liste hinzufügen
    - Feature-Matrix für neuen Provider erstellen
    - Installation/Setup-Hinweise
 
-4. **docs/README.md**:
+6. **docs/README.md**:
    - Provider zur Guides-Tabelle hinzufügen
    - Provider zur unterstützten Provider-Tabelle hinzufügen
 
-5. **docs/index.md** (MkDocs Landing Page):
+7. **docs/index.md** (MkDocs Landing Page):
+   - Provider-Anzahl aktualisieren
    - Provider zur Provider-Tabelle hinzufügen
-   - Provider-Guide zu Guides-Navigation hinzufügen
+   - Provider-Guide zu Features-Links hinzufügen
 
-6. **mkdocs.yml**:
-   - Provider-Guide zur Navigation hinzufügen unter `Guides:`
+8. **docs/guides/PROVIDERS.md** - **SEHR WICHTIG!**:
+   - Provider zur Provider-Übersichts-Tabelle hinzufügen
+   - Vollständiger Provider-Abschnitt mit:
+     - Übersicht & Stärken
+     - Ideale Use-Cases
+     - GAL-Generierung (Output-Format & Struktur)
+     - Transformationen (wie Provider Transformationen handhabt)
+     - gRPC-Support (falls vorhanden)
+     - Authentifizierung
+     - Rate Limiting
+     - Circuit Breaker (falls unterstützt)
+     - Health Checks
+     - Deployment-Befehle
+     - Monitoring & Observability
+     - Best Practices
 
-7. **Tests** (`tests/test_nginx.py`):
-   - Vollständige Test-Suite für Provider
+9. **Provider-spezifischer Guide** (`docs/guides/<PROVIDER>.md`):
+   - Umfassender Guide (1000+ Zeilen auf Deutsch!)
+   - Struktur:
+     - Übersicht & Architektur
+     - Schnellstart
+     - Konfigurationsoptionen (alle Parameter)
+     - Provider-spezifische Features
+     - Deployment-Strategien
+     - Import/Export (falls unterstützt)
+     - Authentication/Authorization
+     - CORS Configuration
+     - Multi-Region/Multi-Zone (falls Cloud-Provider)
+     - Migration von/zu anderen Providern
+     - Best Practices
+     - Troubleshooting
+     - Performance & Limits
+     - Security Best Practices
+   - Mermaid-Diagramme wo sinnvoll (Architektur, Request Flow, Deployment)
+
+10. **Import-Guide** (`docs/import/<provider>.md`) (falls Import unterstützt):
+   - Import-Prozess dokumentieren
+   - Feature-Support-Matrix (was wird beim Import unterstützt)
+   - Import-Beispiele (Basic, JWT, CORS, etc.)
+   - Migration-Guides (zu/von anderen Providern)
+   - Limitierungen und Workarounds
+   - Troubleshooting
+
+11. **Beispiel-Konfiguration** (`examples/<provider>-example.yaml`):
+   - 5-15 realistische Szenarien
+   - Provider-spezifische Features zeigen
+   - Jedes Szenario mit Kommentaren
+   - Deployment-Anweisungen
+
+12. **mkdocs.yml** - **2 Stellen aktualisieren!**:
+   - Provider-Guide zur Navigation unter `Features:` hinzufügen
+   - Import-Guide zur Navigation unter `Config Import & Migration:` hinzufügen
+
+13. **Alle Feature-Guides aktualisieren** - **KRITISCH!**:
+   - **docs/guides/AUTHENTICATION.md**: Provider-Beispiele hinzufügen
+   - **docs/guides/CORS.md**: Provider-Beispiele hinzufügen
+   - **docs/guides/RATE_LIMITING.md**: Provider-Beispiele hinzufügen
+   - **docs/guides/HEADERS.md**: Provider-Beispiele hinzufügen
+   - **docs/guides/TIMEOUT_RETRY.md**: Provider-Beispiele hinzufügen
+   - **docs/guides/LOGGING_OBSERVABILITY.md**: Provider-Monitoring hinzufügen
+   - **docs/guides/BODY_TRANSFORMATION.md**: Provider-Transformation hinzufügen (falls unterstützt)
+   - **docs/guides/CIRCUIT_BREAKER.md**: Provider-Beispiele hinzufügen (falls unterstützt)
+   - **docs/guides/HEALTH_CHECKS.md**: Provider-Health-Checks hinzufügen (falls unterstützt)
+   - **docs/guides/GRPC_TRANSFORMATIONS.md**: Provider-gRPC-Support hinzufügen (falls unterstützt)
+   - **docs/guides/WEBSOCKET.md**: Provider-WebSocket-Support hinzufügen (falls unterstützt)
+   - Jeder Guide hat eine Provider-Implementierungs-Sektion!
+
+14. **docs/import/migration.md**:
+   - Provider zur Migration-Matrix hinzufügen
+   - Migration-Pfade dokumentieren (Provider → GAL → andere Provider)
+
+15. **docs/import/compatibility.md**:
+   - Provider zur Kompatibilitäts-Matrix hinzufügen
+   - Feature-Support-Level dokumentieren
+
+16. **docs/api/CLI_REFERENCE.md**:
+   - Provider zu CLI-Beispielen hinzufügen
+   - generate, validate, import, migrate Beispiele mit neuem Provider
+
+17. **Tests** (`tests/test_<provider>.py` + `tests/test_import_<provider>.py`):
+   - Vollständige Test-Suite für Provider (Export)
+   - Import-Tests (falls Import unterstützt)
    - Alle Features testen
+   - Edge-Cases testen
 
-8. **Beispiele**:
-   - Alle bestehenden Beispiele auf neuen Provider testen
-   - Provider-spezifische Beispiele hinzufügen
-
-9. **Guides**:
-   - Alle Feature-Guides um Provider-Implementierung erweitern
-
-10. **ROADMAP.md**:
+18. **ROADMAP.md**:
    - Provider zur Liste hinzufügen
    - Feature-Matrix aktualisieren
 
-11. **vx.x.x-PLAN.md** (falls Teil von v1.X.0):
+19. **vx.x.x-PLAN.md** (falls Teil von v1.X.0):
    - Provider-Feature als Done markieren
-   - Implementation Details dokumentieren
+   - Implementation Details dokumentieren (Dateien, Zeilen, Tests, Coverage)
+   - Dokumentations-Statistiken (Zeilen, Diagramme)
 
-12. **CHANGELOG.md**:
-   - Unter "Added" eintragen
+20. **CHANGELOG.md**:
+   - Unter "Added" eintragen mit allen Details:
+     - Provider-Klasse (Zeilen, Coverage)
+     - Parser-Klasse (falls vorhanden)
+     - Dokumentation (Zeilen)
+     - Tests (Anzahl, Coverage)
+     - Beispiele
+
+**Checkliste für neuen Provider:**
+```
+□ Provider-Klasse mit Docstrings
+□ Parser-Klasse mit Docstrings (falls Import)
+□ Config-Modelle dokumentiert
+□ CLI-Integration (alle Commands)
+□ README.md: Provider-Anzahl & Feature-Matrix
+□ docs/index.md: Provider-Anzahl & Tabelle
+□ docs/guides/PROVIDERS.md: Vollständiger Provider-Abschnitt
+□ docs/guides/<PROVIDER>.md: Umfassender Guide (1000+ Zeilen)
+□ docs/import/<provider>.md: Import-Guide (falls Import)
+□ examples/<provider>-example.yaml: 5-15 Szenarien
+□ mkdocs.yml: Navigation (Features + Import)
+□ ALLE Feature-Guides: Provider-Beispiele hinzugefügt
+□ docs/import/migration.md: Migration-Matrix
+□ docs/import/compatibility.md: Kompatibilitäts-Matrix
+□ docs/api/CLI_REFERENCE.md: CLI-Beispiele
+□ Tests: test_<provider>.py (Export)
+□ Tests: test_import_<provider>.py (Import)
+□ ROADMAP.md: Provider hinzugefügt
+□ vx.x.x-PLAN.md: Feature als Done markiert
+□ CHANGELOG.md: Added-Sektion
+```
 
 ### Config Breaking Change
 
