@@ -360,7 +360,58 @@ Dokumentation Update Checklist:
      - Troubleshooting
      - Performance & Limits
      - Security Best Practices
-   - Mermaid-Diagramme wo sinnvoll (Architektur, Request Flow, Deployment)
+
+   - **Mermaid-Diagramme** - **SEHR EMPFOHLEN für neue Provider!**
+     - **WICHTIG:** MkDocs Material unterstützt Mermaid nativ (siehe mkdocs.yml:122-124)
+     - Verwende den `mermaid-expert` Agent für professionelle Diagramme
+     - **Empfohlene Diagramme für Provider-Guides:**
+       1. **Architektur-Diagramm** (Graph TB):
+          - Client Layer → Gateway → Backend Services
+          - Authentication Layer, Traffic Management, Monitoring
+          - Zeigt alle Komponenten und deren Interaktionen
+          - Professionelles Farbschema (8+ Farben für verschiedene Komponenten)
+
+       2. **Request Flow Sequenzdiagramm** (Sequence Diagram):
+          - Client → Gateway → Backend Request Flow
+          - Authentication Flow (JWT, API Key)
+          - CORS Preflight (OPTIONS) Flow
+          - Alternative Flows (Fehlerszenarien)
+          - Auto-nummerierte Schritte
+          - Detaillierte Header-Informationen
+
+       3. **Deployment-Flowchart** (Flowchart TD):
+          - Entscheidungsbaum für verschiedene Deployment-Szenarien
+          - 3-5 Deployment-Szenarien mit Entscheidungslogik
+          - Jedes Szenario mit konkreten Deployment-Schritten
+          - Use-Case-Beschreibungen
+
+       4. **Migration-Flow** (Flowchart LR):
+          - Migration von/zu anderen Providern
+          - GAL Import/Export Layer Visualisierung
+          - Migrations-Schritte mit Annotations
+          - Migration-Checkliste-Tabelle
+
+     - **Mermaid-Syntax:**
+       ```markdown
+       ```mermaid
+       graph TB
+           Client[Client] --> Gateway[API Gateway]
+           Gateway --> Backend[Backend Service]
+       ```
+       ```
+
+     - **Best Practices für Mermaid:**
+       - Konsistentes Farbschema über alle Diagramme
+       - Deutsche Beschriftungen
+       - Kurze, prägnante Labels
+       - Erklärungstext nach jedem Diagramm
+       - Production-ready Styling
+
+     - **Beispiel (GCP API Gateway):**
+       - 4 Mermaid-Diagramme: Architektur, Request Flow, Deployment, Migration
+       - ~200 Zeilen Mermaid-Code
+       - Professionelles 8-Farben-Schema
+       - Alle Diagramme interaktiv in MkDocs
 
 10. **Import-Guide** (`docs/import/<provider>.md`) (falls Import unterstützt):
    - Import-Prozess dokumentieren
