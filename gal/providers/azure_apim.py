@@ -8,14 +8,23 @@ Supports subscription keys, Azure AD authentication, rate limiting, and caching.
 import json
 import logging
 from typing import Any, Dict
+from urllib.parse import urlparse
 
 from ..config import (
+    AuthenticationConfig,
+    AuthenticationType,
+    APIKeyAuthConfig,
+    JWTAuthConfig,
     AzureAPIMConfig,
     AzureAPIMGlobalConfig,
     Config,
+    GlobalConfig,
     Route,
     Service,
+    Upstream,
+    UpstreamTarget,
 )
+from ..parsers.azure_apim_parser import AzureAPIMParser
 from ..provider import Provider
 
 logger = logging.getLogger(__name__)
@@ -64,30 +73,126 @@ class AzureAPIMProvider(Provider):
         return "azure_apim"
 
     def parse(self, provider_config: str) -> Config:
-        """Parse Azure APIM configuration to GAL format.
+        """Parse Azure APIM OpenAPI export to GAL format.
 
-        Azure APIM uses ARM Templates which are infrastructure-as-code
-        templates, not runtime configurations. Parsing ARM Templates back
-        to GAL format is not supported as it's not a practical use case.
-
-        Use Azure APIM for exporting GAL configs to Azure, not for importing.
+        Parses OpenAPI 3.0 specifications exported from Azure API Management
+        using the Azure CLI command:
+            az apim api export --api-id <api-id> \\
+                --resource-group <resource-group> \\
+                --service-name <service-name> \\
+                --export-format OpenApiJsonFile \\
+                --file-path <output-path>
 
         Args:
-            provider_config: ARM Template JSON string
+            provider_config: OpenAPI 3.0 JSON or YAML content
+
+        Returns:
+            Config: GAL configuration object
 
         Raises:
-            NotImplementedError: Always raises as parsing is not supported
+            ValueError: If OpenAPI content is invalid
+
+        Example:
+            >>> provider = AzureAPIMProvider()
+            >>> with open("api-export.json") as f:
+            ...     config = provider.parse(f.read())
 
         Note:
-            For migrating from Azure APIM to GAL, manually create a GAL
-            configuration that matches your APIM setup, then use GAL to
-            migrate to another provider.
+            Azure APIM policies (rate limiting, caching) are NOT included
+            in OpenAPI exports. Only API structure, paths, and security
+            schemes are imported. You may need to manually configure
+            additional features in GAL.
         """
-        raise NotImplementedError(
-            "Parsing Azure APIM ARM Templates to GAL format is not supported. "
-            "Azure APIM is an export-only provider. To migrate from Azure APIM, "
-            "manually create a GAL configuration matching your APIM setup."
+        logger.info("Parsing Azure APIM OpenAPI export to GAL configuration")
+
+        # Initialize parser
+        parser = AzureAPIMParser()
+        api = parser.parse(provider_config, api_id="imported-api")
+
+        logger.info(f"Parsed API: {api.title} v{api.version}")
+
+        # Extract backend URL
+        backend_url = parser.extract_backend_url(api)
+        if not backend_url:
+            logger.warning("No backend URL found in OpenAPI spec")
+            backend_url = "https://backend.example.com"
+
+        # Parse backend URL
+        parsed_url = urlparse(backend_url)
+        backend_host = parsed_url.hostname or "backend.example.com"
+        backend_port = parsed_url.port or (443 if parsed_url.scheme == "https" else 80)
+
+        # Extract routes
+        routes_data = parser.extract_routes(api)
+        routes = []
+
+        for route_data in routes_data:
+            # Extract authentication (per-route or global)
+            auth_config = parser.extract_authentication(api)
+            authentication = None
+
+            if auth_config:
+                auth_type = auth_config.get("type")
+                if auth_type == "api_key":
+                    authentication = AuthenticationConfig(
+                        type=AuthenticationType.API_KEY,
+                        api_key=APIKeyAuthConfig(
+                            key_name=auth_config.get(
+                                "key_name", "Ocp-Apim-Subscription-Key"
+                            ),
+                            in_location=auth_config.get("in_location", "header"),
+                        ),
+                    )
+                elif auth_type == "jwt":
+                    authentication = AuthenticationConfig(
+                        type=AuthenticationType.JWT,
+                        jwt_config=JWTAuthConfig(
+                            issuer=auth_config.get("issuer", ""),
+                            audience=auth_config.get("audience"),
+                        ),
+                    )
+
+            route = Route(
+                path_prefix=route_data["path"],
+                http_methods=route_data["methods"],
+                authentication=authentication,
+            )
+            routes.append(route)
+
+        # Create service
+        service = Service(
+            name=api.api_id,
+            protocol="http",
+            upstream=Upstream(
+                targets=[
+                    UpstreamTarget(
+                        host=backend_host,
+                        port=backend_port,
+                    )
+                ]
+            ),
+            routes=routes,
         )
+
+        # Create GAL config
+        config = Config(
+            version="1.0",
+            services=[service],
+            global_config=GlobalConfig(
+                host="0.0.0.0",
+                port=8080,
+            ),
+        )
+
+        logger.info(
+            f"Generated GAL config with {len(routes)} routes for service '{api.api_id}'"
+        )
+        logger.warning(
+            "Azure APIM policies (rate limiting, caching) are not included in OpenAPI exports. "
+            "Configure these features manually in GAL if needed."
+        )
+
+        return config
 
     def generate(self, config: Config) -> str:
         """Generate Azure APIM ARM Template from GAL configuration.

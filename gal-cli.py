@@ -13,6 +13,7 @@ from gal.compatibility import CompatibilityChecker, FeatureSupport
 from gal.manager import Manager
 from gal.providers import (
     APISIXProvider,
+    AzureAPIMProvider,
     EnvoyProvider,
     HAProxyProvider,
     KongProvider,
@@ -64,6 +65,7 @@ def generate(config, provider, output):
         manager.register_provider(TraefikProvider())
         manager.register_provider(NginxProvider())
         manager.register_provider(HAProxyProvider())
+        manager.register_provider(AzureAPIMProvider())
 
         cfg = manager.load_config(config)
 
@@ -102,6 +104,7 @@ def validate(config):
         manager.register_provider(TraefikProvider())
         manager.register_provider(NginxProvider())
         manager.register_provider(HAProxyProvider())
+        manager.register_provider(AzureAPIMProvider())
 
         cfg = manager.load_config(config)
         manager.validate(cfg)  # Validate with provider-specific rules
@@ -140,6 +143,7 @@ def generate_all(config, output_dir):
         manager.register_provider(TraefikProvider())
         manager.register_provider(NginxProvider())
         manager.register_provider(HAProxyProvider())
+        manager.register_provider(AzureAPIMProvider())
 
         cfg = manager.load_config(config)
         original_provider = cfg.provider
@@ -262,6 +266,7 @@ def import_config(provider, input_file, output_file):
         manager.register_provider(TraefikProvider())
         manager.register_provider(NginxProvider())
         manager.register_provider(HAProxyProvider())
+        manager.register_provider(AzureAPIMProvider())
 
         # Get the provider instance
         provider_instance = manager.get_provider(provider)
@@ -655,6 +660,7 @@ def migrate(source_provider, source_config, target_provider, output_dir, yes):
         manager.register_provider(TraefikProvider())
         manager.register_provider(NginxProvider())
         manager.register_provider(HAProxyProvider())
+        manager.register_provider(AzureAPIMProvider())
 
         # Get source provider instance
         source_instance = manager.get_provider(source_provider)
