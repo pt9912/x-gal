@@ -49,6 +49,8 @@ nav:
   - Start: index.md
   - Guides:
     - Schnellstart: guides/QUICKSTART.md
+    - Konfigurationsbeispiele: guides/EXAMPLES.md
+    - Best Practices: guides/BEST_PRACTICES.md
     - Provider Übersicht: guides/PROVIDERS.md
     - Nginx: guides/NGINX.md
     - Envoy: guides/ENVOY.md
