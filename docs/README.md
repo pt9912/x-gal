@@ -26,6 +26,9 @@ Praktische Anleitungen für häufige Aufgaben und Use Cases:
 | [APISIX](guides/APISIX.md) | APISIX-spezifische Konfiguration und Features | APISIX-Nutzer |
 | [Traefik](guides/TRAEFIK.md) | Traefik-spezifische Konfiguration und Features | Traefik-Nutzer |
 | [HAProxy](guides/HAPROXY.md) | HAProxy-spezifische Konfiguration und Features | HAProxy-Nutzer |
+| [Azure APIM](guides/AZURE_APIM.md) | Azure API Management-spezifische Konfiguration | Azure-Nutzer |
+| [GCP API Gateway](guides/GCP_APIGATEWAY.md) | GCP API Gateway-spezifische Konfiguration | GCP-Nutzer |
+| [AWS API Gateway](guides/AWS_APIGATEWAY.md) | AWS API Gateway-spezifische Konfiguration | AWS-Nutzer |
 | [Transformations-Guide](guides/TRANSFORMATIONS.md) | Request-Transformationen und Best Practices | Developers, Architects |
 | [Entwickler-Guide](guides/DEVELOPMENT.md) | Beitragen zum Projekt | Contributors |
 
@@ -75,6 +78,9 @@ gal-cli.py generate -c config.yaml -p kong
 gal-cli.py generate -c config.yaml -p apisix
 gal-cli.py generate -c config.yaml -p traefik
 gal-cli.py generate -c config.yaml -p haproxy
+gal-cli.py generate -c config.yaml -p azure_apim
+gal-cli.py generate -c config.yaml -p gcp_apigateway
+gal-cli.py generate -c config.yaml -p aws_apigateway
 ```
 
 ### Hauptfeatures
@@ -96,6 +102,8 @@ gal-cli.py generate -c config.yaml -p haproxy
 | [Traefik](guides/TRAEFIK.md) | ✅ | YAML/TOML | Middleware | ✅ / ✅ |
 | [HAProxy](guides/HAPROXY.md) | ✅ | haproxy.cfg | Lua | ⚠️ / ✅ |
 | [Azure APIM](guides/AZURE_APIM.md) | ✅ | ARM/JSON | Policy XML | ✅ / ✅ |
+| [GCP API Gateway](guides/GCP_APIGATEWAY.md) | ✅ | OpenAPI 2.0 | Backend | ✅ / ✅ |
+| [AWS API Gateway](guides/AWS_APIGATEWAY.md) | ✅ | OpenAPI 3.0 | VTL | ✅ / ✅ |
 
 ## Häufig verwendete Ressourcen
 
@@ -340,7 +348,7 @@ MIT License - siehe [LICENSE](../LICENSE)
 - ✅ APISIX Import-Unterstützung (JSON/YAML Parser)
 - ✅ Kong Import-Unterstützung (Erweitert)
 - ✅ Envoy Import-Unterstützung (Erweitert)
-- ✅ Umfassende Feature Coverage Analyse für alle 6 Provider
+- ✅ Umfassende Feature Coverage Analyse für alle 10 Provider
 - ✅ Provider-spezifische Dokumentationsguides
 
 Siehe [CHANGELOG.md](../CHANGELOG.md) für vollständige Release-Notes.
