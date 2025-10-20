@@ -68,6 +68,7 @@ nav:
     - Logging & Observability: guides/LOGGING_OBSERVABILITY.md
     - Body Transformation: guides/BODY_TRANSFORMATION.md
     - gRPC Transformations: guides/GRPC_TRANSFORMATIONS.md
+    - AWS API Gateway: guides/AWS_APIGATEWAY.md
     - Azure API Management: guides/AZURE_APIM.md
     - WebSocket: guides/WEBSOCKET.md
     - Timeout & Retry: guides/TIMEOUT_RETRY.md
@@ -79,6 +80,8 @@ nav:
     - Traefik Import: import/traefik.md
     - Nginx Import: import/nginx.md
     - HAProxy Import: import/haproxy.md
+    - AWS API Gateway Import: import/aws-apigateway.md
+    - Azure APIM Import: import/azure-apim.md
     - Compatibility: import/compatibility.md
   - API-Referenz:
     - CLI: api/CLI_REFERENCE.md
