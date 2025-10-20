@@ -1,6 +1,6 @@
 ---
 name: Documentation Manager
-description: Verwaltet und aktualisiert die Dokumentation für x-gal (GAL - Gateway Abstraction Layer). Nutze diesen Skill, wenn neue Features hinzugefügt, Provider erweitert oder Dokumentation aktualisiert werden muss.
+description: Verwaltet und aktualisiert die Dokumentation für x-gal (GAL - Gateway Abstraction Layer). Nutze diesen Skill PROAKTIV, wenn neue Features hinzugefügt werden, neue Provider hinzugefügt oder bestehende Provider erweitert werden, oder Dokumentation aktualisiert werden muss. WICHTIG Bei neuen Providern müssen 20+ Dokumente aktualisiert werden (Feature-Guides, PROVIDERS.md, README, etc.).
 ---
 
 # Documentation Manager Skill
