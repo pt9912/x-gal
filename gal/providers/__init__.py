@@ -6,6 +6,7 @@ from .apisix import APISIXProvider
 from .aws_apigateway import AWSAPIGatewayProvider
 from .azure_apim import AzureAPIMProvider
 from .envoy import EnvoyProvider
+from .gcp_apigateway import GCPAPIGatewayProvider
 from .haproxy import HAProxyProvider
 from .kong import KongProvider
 from .nginx import NginxProvider
@@ -20,4 +21,5 @@ __all__ = [
     "HAProxyProvider",
     "AWSAPIGatewayProvider",
     "AzureAPIMProvider",
+    "GCPAPIGatewayProvider",
 ]

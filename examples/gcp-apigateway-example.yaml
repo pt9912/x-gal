@@ -1,0 +1,281 @@
+# GCP API Gateway Configuration Examples
+#
+# Google Cloud API Gateway provider configuration for GAL
+# Generates OpenAPI 2.0 (Swagger) specifications with x-google-backend extensions
+#
+# Deployment:
+#   gal generate -c gcp-apigateway-example.yaml -p gcp_apigateway > openapi.yaml
+#
+#   gcloud api-gateway apis create user-api --project=my-project
+#
+#   gcloud api-gateway api-configs create user-api-config \
+#     --api=user-api \
+#     --openapi-spec=openapi.yaml \
+#     --project=my-project \
+#     --backend-auth-service-account=api-gateway@my-project.iam.gserviceaccount.com
+#
+#   gcloud api-gateway gateways create user-api-gateway \
+#     --api=user-api \
+#     --api-config=user-api-config \
+#     --location=us-central1 \
+#     --project=my-project
+
+---
+
+# ===========================
+# Example 1: Basic HTTP Backend
+# ===========================
+version: "1.0"
+provider: gcp_apigateway
+
+global_config:
+  gcp_apigateway:
+    # GCP Project Configuration
+    project_id: "my-gcp-project"
+    api_id: "user-api"
+    api_display_name: "User Management API"
+    api_config_id: "user-api-config"
+    gateway_id: "user-api-gateway"
+    region: "us-central1"
+
+    # Backend Configuration
+    backend_address: "https://backend.example.com"
+    backend_protocol: "https"
+    backend_path_translation: "APPEND_PATH_TO_ADDRESS"
+    backend_deadline: 30.0
+
+    # CORS Configuration
+    cors_enabled: true
+    cors_allow_origins:
+      - "*"
+    cors_allow_methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - OPTIONS
+    cors_allow_headers:
+      - Content-Type
+      - Authorization
+
+services:
+  - name: user_service
+    type: rest
+    protocol: http
+
+    upstream:
+      targets:
+        - host: backend.example.com
+          port: 443
+
+    routes:
+      - path_prefix: /api/users
+        methods:
+          - GET
+          - POST
+
+      - path_prefix: /api/users/{id}
+        methods:
+          - GET
+          - PUT
+          - DELETE
+
+---
+
+# ===========================
+# Example 2: JWT Authentication
+# ===========================
+version: "1.0"
+provider: gcp_apigateway
+
+global_config:
+  gcp_apigateway:
+    project_id: "my-gcp-project"
+    api_id: "secure-api"
+    api_display_name: "Secure API with JWT"
+    region: "us-central1"
+
+    # Backend
+    backend_address: "https://secure-backend.example.com"
+
+    # JWT Authentication (x-google-issuer, x-google-jwks_uri)
+    jwt_issuer: "https://accounts.google.com"
+    jwt_jwks_uri: "https://www.googleapis.com/oauth2/v3/certs"
+    jwt_audiences:
+      - "https://my-gcp-project.uc.r.appspot.com"
+
+    # CORS
+    cors_enabled: true
+    cors_allow_origins:
+      - "https://app.example.com"
+
+services:
+  - name: api_service
+    type: rest
+    protocol: http
+
+    upstream:
+      targets:
+        - host: secure-backend.example.com
+          port: 443
+
+    routes:
+      - path_prefix: /api/data
+        methods:
+          - GET
+          - POST
+
+---
+
+# ===========================
+# Example 3: Cloud Run Backend
+# ===========================
+version: "1.0"
+provider: gcp_apigateway
+
+global_config:
+  gcp_apigateway:
+    project_id: "my-gcp-project"
+    api_id: "cloudrun-api"
+    api_display_name: "Cloud Run API"
+    region: "us-central1"
+
+    # Cloud Run Backend
+    backend_address: "https://my-service-abc123-uc.a.run.app"
+    backend_protocol: "https"
+    backend_deadline: 60.0  # Cloud Run may need longer timeouts
+
+    # Service Account for Backend Auth
+    service_account_email: "api-gateway@my-gcp-project.iam.gserviceaccount.com"
+    backend_disable_auth: false
+    backend_jwt_audience: "https://my-service-abc123-uc.a.run.app"
+
+    # JWT for Client Authentication
+    jwt_issuer: "https://securetoken.google.com/my-gcp-project"
+    jwt_jwks_uri: "https://www.googleapis.com/service_accounts/v1/metadata/x509/securetoken@system.gserviceaccount.com"
+
+services:
+  - name: cloudrun_service
+    type: rest
+    protocol: http
+
+    upstream:
+      targets:
+        - host: my-service-abc123-uc.a.run.app
+          port: 443
+
+    routes:
+      - path_prefix: /api/v1
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+
+---
+
+# ===========================
+# Example 4: Firebase Auth JWT
+# ===========================
+version: "1.0"
+provider: gcp_apigateway
+
+global_config:
+  gcp_apigateway:
+    project_id: "my-firebase-project"
+    api_id: "firebase-api"
+    api_display_name: "Firebase Authenticated API"
+    region: "us-central1"
+
+    # Backend
+    backend_address: "https://backend.example.com"
+
+    # Firebase Auth JWT
+    jwt_issuer: "https://securetoken.google.com/my-firebase-project"
+    jwt_jwks_uri: "https://www.googleapis.com/service_accounts/v1/metadata/x509/securetoken@system.gserviceaccount.com"
+    jwt_audiences:
+      - "my-firebase-project"
+
+    # CORS for Web Apps
+    cors_enabled: true
+    cors_allow_origins:
+      - "https://app.example.com"
+      - "https://admin.example.com"
+    cors_allow_headers:
+      - Content-Type
+      - Authorization
+      - Firebase-Instance-ID-Token
+    cors_expose_headers:
+      - X-Request-Id
+
+services:
+  - name: firebase_service
+    type: rest
+    protocol: http
+
+    upstream:
+      targets:
+        - host: backend.example.com
+          port: 443
+
+    routes:
+      - path_prefix: /api/users
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+
+      - path_prefix: /api/posts
+        methods:
+          - GET
+          - POST
+
+---
+
+# ===========================
+# Example 5: Multi-Region Setup
+# ===========================
+version: "1.0"
+provider: gcp_apigateway
+
+global_config:
+  gcp_apigateway:
+    project_id: "my-global-project"
+    api_id: "global-api"
+    api_display_name: "Global Multi-Region API"
+
+    # Deploy multiple gateways in different regions
+    # us-central1, europe-west1, asia-northeast1
+    region: "us-central1"  # Primary region
+
+    # Global Backend (Load Balancer)
+    backend_address: "https://global-lb.example.com"
+    backend_deadline: 30.0
+
+    # JWT
+    jwt_issuer: "https://accounts.google.com"
+    jwt_jwks_uri: "https://www.googleapis.com/oauth2/v3/certs"
+
+    # CORS
+    cors_enabled: true
+    cors_allow_origins:
+      - "*"
+
+services:
+  - name: global_service
+    type: rest
+    protocol: http
+
+    upstream:
+      targets:
+        - host: global-lb.example.com
+          port: 443
+
+    routes:
+      - path_prefix: /api/v1
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE

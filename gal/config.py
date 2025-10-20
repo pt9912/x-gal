@@ -24,6 +24,7 @@ class GlobalConfig:
         metrics: Optional metrics configuration
         azure_apim: Optional Azure API Management global configuration
         aws_apigateway: Optional AWS API Gateway global configuration
+        gcp_apigateway: Optional GCP API Gateway global configuration
 
     Example:
         >>> config = GlobalConfig(host="127.0.0.1", port=8080)
@@ -39,6 +40,7 @@ class GlobalConfig:
     metrics: Optional["MetricsConfig"] = None
     azure_apim: Optional["AzureAPIMGlobalConfig"] = None
     aws_apigateway: Optional["AWSAPIGatewayConfig"] = None
+    gcp_apigateway: Optional["GCPAPIGatewayConfig"] = None
 
 
 @dataclass
@@ -1057,6 +1059,95 @@ class AWSAPIGatewayConfig:
     # OpenAPI Export
     openapi_version: str = "3.0.1"
     export_format: str = "oas30"  # oas30 (OpenAPI 3.0)
+
+
+@dataclass
+class GCPAPIGatewayConfig:
+    """GCP API Gateway specific configuration.
+
+    Configuration for Google Cloud API Gateway provider (lightweight implementation).
+    Supports OpenAPI 2.0 (Swagger) with x-google-backend extensions.
+
+    Attributes:
+        api_id: API Gateway API ID (default: "gal-api")
+        api_display_name: Display name for the API
+        api_config_id: API Config ID (default: "gal-api-config")
+        gateway_id: Gateway ID (default: "gal-gateway")
+        project_id: GCP Project ID
+        region: GCP region for gateway deployment (default: "us-central1")
+        backend_address: Backend service address (URL)
+        backend_protocol: Backend protocol - http or https (default: "https")
+        backend_path_translation: Path translation - APPEND_PATH_TO_ADDRESS or CONSTANT_ADDRESS (default: "APPEND_PATH_TO_ADDRESS")
+        backend_deadline: Backend request deadline in seconds (default: 30.0)
+        backend_disable_auth: Disable backend authentication (default: False)
+        backend_jwt_audience: JWT audience for backend authentication
+        jwt_issuer: JWT token issuer URL (for x-google-issuer)
+        jwt_jwks_uri: JWKS URI for JWT validation (for x-google-jwks_uri)
+        jwt_audiences: List of valid JWT audiences
+        service_account_email: Service account email for backend authentication
+        cors_enabled: Enable CORS (default: True)
+        cors_allow_origins: Allowed origins for CORS (default: ["*"])
+        cors_allow_methods: Allowed HTTP methods for CORS
+        cors_allow_headers: Allowed headers for CORS
+        cors_expose_headers: Exposed headers for CORS
+        cors_max_age: CORS preflight cache duration in seconds (default: 3600)
+        openapi_version: OpenAPI specification version (default: "2.0" - Swagger)
+
+    Example:
+        >>> gcp_config = GCPAPIGatewayConfig(
+        ...     api_id="user-api",
+        ...     project_id="my-gcp-project",
+        ...     region="us-central1",
+        ...     backend_address="https://backend.example.com",
+        ...     jwt_issuer="https://accounts.google.com"
+        ... )
+        >>> gcp_config.openapi_version
+        '2.0'
+
+    Note:
+        GCP API Gateway only supports OpenAPI 2.0 (Swagger), not OpenAPI 3.0.
+    """
+
+    # API Configuration
+    api_id: str = "gal-api"
+    api_display_name: str = "GAL API"
+    api_config_id: str = "gal-api-config"
+    gateway_id: str = "gal-gateway"
+
+    # GCP Project & Region
+    project_id: str = ""
+    region: str = "us-central1"
+
+    # Backend Configuration (x-google-backend)
+    backend_address: str = ""
+    backend_protocol: str = "https"  # http, https
+    backend_path_translation: str = "APPEND_PATH_TO_ADDRESS"  # APPEND_PATH_TO_ADDRESS, CONSTANT_ADDRESS
+    backend_deadline: float = 30.0  # seconds
+    backend_disable_auth: bool = False
+    backend_jwt_audience: str = ""
+
+    # JWT Authentication (x-google-issuer, x-google-jwks_uri)
+    jwt_issuer: str = ""
+    jwt_jwks_uri: str = ""
+    jwt_audiences: List[str] = field(default_factory=list)
+
+    # Service Account
+    service_account_email: str = ""
+
+    # CORS Configuration
+    cors_enabled: bool = True
+    cors_allow_origins: List[str] = field(default_factory=lambda: ["*"])
+    cors_allow_methods: List[str] = field(
+        default_factory=lambda: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    )
+    cors_allow_headers: List[str] = field(
+        default_factory=lambda: ["Content-Type", "Authorization"]
+    )
+    cors_expose_headers: List[str] = field(default_factory=list)
+    cors_max_age: int = 3600  # seconds
+
+    # OpenAPI Export (Swagger 2.0 only!)
+    openapi_version: str = "2.0"
 
 
 @dataclass
