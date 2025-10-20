@@ -2,7 +2,7 @@
 
 ## Übersicht
 
-GAL unterstützt sieben führende API-Gateway-Provider - sechs selbst-gehostete und einen Cloud-nativen Provider. Jeder Provider hat spezifische Eigenschaften, Stärken und ideale Use Cases.
+GAL unterstützt neun führende API-Gateway-Provider - sechs selbst-gehostete und drei Cloud-native Provider. Jeder Provider hat spezifische Eigenschaften, Stärken und ideale Use Cases.
 
 ## Unterstützte Provider
 
@@ -15,6 +15,7 @@ GAL unterstützt sieben führende API-Gateway-Provider - sechs selbst-gehostete 
 | Nginx | CONF | ngx_http modules | ✅ | ✅ | ✅ File + reload | Self-Hosted |
 | HAProxy | CFG | ACLs + Lua | ✅ | ✅ | ✅ File + reload | Self-Hosted |
 | **Azure APIM** | **ARM+JSON** | **Policy XML** | **✅** | **✅** | **✅ ARM Deploy** | **Azure Cloud** |
+| **GCP API Gateway** | **OpenAPI 2.0** | **Backend-basiert** | **⚠️** | **✅** | **✅ gcloud CLI** | **Google Cloud** |
 
 ## Envoy Proxy
 
@@ -967,6 +968,224 @@ resource "azurerm_template_deployment" "gal_apim" {
 
 ---
 
+## GCP API Gateway
+
+### Übersicht
+
+GCP API Gateway ist ein vollständig verwalteter Cloud-native API Gateway von Google Cloud Platform.
+
+> **💡 API-Referenz:** Für technische Details zur Implementierung siehe `gal/providers/gcp_apigateway.py:41-58` (GCPAPIGatewayProvider Klassen-Docstring)
+
+**Stärken:**
+- Vollständig verwaltet (Serverless)
+- Native GCP-Integration (Cloud Run, Cloud Functions, IAM)
+- OpenAPI 2.0 (Swagger) basiert
+- Automatische Skalierung
+- Integriertes Monitoring (Cloud Logging, Monitoring, Trace)
+
+**Ideal für:**
+- Cloud-native Applikationen auf GCP
+- Serverless Backends (Cloud Run, Cloud Functions)
+- Google Sign-In / Firebase Auth Integration
+- Multi-Region Global Deployments
+
+### GAL-Generierung
+
+**Output:** `openapi.yaml` (OpenAPI 2.0 / Swagger Specification)
+
+**Struktur:**
+
+```yaml
+swagger: "2.0"
+info:
+  title: "My API"
+  version: "1.0.0"
+
+schemes:
+  - https
+
+# Backend Configuration
+x-google-backend:
+  address: "https://backend.run.app"
+  deadline: 30.0
+  path_translation: APPEND_PATH_TO_ADDRESS
+
+# JWT Authentication
+securityDefinitions:
+  google_jwt:
+    authorizationUrl: ""
+    flow: "implicit"
+    type: "oauth2"
+    x-google-issuer: "https://accounts.google.com"
+    x-google-jwks_uri: "https://www.googleapis.com/oauth2/v3/certs"
+    x-google-audiences: "https://my-project.example.com"
+
+security:
+  - google_jwt: []
+
+paths:
+  /api/users:
+    get:
+      summary: "Get users"
+      operationId: "getUsers"
+      responses:
+        200:
+          description: "Success"
+    options:
+      # CORS Preflight
+      summary: "CORS preflight"
+      responses:
+        200:
+          description: "CORS headers"
+```
+
+### Transformationen
+
+GCP API Gateway hat **keine native Transformation-Engine** wie Envoy/Kong.
+
+**Alternativen:**
+- **Backend Transformation:** Implementierung in Cloud Run/Cloud Functions Backend
+- **Cloud Endpoints ESP:** Erweiterte Transformation-Features
+- **Apigee:** Enterprise API Management mit umfangreichen Transformationen
+
+### gRPC-Support
+
+⚠️ **gRPC-HTTP Transcoding:**
+- GCP API Gateway unterstützt gRPC-JSON Transcoding via Cloud Endpoints
+- GAL generiert OpenAPI 2.0 Specs, nicht direkt gRPC-fähig
+- Für gRPC: Verwende Cloud Endpoints direkt oder Apigee
+
+### Authentifizierung
+
+**Unterstützte Methoden:**
+- ✅ **JWT Authentication:** Native Integration (x-google-issuer, x-google-jwks_uri)
+- ✅ **Google Sign-In:** Automatisch unterstützt
+- ✅ **Firebase Authentication:** Direkte Integration
+- ✅ **Custom JWT Issuer:** Auth0, Okta, Keycloak, etc.
+- ⚠️ **API Keys:** Begrenzte Unterstützung (OAuth2/JWT empfohlen)
+- ❌ **Basic Auth:** Nicht nativ unterstützt (Backend-Implementierung)
+
+### Rate Limiting
+
+❌ **Kein natives Gateway-Level Rate Limiting**
+
+**Alternativen:**
+- Cloud Endpoints Quotas (x-google-management Extension)
+- Backend Rate Limiting
+- Apigee für Enterprise Rate Limiting
+- Cloud Armor für DDoS Protection
+
+### Circuit Breaker
+
+❌ **Kein nativer Circuit Breaker**
+
+**Alternativen:**
+- Backend Circuit Breaker (z.B. Hystrix, Resilience4j)
+- Cloud Run automatische Skalierung bei Überlastung
+
+### Health Checks
+
+⚠️ **Backend Health Checks:**
+- Cloud Run: Automatische Health Checks
+- Cloud Functions: Built-in Health Monitoring
+- Load Balancer: Konfigurierbare Health Checks
+
+### Deployment-Befehle
+
+**OpenAPI Spec generieren:**
+```bash
+gal generate -c config.yaml -p gcp_apigateway > openapi.yaml
+```
+
+**GCP Deployment:**
+```bash
+# API erstellen
+gcloud api-gateway apis create my-api \
+  --project=my-gcp-project
+
+# API Config deployen
+gcloud api-gateway api-configs create my-api-config \
+  --api=my-api \
+  --openapi-spec=openapi.yaml \
+  --project=my-gcp-project
+
+# Gateway erstellen
+gcloud api-gateway gateways create my-gateway \
+  --api=my-api \
+  --api-config=my-api-config \
+  --location=us-central1 \
+  --project=my-gcp-project
+
+# Gateway URL abrufen
+gcloud api-gateway gateways describe my-gateway \
+  --location=us-central1 \
+  --project=my-gcp-project \
+  --format="value(defaultHostname)"
+```
+
+**Multi-Region Deployment:**
+```bash
+# Gateway in mehreren Regionen deployen
+for region in us-central1 europe-west1 asia-east1; do
+  gcloud api-gateway gateways create my-gateway-${region} \
+    --api=my-api \
+    --api-config=my-api-config \
+    --location=${region} \
+    --project=my-gcp-project
+done
+```
+
+### Monitoring & Observability
+
+**Cloud Logging:**
+- Automatische Request/Response Logs
+- Strukturierte JSON Logs
+- Filter nach Status Code, Latency, Endpoint
+
+**Cloud Monitoring:**
+- Request Rate, Error Rate, Latency (P50, P95, P99)
+- Custom Dashboards
+- Alerting Policies
+
+**Cloud Trace:**
+- Distributed Tracing
+- End-to-End Request Tracking
+- Integration mit Cloud Run/Cloud Functions
+
+**Beispiel: Logs abfragen:**
+```bash
+# Fehler-Logs anzeigen
+gcloud logging read "resource.type=api AND httpRequest.status>=400" \
+  --project=my-gcp-project \
+  --limit=50
+
+# Latency-Analyse
+gcloud logging read "resource.type=api AND httpRequest.latency>1s" \
+  --project=my-gcp-project \
+  --format=json
+```
+
+### Best Practices
+
+1. **Verwende JWT statt API Keys** für Production
+2. **Implementiere Rate Limiting im Backend** (kein Gateway-Level RL)
+3. **Nutze Cloud Monitoring** für Alerting
+4. **Multi-Region Deployments** für globale APIs
+5. **Cloud Armor** für DDoS Protection
+6. **Service Account Auth** für Backend-zu-Backend Communication
+7. **OpenAPI 2.0** - GCP unterstützt nur Swagger, kein OpenAPI 3.0
+
+### Limitierungen
+
+- ❌ Nur OpenAPI 2.0 (Swagger), kein OpenAPI 3.0
+- ❌ Keine nativen Transformationen
+- ❌ Kein Gateway-Level Rate Limiting
+- ❌ Kein Circuit Breaker
+- ⚠️ gRPC nur via Cloud Endpoints
+- ✅ Hervorragend für serverless/cloud-native Workloads
+
+---
+
 ## Provider-Vergleich
 
 ### Performance
@@ -980,21 +1199,22 @@ resource "azurerm_template_deployment" "gal_apim" {
 | Kong | ~50k | 2ms | 15ms | Self-Hosted |
 | Traefik | ~40k | 3ms | 20ms | Self-Hosted |
 | Azure APIM | Varies* | Varies* | Varies* | Azure Cloud |
+| GCP API Gateway | Varies* | Varies* | Varies* | Google Cloud |
 
-*Benchmark-Werte sind Richtwerte und variieren je nach Setup. Azure APIM Performance hängt von SKU ab (Developer < Basic < Standard < Premium)*
+*Benchmark-Werte sind Richtwerte und variieren je nach Setup. Azure APIM Performance hängt von SKU ab (Developer < Basic < Standard < Premium). GCP API Gateway Performance variiert je nach Region und Backend-Typ.*
 
 ### Transformations-Vergleich
 
-| Feature | Envoy | Kong | APISIX | Traefik | Nginx | HAProxy | Azure APIM |
-|---------|-------|------|--------|---------|-------|---------|------------|
-| Defaults | ✅ Lua | ✅ Headers | ✅ Lua | ⚠️ Plugins | ✅ ngx | ⚠️ Limited | ✅ Policy XML |
-| Computed Fields | ✅ Lua | ❌ | ✅ Lua | ❌ | ✅ ngx | ❌ | ⚠️ Limited |
-| UUID Generation | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ⚠️ Custom |
-| Timestamp | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ⚠️ Custom |
-| Validation | ⚠️ Limited | ⚠️ Limited | ✅ Full | ❌ | ⚠️ Limited | ⚠️ Limited | ✅ Policy |
-| Rate Limiting | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Built-in |
-| JWT Auth | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ Azure AD |
-| Header Manipulation | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Policy |
+| Feature | Envoy | Kong | APISIX | Traefik | Nginx | HAProxy | Azure APIM | GCP API Gateway |
+|---------|-------|------|--------|---------|-------|---------|------------|-----------------|
+| Defaults | ✅ Lua | ✅ Headers | ✅ Lua | ⚠️ Plugins | ✅ ngx | ⚠️ Limited | ✅ Policy XML | ❌ Backend |
+| Computed Fields | ✅ Lua | ❌ | ✅ Lua | ❌ | ✅ ngx | ❌ | ⚠️ Limited | ❌ Backend |
+| UUID Generation | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ⚠️ Custom | ❌ Backend |
+| Timestamp | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ⚠️ Custom | ❌ Backend |
+| Validation | ⚠️ Limited | ⚠️ Limited | ✅ Full | ❌ | ⚠️ Limited | ⚠️ Limited | ✅ Policy | ⚠️ OpenAPI |
+| Rate Limiting | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Built-in | ❌ Backend |
+| JWT Auth | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ Azure AD | ✅ Google JWT |
+| Header Manipulation | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Policy | ⚠️ Limited |
 
 ### Use Case Matrix
 
@@ -1007,8 +1227,10 @@ resource "azurerm_template_deployment" "gal_apim" {
 | gRPC Heavy | Envoy, APISIX | Native HTTP/2 |
 | Multi-Cloud | Kong, APISIX | Provider-agnostic |
 | **Azure Cloud-Native** | **Azure APIM** | **Fully Managed, Azure AD** |
+| **GCP Cloud-Native** | **GCP API Gateway** | **Serverless, Cloud Run/Functions** |
 | **Developer Portal** | **Azure APIM, Kong** | **Built-in Portal** |
 | **Hybrid Cloud** | **Azure APIM, Kong** | **On-Prem + Cloud** |
+| **Serverless Backends** | **GCP API Gateway** | **Cloud Run, Cloud Functions** |
 
 ## Provider-Wechsel
 
@@ -1094,6 +1316,7 @@ Alle Provider-Implementierungen enthalten umfassende Google-style Docstrings mit
 | `gal/providers/nginx.py` | NginxProvider | Nginx Config Generator |
 | `gal/providers/haproxy.py` | HAProxyProvider | HAProxy Config Generator |
 | `gal/providers/azure_apim.py:24-64` | AzureAPIMProvider | Azure APIM ARM Template Generator |
+| `gal/providers/gcp_apigateway.py:41-58` | GCPAPIGatewayProvider | GCP API Gateway OpenAPI 2.0 Generator |
 
 ### Methoden-Dokumentation
 
