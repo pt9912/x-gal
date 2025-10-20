@@ -40,7 +40,7 @@ services:
         #   "username": "alice",
         #   "action": "login",
         #   "trace_id": "550e8400-e29b-41d4-a716-446655440000",
-        #   "timestamp": "2025-01-18T14:30:00Z"
+        #   "timestamp": "2025-10-18T14:30:00Z"
         # }
 
   # =============================================================================
@@ -188,7 +188,7 @@ services:
         #   "data": [...],
         #   "api_version": "v1.2.0",
         #   "server_id": "gateway-1",
-        #   "server_time": "2025-01-18T14:30:00Z",
+        #   "server_time": "2025-10-18T14:30:00Z",
         #   "response_id": "550e8400-e29b-41d4-a716-446655440000"
         # }
 
@@ -582,7 +582,7 @@ services:
         #   "password": "hashed",
         #   "trace_id": "550e8400...",           # added
         #   "span_id": "660f9500...",            # added
-        #   "request_timestamp": "2025-01-18...", # added
+        #   "request_timestamp": "2025-10-18...", # added
         #   "gateway": "gal-production",         # added
         #   "gateway_version": "v1.2.0",         # added
         #   "api_version": "v1"                  # added
@@ -605,7 +605,7 @@ services:
         #   "name": "Alice",
         #   "email": "alice@example.com",
         #   "created_at": "2025-01-01T00:00:00Z",
-        #   "response_timestamp": "2025-01-18T14:30:00Z",  # added
+        #   "response_timestamp": "2025-10-18T14:30:00Z",  # added
         #   "response_id": "770fa600...",                  # added
         #   "server_version": "v1.2.0",                    # added
         #   "server_region": "eu-west-1",                  # added

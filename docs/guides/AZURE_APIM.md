@@ -1209,4 +1209,4 @@ services:
 
 **Version:** 1.4.0
 **Status:** ✅ Vollständig implementiert
-**Letzte Aktualisierung:** 2025-01-19
+**Letzte Aktualisierung:** 2025-10-19

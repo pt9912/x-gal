@@ -37,8 +37,8 @@ GAL unterstützt dynamische Werte:
 | Variable | Beschreibung | Beispiel |
 |----------|--------------|----------|
 | `{{uuid}}` | Generiert UUID v4 | `550e8400-e29b-41d4-a716-446655440000` |
-| `{{now}}` | Aktueller Timestamp (ISO 8601) | `2025-01-18T14:30:00Z` |
-| `{{timestamp}}` | Alias für `{{now}}` | `2025-01-18T14:30:00Z` |
+| `{{now}}` | Aktueller Timestamp (ISO 8601) | `2025-10-18T14:30:00Z` |
+| `{{timestamp}}` | Alias für `{{now}}` | `2025-10-18T14:30:00Z` |
 
 ### Wann verwenden?
 
@@ -87,7 +87,7 @@ services:
   "username": "alice",
   "email": "alice@example.com",
   "trace_id": "550e8400-e29b-41d4-a716-446655440000",
-  "timestamp": "2025-01-18T14:30:00Z"
+  "timestamp": "2025-10-18T14:30:00Z"
 }
 ```
 
@@ -137,7 +137,7 @@ routes:
 {
   "id": 1,
   "username": "alice",
-  "server_time": "2025-01-18T14:30:00Z"
+  "server_time": "2025-10-18T14:30:00Z"
 }
 ```
 
@@ -845,7 +845,7 @@ curl -X POST http://gateway/api/users \
 -- /etc/haproxy/transform.lua
 -- Purpose: Transform request body for api_service
 -- Author: DevOps Team
--- Date: 2025-01-18
+-- Date: 2025-10-18
 -- Dependencies: lua-json
 
 core.register_action("transform_request_api_service_route0", {"http-req"}, function(txn)
@@ -1133,5 +1133,5 @@ systemctl restart haproxy
 ---
 
 **Version:** v1.2.0
-**Zuletzt aktualisiert:** 2025-01-18
+**Zuletzt aktualisiert:** 2025-10-18
 **Autor:** GAL Development Team

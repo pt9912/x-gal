@@ -7,7 +7,7 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
-## [1.4.0] - 2025-01-19
+## [1.4.0] - 2025-10-19
 
 ### Hinzugefügt
 
@@ -491,7 +491,7 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 - Verschiedene Bugfixes und Verbesserungen über alle Provider hinweg
 
-## [1.0.0] - 2025-01-17
+## [1.0.0] - 2025-10-17
 
 ### Added
 
