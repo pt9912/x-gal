@@ -1261,8 +1261,8 @@ Vollständige Beispiele finden Sie in `examples/aws-apigateway-example.yaml`:
 
 ### Beispiele
 
-- [AWS API Gateway Examples](../../examples/aws-apigateway-example.yaml)
-- [GitHub Actions Workflow](.github/workflows/deploy-api.yml)
+- [AWS API Gateway Examples](https://github.com/pt9912/x-gal/blob/main/examples/aws-apigateway-example.yaml)
+- [GitHub Actions Workflow](https://github.com/pt9912/x-gal/blob/main/.github/workflows/deploy-api.yml)
 
 ---
 
