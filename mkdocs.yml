@@ -58,6 +58,9 @@ nav:
     - APISIX: guides/APISIX.md
     - Traefik: guides/TRAEFIK.md
     - HAProxy: guides/HAPROXY.md
+    - Azure API Management: guides/AZURE_APIM.md
+    - AWS API Gateway: guides/AWS_APIGATEWAY.md
+    - GCP API Gateway: guides/GCP_APIGATEWAY.md
     - Transformationen: guides/TRANSFORMATIONS.md
     - Entwicklung: guides/DEVELOPMENT.md
   - Features:
@@ -70,9 +73,6 @@ nav:
     - Logging & Observability: guides/LOGGING_OBSERVABILITY.md
     - Body Transformation: guides/BODY_TRANSFORMATION.md
     - gRPC Transformations: guides/GRPC_TRANSFORMATIONS.md
-    - AWS API Gateway: guides/AWS_APIGATEWAY.md
-    - Azure API Management: guides/AZURE_APIM.md
-    - GCP API Gateway: guides/GCP_APIGATEWAY.md
     - WebSocket: guides/WEBSOCKET.md
     - Timeout & Retry: guides/TIMEOUT_RETRY.md
   - Config Import & Migration:
