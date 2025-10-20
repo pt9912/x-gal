@@ -1,0 +1,1 @@
+Richtet automatisch die lokale Python-Entwicklungsumgebung ein (venv, pytest, black, isort, flake8). Nutze diesen Skill bei pytest/python Fehlern oder "setup dev environment". (user)
