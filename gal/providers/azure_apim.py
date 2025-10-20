@@ -161,6 +161,7 @@ class AzureAPIMProvider(Provider):
         # Create service
         service = Service(
             name=api.api_id,
+            type="rest",  # Azure APIM OpenAPI exports are always REST APIs
             protocol="http",
             upstream=Upstream(
                 targets=[
@@ -176,6 +177,7 @@ class AzureAPIMProvider(Provider):
         # Create GAL config
         config = Config(
             version="1.0",
+            provider="gal",  # Imported from Azure APIM, converted to GAL format
             services=[service],
             global_config=GlobalConfig(
                 host="0.0.0.0",
