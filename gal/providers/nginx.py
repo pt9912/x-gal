@@ -20,6 +20,7 @@ from ..config import (
     HeaderManipulation,
     HealthCheckConfig,
     LoadBalancerConfig,
+    MirroringConfig,
     PassiveHealthCheck,
     ProtoDescriptor,
     RateLimitConfig,
@@ -395,6 +396,11 @@ class NginxProvider(Provider):
         for i, route in enumerate(service.routes):
             self._generate_location(service, route, i, config, output)
 
+        # Generate mirror location blocks for request mirroring
+        for route in service.routes:
+            if route.mirroring and route.mirroring.enabled:
+                self._generate_mirror_locations(service, route, output)
+
         output.append("    }")
         output.append("")
 
@@ -447,6 +453,10 @@ class NginxProvider(Provider):
         # gRPC transformation (requires OpenResty + lua-protobuf)
         if route.grpc_transformation and route.grpc_transformation.enabled:
             self._generate_grpc_transformation_nginx(service, route, config, output)
+
+        # Request mirroring (shadow traffic)
+        if route.mirroring and route.mirroring.enabled:
+            self._generate_request_mirroring(service, route, output)
 
         # Traffic splitting (A/B testing, canary deployments)
         if route.traffic_split and route.traffic_split.enabled:
@@ -685,6 +695,99 @@ class NginxProvider(Provider):
                 output.append(f"            # more_clear_headers '{name}';")
 
         if headers.response_add or headers.response_set:
+            output.append("")
+
+    def _generate_request_mirroring(self, service: Service, route: Route, output: List[str]) -> None:
+        """Generate Nginx mirror directives for request mirroring/shadowing.
+
+        Implements shadow traffic by duplicating requests to mirror targets while
+        returning responses from the primary backend. Supports:
+        - Multiple shadow targets
+        - Request body mirroring control
+        - Sampling via split_clients (percentage-based)
+
+        Args:
+            service: Service with request mirroring
+            route: Route with mirroring configuration
+            output: Output buffer to append to
+
+        Side Effects:
+            Appends mirror directives to location block
+
+        Nginx Docs:
+            http://nginx.org/en/docs/http/ngx_http_mirror_module.html
+        """
+        mirroring = route.mirroring
+
+        output.append("")
+        output.append("            # Request Mirroring")
+
+        # Enable/disable request body mirroring
+        if mirroring.mirror_request_body:
+            output.append("            mirror_request_body on;")
+        else:
+            output.append("            mirror_request_body off;")
+
+        # Generate mirror directives for each target
+        for i, target in enumerate(mirroring.targets):
+            mirror_uri = f"/mirror_{service.name}_{target.name}"
+
+            # Sampling support via split_clients
+            if target.sample_percentage < 100.0:
+                output.append(f"            # Mirror to {target.name} ({target.sample_percentage}% sampled)")
+                output.append(f"            set_random $mirror_{i}_rand 0 100;")
+                output.append(f"            set $mirror_{i}_enable 0;")
+                output.append(f"            if ($mirror_{i}_rand < {int(target.sample_percentage)}) {{")
+                output.append(f"                set $mirror_{i}_enable 1;")
+                output.append("            }")
+                output.append(f"            if ($mirror_{i}_enable = 1) {{")
+                output.append(f"                mirror {mirror_uri};")
+                output.append("            }")
+            else:
+                output.append(f"            # Mirror to {target.name} (100%)")
+                output.append(f"            mirror {mirror_uri};")
+
+        output.append("")
+
+    def _generate_mirror_locations(self, service: Service, route: Route, output: List[str]) -> None:
+        """Generate internal location blocks for mirror targets.
+
+        Creates separate location blocks for each mirror target that proxy
+        requests to the shadow backend. These locations are used by the
+        mirror directive.
+
+        Args:
+            service: Service with request mirroring
+            route: Route with mirroring configuration
+            output: Output buffer to append to
+
+        Side Effects:
+            Appends internal location blocks for mirror targets
+        """
+        mirroring = route.mirroring
+
+        for target in mirroring.targets:
+            mirror_uri = f"/mirror_{service.name}_{target.name}"
+
+            output.append(f"        # Mirror location for {target.name}")
+            output.append(f"        location = {mirror_uri} {{")
+            output.append("            internal;")
+            output.append(f"            proxy_pass http://{target.upstream.host}:{target.upstream.port}{route.path_prefix};")
+            output.append("            proxy_http_version 1.1;")
+            output.append('            proxy_set_header Connection "";')
+
+            # Add custom headers for mirror target
+            if target.headers:
+                for key, value in target.headers.items():
+                    output.append(f"            proxy_set_header {key} '{value}';")
+
+            # Set timeout for mirror request
+            timeout = target.timeout if target.timeout else "5s"
+            output.append(f"            proxy_connect_timeout {timeout};")
+            output.append(f"            proxy_send_timeout {timeout};")
+            output.append(f"            proxy_read_timeout {timeout};")
+
+            output.append("        }")
             output.append("")
 
     def _generate_traffic_split(self, service: Service, route: Route, output: List[str]) -> None:
