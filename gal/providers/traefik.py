@@ -23,6 +23,7 @@ from ..config import (
     HeaderManipulation,
     HealthCheckConfig,
     LoadBalancerConfig,
+    MirroringConfig,
     PassiveHealthCheck,
     RateLimitConfig,
     Route,
@@ -131,6 +132,18 @@ class TraefikProvider(Provider):
             True
         """
         logger.debug(f"Validating Traefik configuration: {len(config.services)} services")
+
+        # Check for request mirroring (supported but not yet implemented)
+        for service in config.services:
+            for route in service.routes:
+                if route.mirroring and route.mirroring.enabled:
+                    logger.warning(
+                        f"Request mirroring on route {route.path_prefix} is supported in Traefik "
+                        f"via mirroring service, but not yet implemented in GAL. "
+                        f"Mirroring configuration will be ignored. "
+                        f"See: https://doc.traefik.io/traefik/routing/services/#mirroring-service"
+                    )
+
         return True
 
     def generate(self, config: Config) -> str:

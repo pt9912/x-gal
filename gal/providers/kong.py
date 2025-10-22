@@ -25,6 +25,7 @@ from ..config import (
     HealthCheckConfig,
     JwtConfig,
     LoadBalancerConfig,
+    MirroringConfig,
     PassiveHealthCheck,
     RateLimitConfig,
     Route,
@@ -122,6 +123,17 @@ class KongProvider(Provider):
             True
         """
         logger.debug(f"Validating Kong configuration: {len(config.services)} services")
+
+        # Check for request mirroring (requires Enterprise or external plugin)
+        for service in config.services:
+            for route in service.routes:
+                if route.mirroring and route.mirroring.enabled:
+                    logger.info(
+                        f"Request mirroring on route {route.path_prefix} will be generated "
+                        f"with comments. Requires Kong Enterprise Edition or external plugin "
+                        f"(e.g., request-mirror-plugin). Configuration included for reference."
+                    )
+
         return True
 
     def generate(self, config: Config) -> str:
