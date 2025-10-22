@@ -24,7 +24,10 @@ from gal.config import (
     UpstreamTarget,
 )
 from gal.providers.apisix import APISIXProvider
+from gal.providers.aws_apigateway import AWSAPIGatewayProvider
+from gal.providers.azure_apim import AzureAPIMProvider
 from gal.providers.envoy import EnvoyProvider
+from gal.providers.haproxy import HAProxyProvider
 from gal.providers.kong import KongProvider
 from gal.providers.nginx import NginxProvider
 from gal.providers.traefik import TraefikProvider
@@ -566,3 +569,312 @@ class TestTrafficSplitUseCases:
 
         assert len(config.targets) == 3
         assert sum(t.weight for t in config.targets) == 100
+
+
+class TestHAProxyTrafficSplit:
+    """Test HAProxy traffic splitting implementation"""
+
+    def _create_test_config(self):
+        """Helper to create test configuration"""
+        global_config = GlobalConfig()
+        route = Route(
+            path_prefix="/api/v1",
+            methods=["GET", "POST"],
+            traffic_split=TrafficSplitConfig(
+                enabled=True,
+                targets=[
+                    SplitTarget(
+                        name="stable",
+                        weight=90,
+                        upstream=UpstreamTarget(host="api-v1-stable", port=8080),
+                    ),
+                    SplitTarget(
+                        name="canary",
+                        weight=10,
+                        upstream=UpstreamTarget(host="api-v1-canary", port=8080),
+                    ),
+                ],
+            ),
+        )
+        service = Service(
+            name="canary_deployment_api",
+            type="rest",
+            protocol="http",
+            upstream=Upstream(host="placeholder", port=8080),
+            routes=[route],
+        )
+        return Config(
+            version="1.0", provider="haproxy", global_config=global_config, services=[service]
+        )
+
+    def test_haproxy_weighted_servers(self):
+        """Test HAProxy generates weighted servers correctly"""
+        config = self._create_test_config()
+        provider = HAProxyProvider()
+        output = provider.generate(config)
+
+        # Check weighted server entries
+        assert "server server_stable api-v1-stable:8080" in output
+        assert "server server_canary api-v1-canary:8080" in output
+
+        # Check weight conversion (GAL 90 → HAProxy 230 = 90 × 2.56)
+        assert "weight 230" in output  # 90 × 2.56 ≈ 230
+        assert "weight 25" in output   # 10 × 2.56 ≈ 25
+
+        # Check backend configuration
+        assert "backend backend_canary_deployment_api" in output
+        assert "balance roundrobin" in output
+
+    def test_haproxy_health_checks(self):
+        """Test HAProxy includes health checks"""
+        config = self._create_test_config()
+        provider = HAProxyProvider()
+        output = provider.generate(config)
+
+        # Check health check configuration
+        assert "check inter 10s fall 3 rise 2" in output
+
+
+class TestAzureAPIMTrafficSplit:
+    """Test Azure API Management traffic splitting implementation"""
+
+    def _create_test_config(self):
+        """Helper to create test configuration"""
+        global_config = GlobalConfig()
+        route = Route(
+            path_prefix="/api/v1",
+            methods=["GET", "POST"],
+            traffic_split=TrafficSplitConfig(
+                enabled=True,
+                targets=[
+                    SplitTarget(
+                        name="stable",
+                        weight=90,
+                        upstream=UpstreamTarget(host="api-v1-stable", port=8080),
+                    ),
+                    SplitTarget(
+                        name="canary",
+                        weight=10,
+                        upstream=UpstreamTarget(host="api-v1-canary", port=8080),
+                    ),
+                ],
+            ),
+        )
+        service = Service(
+            name="canary_deployment_api",
+            type="rest",
+            protocol="http",
+            upstream=Upstream(host="placeholder", port=8080),
+            routes=[route],
+        )
+        return Config(
+            version="1.0", provider="azure_apim", global_config=global_config, services=[service]
+        )
+
+    def test_azure_apim_backend_pool(self):
+        """Test Azure APIM generates load-balanced backend pool"""
+        config = self._create_test_config()
+        provider = AzureAPIMProvider()
+        output = provider.generate(config)
+
+        import json
+        arm_template = json.loads(output)
+
+        # Find backend pool resource
+        backend_pools = [
+            r for r in arm_template["resources"]
+            if r["type"] == "Microsoft.ApiManagement/service/backends"
+            and "pool" in r.get("properties", {})
+        ]
+
+        assert len(backend_pools) > 0, "No backend pools found"
+
+        pool = backend_pools[0]
+        pool_services = pool["properties"]["pool"]["services"]
+
+        # Check weights
+        assert len(pool_services) == 2
+        weights = [s["weight"] for s in pool_services]
+        assert 90 in weights
+        assert 10 in weights
+
+    def test_azure_apim_individual_backends(self):
+        """Test Azure APIM generates individual backends for each target"""
+        config = self._create_test_config()
+        provider = AzureAPIMProvider()
+        output = provider.generate(config)
+
+        import json
+        arm_template = json.loads(output)
+
+        # Find individual backend resources
+        individual_backends = [
+            r for r in arm_template["resources"]
+            if r["type"] == "Microsoft.ApiManagement/service/backends"
+            and "pool" not in r.get("properties", {})
+        ]
+
+        # Should have 2 individual backends (stable + canary)
+        assert len(individual_backends) >= 2
+
+        # Check backend names contain target names
+        backend_names = [r["name"] for r in individual_backends]
+        assert any("stable" in str(name) for name in backend_names)
+        assert any("canary" in str(name) for name in backend_names)
+
+    def test_azure_apim_policy_xml(self):
+        """Test Azure APIM policy XML uses backend pool"""
+        config = self._create_test_config()
+        provider = AzureAPIMProvider()
+        output = provider.generate(config)
+
+        import json
+        arm_template = json.loads(output)
+
+        # Find policy resources
+        policies = [
+            r for r in arm_template["resources"]
+            if r["type"] == "Microsoft.ApiManagement/service/apis/operations/policies"
+        ]
+
+        assert len(policies) > 0, "No policies found"
+
+        # Check policy XML references backend pool
+        policy_xml = policies[0]["properties"]["value"]
+        assert "set-backend-service" in policy_xml
+        assert "backend-pool" in policy_xml
+
+
+class TestAWSAPIGatewayTrafficSplit:
+    """Test AWS API Gateway traffic splitting implementation"""
+
+    def _create_test_config(self):
+        """Helper to create test configuration"""
+        global_config = GlobalConfig()
+        route = Route(
+            path_prefix="/api/v1",
+            methods=["GET", "POST"],
+            traffic_split=TrafficSplitConfig(
+                enabled=True,
+                targets=[
+                    SplitTarget(
+                        name="stable",
+                        weight=90,
+                        upstream=UpstreamTarget(host="api-v1-stable", port=8080),
+                    ),
+                    SplitTarget(
+                        name="canary",
+                        weight=10,
+                        upstream=UpstreamTarget(host="api-v1-canary", port=8080),
+                    ),
+                ],
+            ),
+        )
+        service = Service(
+            name="canary_deployment_api",
+            type="rest",
+            protocol="http",
+            upstream=Upstream(host="placeholder", port=8080),
+            routes=[route],
+        )
+        return Config(
+            version="1.0", provider="aws_apigateway", global_config=global_config, services=[service]
+        )
+
+    def test_aws_vtl_template(self):
+        """Test AWS API Gateway generates VTL request templates"""
+        config = self._create_test_config()
+        provider = AWSAPIGatewayProvider()
+        output = provider.generate(config)
+
+        import json
+        spec = json.loads(output)
+
+        # Find integration with VTL template
+        operation = spec["paths"]["/api/v1"]["get"]
+        integration = operation["x-amazon-apigateway-integration"]
+
+        # Check VTL template exists
+        assert "requestTemplates" in integration
+        assert "application/json" in integration["requestTemplates"]
+
+        vtl_template = integration["requestTemplates"]["application/json"]
+
+        # Check VTL logic
+        assert "#set($random = $context.requestTimeEpoch % 100)" in vtl_template
+        assert "#if($random < 90)" in vtl_template
+        assert "stageVariables" in vtl_template
+
+    def test_aws_stage_variables(self):
+        """Test AWS API Gateway uses stage variables for backend URLs"""
+        config = self._create_test_config()
+        provider = AWSAPIGatewayProvider()
+        output = provider.generate(config)
+
+        import json
+        spec = json.loads(output)
+
+        # Find integration
+        operation = spec["paths"]["/api/v1"]["get"]
+        integration = operation["x-amazon-apigateway-integration"]
+
+        # Check stage variable references
+        assert "${stageVariables.backend_url}" in integration["uri"]
+
+        vtl_template = integration["requestTemplates"]["application/json"]
+        assert "canary_deployment_api_stable_url" in vtl_template
+        assert "canary_deployment_api_canary_url" in vtl_template
+
+    def test_aws_cumulative_weight_logic(self):
+        """Test AWS VTL uses cumulative weight logic"""
+        # Create 3-target config (70/20/10)
+        global_config = GlobalConfig()
+        route = Route(
+            path_prefix="/api/multi",
+            methods=["GET"],
+            traffic_split=TrafficSplitConfig(
+                enabled=True,
+                targets=[
+                    SplitTarget(
+                        name="stable",
+                        weight=70,
+                        upstream=UpstreamTarget(host="api-stable", port=8080),
+                    ),
+                    SplitTarget(
+                        name="beta",
+                        weight=20,
+                        upstream=UpstreamTarget(host="api-beta", port=8080),
+                    ),
+                    SplitTarget(
+                        name="canary",
+                        weight=10,
+                        upstream=UpstreamTarget(host="api-canary", port=8080),
+                    ),
+                ],
+            ),
+        )
+        service = Service(
+            name="multi_rule_api",
+            type="rest",
+            protocol="http",
+            upstream=Upstream(host="placeholder", port=8080),
+            routes=[route],
+        )
+        config = Config(
+            version="1.0", provider="aws_apigateway", global_config=global_config, services=[service]
+        )
+
+        provider = AWSAPIGatewayProvider()
+        output = provider.generate(config)
+
+        import json
+        spec = json.loads(output)
+
+        operation = spec["paths"]["/api/multi"]["get"]
+        integration = operation["x-amazon-apigateway-integration"]
+        vtl_template = integration["requestTemplates"]["application/json"]
+
+        # Check cumulative weight conditions
+        assert "#if($random < 70)" in vtl_template
+        assert "#elseif($random < 90)" in vtl_template  # 70 + 20
+        assert "#elseif($random < 100)" in vtl_template  # 70 + 20 + 10
