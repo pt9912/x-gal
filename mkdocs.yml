@@ -64,6 +64,7 @@ nav:
     - Transformationen: guides/TRANSFORMATIONS.md
     - Entwicklung: guides/DEVELOPMENT.md
   - Features:
+    - Traffic Splitting: guides/TRAFFIC_SPLITTING.md
     - Authentication: guides/AUTHENTICATION.md
     - CORS: guides/CORS.md
     - Rate Limiting: guides/RATE_LIMITING.md
