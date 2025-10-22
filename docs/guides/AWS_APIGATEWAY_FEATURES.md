@@ -553,6 +553,128 @@ Access-Control-Max-Age: 86400
 
 ---
 
+## Request Mirroring
+
+⚠️ **Workaround: Lambda@Edge**
+
+AWS API Gateway unterstützt Request Mirroring nicht nativ. GAL konfiguriert einen **Lambda@Edge Workaround**.
+
+**GAL Config:**
+```yaml
+services:
+  - name: user_api
+    protocol: http
+    upstream:
+      targets:
+        - host: backend.example.com
+          port: 443
+    routes:
+      - path_prefix: /api/users
+        mirroring:
+          enabled: true
+          mirroring_lambda_edge_arn: "arn:aws:lambda:us-east-1:123456789012:function:mirror-function:1"
+          targets:
+            - name: shadow-backend
+              upstream:
+                host: shadow.example.com
+                port: 443
+              sample_percentage: 50
+              timeout: 5
+              headers:
+                X-Mirror: "true"
+                X-Shadow-Version: "v2"
+```
+
+**Lambda@Edge Function (mirror-function):**
+```javascript
+// Lambda@Edge Viewer Request Handler
+exports.handler = async (event) => {
+  const request = event.Records[0].cf.request;
+  const https = require('https');
+
+  // Sample percentage logic (50%)
+  const sampleRate = parseInt(process.env.SAMPLE_PERCENTAGE || '50');
+  if (Math.random() * 100 < sampleRate) {
+    // Mirror request to shadow backend (fire-and-forget)
+    const mirrorRequest = {
+      hostname: process.env.SHADOW_HOST,  // shadow.example.com
+      port: 443,
+      path: request.uri,
+      method: request.method,
+      headers: {
+        ...request.headers,
+        'x-mirror': [{ value: 'true' }],
+        'x-shadow-version': [{ value: 'v2' }]
+      }
+    };
+
+    https.request(mirrorRequest, (res) => {
+      // Ignore response (fire-and-forget)
+      res.on('data', () => {});
+      res.on('end', () => {});
+    }).on('error', (error) => {
+      console.error('Mirror failed:', error);
+    }).end();
+  }
+
+  // Return original request (continue to origin)
+  return request;
+};
+```
+
+**Deployment:**
+```bash
+# 1. Lambda@Edge Function erstellen
+zip mirror-function.zip index.js
+
+aws lambda create-function \
+  --function-name mirror-function \
+  --runtime nodejs18.x \
+  --role arn:aws:iam::123456789012:role/lambda-edge-role \
+  --handler index.handler \
+  --zip-file fileb://mirror-function.zip \
+  --region us-east-1
+
+# 2. Version veröffentlichen (required für Lambda@Edge)
+aws lambda publish-version \
+  --function-name mirror-function \
+  --region us-east-1
+
+# 3. CloudFront Distribution mit Lambda@Edge verknüpfen
+aws cloudfront update-distribution \
+  --id E1234567890ABC \
+  --distribution-config '{
+    "LambdaFunctionAssociations": {
+      "Items": [{
+        "LambdaFunctionARN": "arn:aws:lambda:us-east-1:123456789012:function:mirror-function:1",
+        "EventType": "viewer-request"
+      }]
+    }
+  }'
+
+# 4. Environment Variables setzen
+aws lambda update-function-configuration \
+  --function-name mirror-function \
+  --environment Variables={SAMPLE_PERCENTAGE=50,SHADOW_HOST=shadow.example.com} \
+  --region us-east-1
+```
+
+**Hinweise:**
+- ⚠️ **Lambda@Edge erforderlich**: Kein natives Mirroring in AWS API Gateway
+- ⚠️ **CloudFront Integration**: Lambda@Edge läuft nur mit CloudFront (EDGE Endpoints)
+- ✅ **Sample Percentage**: Via Environment Variables konfigurierbar
+- ✅ **Custom Headers**: Im Lambda-Code definierbar
+- ⚠️ **Regional Endpoints**: Nicht unterstützt (nur EDGE mit CloudFront)
+
+**Alternativen:**
+- **API Gateway REST API → Lambda Proxy** mit Mirroring-Logik im Lambda
+- **Application Load Balancer** (ALB) mit Target Groups statt API Gateway
+- **AWS App Mesh** für Service-Mesh-basiertes Mirroring
+
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#aws-api-gateway-workaround-lambdaedge)
+
+---
+
 ## Beispiele
 
 Vollständige Beispiele finden Sie in `examples/aws-apigateway-example.yaml`:

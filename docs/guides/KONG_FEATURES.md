@@ -259,6 +259,77 @@ plugins:
       json: ["password"]
 ```
 
+### 9. Request Mirroring
+
+⚠️ **Plugin/Enterprise Support**
+
+Kong unterstützt Request Mirroring via **Enterprise Plugin** oder **request-transformer + post-function** Workaround.
+
+```yaml
+# Global Config (für Enterprise Plugin)
+global_config:
+  kong_mirroring_enable_enterprise: true
+
+# Route Config
+routes:
+  - path_prefix: /api/users
+    mirroring:
+      enabled: true
+      targets:
+        - name: shadow-v2
+          upstream:
+            host: shadow.example.com
+            port: 443
+          sample_percentage: 50
+          headers:
+            X-Mirror: "true"
+            X-Shadow-Version: "v2"
+```
+
+**Generiert (Enterprise Plugin)**:
+```yaml
+plugins:
+- name: request-mirroring  # Kong Enterprise Plugin
+  config:
+    mirror_upstream: shadow-v2
+    sample_percentage: 50
+    headers:
+      - "X-Mirror: true"
+      - "X-Shadow-Version: v2"
+```
+
+**Generiert (OpenSource Workaround)**:
+```yaml
+plugins:
+- name: post-function
+  config:
+    access:
+      - |
+        -- Lua code for mirroring (fire-and-forget)
+        local http = require "resty.http"
+        local httpc = http.new()
+
+        -- Sample percentage
+        if math.random(100) <= 50 then
+          local res, err = httpc:request_uri("https://shadow.example.com:443" .. ngx.var.request_uri, {
+            method = ngx.req.get_method(),
+            headers = {
+              ["X-Mirror"] = "true",
+              ["X-Shadow-Version"] = "v2"
+            }
+          })
+        end
+```
+
+**Hinweise:**
+- ⚠️ **Enterprise Plugin**: `kong_mirroring_enable_enterprise: true` für natives Mirroring
+- ⚠️ **OpenSource**: Workaround via post-function Plugin (Lua-Code)
+- ✅ Custom Headers unterstützt
+- ✅ Sample Percentage (0-100%)
+- ✅ Multiple Mirror Targets möglich
+
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#5-kong-partial-pluginworkaround)
+
 ---
 
 ## Provider-Vergleich

@@ -371,3 +371,140 @@ global_config:
 
 ---
 
+## Request Mirroring
+
+⚠️ **Workaround: Cloud Functions**
+
+GCP API Gateway unterstützt Request Mirroring nicht nativ. GAL konfiguriert einen **Cloud Functions Workaround**.
+
+**GAL Config:**
+```yaml
+services:
+  - name: user_api
+    protocol: http
+    upstream:
+      targets:
+        - host: backend.example.com
+          port: 443
+    routes:
+      - path_prefix: /api/users
+        mirroring:
+          enabled: true
+          mirroring_cloud_function_url: "https://us-central1-my-project.cloudfunctions.net/mirror-function"
+          targets:
+            - name: shadow-backend
+              upstream:
+                host: shadow.example.com
+                port: 443
+              sample_percentage: 50
+              timeout: 5
+              headers:
+                X-Mirror: "true"
+                X-Shadow-Version: "v2"
+```
+
+**Cloud Functions Implementation (mirror-function):**
+```javascript
+// Cloud Functions HTTP Trigger
+const https = require('https');
+
+exports.mirrorRequest = (req, res) => {
+  // Sample percentage check (50%)
+  const sampleRate = parseInt(process.env.SAMPLE_PERCENTAGE || '50');
+
+  if (Math.random() * 100 < sampleRate) {
+    // Fire-and-forget mirror request
+    const mirrorOptions = {
+      hostname: process.env.SHADOW_HOST,
+      port: 443,
+      path: req.path,
+      method: req.method,
+      headers: {
+        ...req.headers,
+        'x-mirror': 'true',
+        'x-shadow-version': 'v2'
+      }
+    };
+
+    const mirrorReq = https.request(mirrorOptions, (mirrorRes) => {
+      // Ignore response
+      mirrorRes.on('data', () => {});
+      mirrorRes.on('end', () => {});
+    });
+
+    mirrorReq.on('error', (error) => {
+      console.error('Mirror failed:', error);
+    });
+
+    mirrorReq.end();
+  }
+
+  // Return success (mirroring is fire-and-forget)
+  res.status(200).send('OK');
+};
+```
+
+**Deployment:**
+```bash
+# 1. Cloud Functions deployen
+gcloud functions deploy mirror-function \
+  --runtime nodejs18 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --region us-central1 \
+  --set-env-vars SAMPLE_PERCENTAGE=50,SHADOW_HOST=shadow.example.com \
+  --entry-point mirrorRequest
+
+# 2. Function URL abrufen
+gcloud functions describe mirror-function \
+  --region us-central1 \
+  --format='value(httpsTrigger.url)'
+
+# 3. API Gateway Config generieren
+gal generate -c config.yaml -p gcp_apigateway -o openapi.yaml
+
+# 4. API Gateway deployen
+gcloud api-gateway apis create user-api \
+  --project=my-project
+
+gcloud api-gateway api-configs create user-api-config \
+  --api=user-api \
+  --openapi-spec=openapi.yaml \
+  --project=my-project \
+  --backend-auth-service-account=backend-sa@my-project.iam.gserviceaccount.com
+
+gcloud api-gateway gateways create user-gateway \
+  --api=user-api \
+  --api-config=user-api-config \
+  --location=us-central1 \
+  --project=my-project
+```
+
+**Hinweise:**
+- ⚠️ **Cloud Functions erforderlich**: Kein natives Mirroring in GCP API Gateway
+- ⚠️ **HTTP Trigger**: Cloud Function muss HTTP-Trigger haben
+- ✅ **Sample Percentage**: Via Environment Variables konfigurierbar
+- ✅ **Custom Headers**: Im Cloud Function Code definierbar
+- ⚠️ **Zusätzliche Latenz**: Cloud Function Call → Mirror Request
+
+**Alternativen:**
+- **Cloud Run + Envoy Sidecar** für natives Request Mirroring
+- **Apigee** (Google Cloud's Enterprise API Gateway) mit nativen Mirroring-Policies
+- **Cloud Load Balancer** mit Traffic Mirroring (Packet Mirroring)
+
+**Monitoring:**
+```bash
+# Cloud Functions Logs
+gcloud functions logs read mirror-function \
+  --region us-central1 \
+  --limit 50
+
+# Cloud Functions Metrics
+gcloud monitoring metrics-descriptors list \
+  --filter="resource.type=cloud_function AND resource.labels.function_name=mirror-function"
+```
+
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#gcp-api-gateway-workaround-cloud-functions)
+
+---
+

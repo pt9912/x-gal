@@ -509,6 +509,124 @@ Failed Requests: 0 (0.0%)
 - [examples/traffic-split-example.yaml](https://github.com/pt9912/x-gal/blob/develop/examples/traffic-split-example.yaml) - 6 Beispiel-Szenarien
 - [tests/docker/haproxy/](../../tests/docker/haproxy/) - Docker Compose E2E Tests
 
+### 8. Request Mirroring
+
+✅ **Native Support: http-request mirror (HAProxy 2.4+)**
+
+HAProxy 2.4+ unterstützt Request Mirroring nativ mit der `http-request mirror` Directive.
+
+**GAL Config:**
+```yaml
+routes:
+  - path_prefix: /api/users
+    mirroring:
+      enabled: true
+      targets:
+        - name: shadow-v2
+          upstream:
+            host: shadow.example.com
+            port: 443
+          sample_percentage: 50
+          timeout: 5
+          headers:
+            X-Mirror: "true"
+            X-Shadow-Version: "v2"
+```
+
+**Generiert (HAProxy 2.4+):**
+```haproxy
+# Mirror Backend
+backend shadow-v2_mirror
+    server mirror1 shadow.example.com:443 check
+
+# Frontend
+frontend http_front
+    bind *:80
+    default_backend user_backend
+
+# Primary Backend mit Mirroring
+backend user_backend
+    # Sample Percentage via ACL (50%)
+    acl mirror_sample rand(100) lt 50
+    http-request mirror shadow-v2_mirror if mirror_sample
+
+    # Original Backend
+    server srv1 backend.example.com:443 check
+```
+
+**Generiert (HAProxy < 2.4 - Lua Workaround):**
+```haproxy
+# Global section: Load Lua script
+global
+    lua-load /etc/haproxy/lua/mirror.lua
+
+backend user_backend
+    # Call Lua function for mirroring
+    http-request lua.mirror_request
+
+    server srv1 backend.example.com:443 check
+```
+
+**Lua Script (/etc/haproxy/lua/mirror.lua):**
+```lua
+-- mirror.lua - Request Mirroring für HAProxy <2.4
+core.register_action("mirror_request", { "http-req" }, function(txn)
+    local http = require("socket.http")
+
+    -- Sample percentage check (50%)
+    if math.random(100) <= 50 then
+        -- Fire-and-forget HTTP request
+        http.request{
+            url = "https://shadow.example.com:443" .. txn.f:path(),
+            method = txn.f:method(),
+            headers = {
+                ["X-Mirror"] = "true",
+                ["X-Shadow-Version"] = "v2"
+            }
+        }
+    end
+end)
+```
+
+**Hinweise:**
+- ✅ **HAProxy 2.4+**: Native `http-request mirror` Directive
+- ⚠️ **HAProxy <2.4**: Lua-Script-Workaround erforderlich
+- ✅ Sample Percentage via `acl mirror_sample rand(100) lt 50`
+- ✅ Custom Headers via Lua oder HAProxy http-request set-header
+- ✅ Multiple Mirror Targets möglich
+
+**Deployment:**
+```bash
+# HAProxy Version prüfen
+haproxy -v
+
+# HAProxy 2.4+ (natives Mirroring)
+gal generate -c config.yaml -p haproxy -o haproxy.cfg
+haproxy -f haproxy.cfg -c  # Validate
+systemctl reload haproxy
+
+# HAProxy <2.4 (Lua Workaround)
+# 1. Lua-Script installieren
+mkdir -p /etc/haproxy/lua
+cp mirror.lua /etc/haproxy/lua/
+
+# 2. Config generieren & deployen
+gal generate -c config.yaml -p haproxy -o haproxy.cfg
+haproxy -f haproxy.cfg -c
+systemctl reload haproxy
+```
+
+**Monitoring:**
+```bash
+# Mirror Backend Status
+echo "show stat" | socat stdio /var/run/haproxy.sock | grep shadow-v2_mirror
+
+# Request Counters
+echo "show info" | socat stdio /var/run/haproxy.sock | grep Requests
+```
+
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#4-haproxy-native-24)
+
 ---
 
 ## HAProxy-spezifische Details
