@@ -103,6 +103,7 @@ class GlobalConfig:
     azure_apim: Optional["AzureAPIMGlobalConfig"] = None
     aws_apigateway: Optional["AWSAPIGatewayConfig"] = None
     gcp_apigateway: Optional["GCPAPIGatewayConfig"] = None
+    kong: Optional["KongGlobalConfig"] = None
 
 
 @dataclass
@@ -1127,6 +1128,11 @@ class AWSAPIGatewayConfig:
     openapi_version: str = "3.0.1"
     export_format: str = "oas30"  # oas30 (OpenAPI 3.0)
 
+    # Request Mirroring (not natively supported)
+    mirroring_workaround: str = ""  # "lambda_edge", "cloudwatch_logs", or "" (disabled)
+    mirroring_lambda_edge_arn: str = ""  # Lambda@Edge function ARN for mirroring
+    mirroring_cloudwatch_log_group: str = ""  # CloudWatch Logs group name
+
 
 @dataclass
 class GCPAPIGatewayConfig:
@@ -1215,6 +1221,42 @@ class GCPAPIGatewayConfig:
 
     # OpenAPI Export (Swagger 2.0 only!)
     openapi_version: str = "2.0"
+
+    # Request Mirroring (not natively supported)
+    mirroring_workaround: str = ""  # "cloud_functions", "cloud_run", or "" (disabled)
+    mirroring_cloud_function_url: str = ""  # Cloud Function URL for mirroring
+    mirroring_cloud_run_url: str = ""  # Cloud Run service URL for mirroring
+
+
+@dataclass
+class KongGlobalConfig:
+    """Kong API Gateway specific configuration.
+
+    Configuration for Kong Gateway provider, supporting both Open Source
+    and Enterprise editions with different feature sets.
+
+    Attributes:
+        version: Kong version - "OpenSource" or "Enterprise" (default: "OpenSource")
+                 - OpenSource: Only native Kong features (plugins require external installation)
+                 - Enterprise: Full access to Kong Enterprise plugins (request-mirror, etc.)
+        admin_api_url: Kong Admin API URL (default: "http://localhost:8001")
+        control_plane_url: Kong Control Plane URL for Enterprise deployments
+        workspace: Kong Enterprise workspace name (default: "default")
+
+    Example:
+        >>> kong_config = KongGlobalConfig(
+        ...     version="Enterprise",
+        ...     admin_api_url="http://kong-admin:8001",
+        ...     workspace="production"
+        ... )
+        >>> kong_config.version
+        'Enterprise'
+    """
+
+    version: str = "OpenSource"  # or "Enterprise"
+    admin_api_url: str = "http://localhost:8001"
+    control_plane_url: str = ""
+    workspace: str = "default"
 
 
 @dataclass
@@ -1776,13 +1818,42 @@ class Config:
 
         # Parse global config
         global_data = data.get("global", {})
+
+        # Parse provider-specific global configs
+        azure_apim_config = None
+        if "azure_apim" in global_data:
+            azure_apim_config = AzureAPIMGlobalConfig(**global_data["azure_apim"])
+            global_data["azure_apim"] = azure_apim_config
+
+        aws_config = None
+        if "aws_apigateway" in global_data:
+            aws_config = AWSAPIGatewayConfig(**global_data["aws_apigateway"])
+            global_data["aws_apigateway"] = aws_config
+
+        gcp_config = None
+        if "gcp_apigateway" in global_data:
+            gcp_config = GCPAPIGatewayConfig(**global_data["gcp_apigateway"])
+            global_data["gcp_apigateway"] = gcp_config
+
+        kong_config = None
+        if "kong" in global_data:
+            kong_config = KongGlobalConfig(**global_data["kong"])
+            global_data["kong"] = kong_config
+
         global_config = GlobalConfig(**global_data)
         logger.debug(f"Parsed global config: {global_config.host}:{global_config.port}")
 
         # Parse services
         services = []
         for svc_data in data.get("services", []):
-            upstream = Upstream(**svc_data["upstream"])
+            # Parse upstream with targets
+            upstream_data = svc_data["upstream"]
+            upstream_targets = None
+            if "targets" in upstream_data:
+                upstream_targets = [UpstreamTarget(**t) for t in upstream_data["targets"]]
+                upstream_data["targets"] = upstream_targets
+
+            upstream = Upstream(**upstream_data)
 
             # Parse routes with optional rate limiting, authentication, headers, and CORS
             routes = []

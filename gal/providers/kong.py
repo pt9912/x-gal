@@ -125,14 +125,24 @@ class KongProvider(Provider):
         logger.debug(f"Validating Kong configuration: {len(config.services)} services")
 
         # Check for request mirroring (requires Enterprise or external plugin)
+        kong_version = "OpenSource"
+        if config.global_config and config.global_config.kong:
+            kong_version = config.global_config.kong.version
+
         for service in config.services:
             for route in service.routes:
                 if route.mirroring and route.mirroring.enabled:
-                    logger.info(
-                        f"Request mirroring on route {route.path_prefix} will be generated "
-                        f"with comments. Requires Kong Enterprise Edition or external plugin "
-                        f"(e.g., request-mirror-plugin). Configuration included for reference."
-                    )
+                    if kong_version == "Enterprise":
+                        logger.info(
+                            f"Request mirroring on route {route.path_prefix} will use "
+                            f"Kong Enterprise request-mirror plugin."
+                        )
+                    else:
+                        logger.info(
+                            f"Request mirroring on route {route.path_prefix} will be generated "
+                            f"as commented YAML. Set global.kong.version='Enterprise' to "
+                            f"generate actual plugin configuration."
+                        )
 
         return True
 
@@ -480,40 +490,61 @@ class KongProvider(Provider):
                         "Consider using kong-circuit-breaker plugin or switch to a provider with native support."
                     )
 
-                # Request Mirroring: Kong does not have native mirroring support.
-                # Can be implemented with:
-                # 1. Kong Enterprise: request-mirror plugin (Enterprise feature)
-                # 2. Custom Plugin: Lua-based mirroring plugin
-                # 3. External Tool: Duplicate traffic at load balancer level
+                # Request Mirroring
                 if route.mirroring and route.mirroring.enabled:
-                    output.append("")
-                    output.append("    # ====== REQUEST MIRRORING CONFIGURATION ======")
-                    output.append("    # Kong does not have native mirroring support.")
-                    output.append("    # Options:")
-                    output.append("    #   1. Kong Enterprise: Use 'request-mirror' plugin")
-                    output.append("    #   2. Custom Lua Plugin: Implement mirroring logic")
-                    output.append("    #   3. External Tool: gor, teeproxy, or Nginx")
-                    output.append("    #")
-                    output.append("    # Example Kong Enterprise Plugin Configuration:")
-                    output.append("    # plugins:")
-                    for target in route.mirroring.targets:
-                        output.append(f"    # - name: request-mirror  # Kong Enterprise only")
+                    # Check Kong version from global config
+                    kong_version = "OpenSource"
+                    if config.global_config and config.global_config.kong:
+                        kong_version = config.global_config.kong.version
+
+                    if kong_version == "Enterprise":
+                        # Generate actual Enterprise plugin configuration
+                        for target in route.mirroring.targets:
+                            mirror_plugin = {
+                                "name": "request-mirror",
+                                "config": {
+                                    "mirror_host": f"http://{target.upstream.host}:{target.upstream.port}",
+                                    "mirror_path": route.path_prefix,
+                                }
+                            }
+
+                            if target.sample_percentage < 100.0:
+                                mirror_plugin["config"]["sample_rate"] = target.sample_percentage / 100.0
+
+                            if target.headers:
+                                mirror_plugin["config"]["headers"] = target.headers
+
+                            route_plugins.append(mirror_plugin)
+                    else:
+                        # Generate commented configuration for OpenSource
+                        output.append("")
+                        output.append("    # ====== REQUEST MIRRORING CONFIGURATION ======")
+                        output.append("    # Kong OpenSource does not have native mirroring support.")
+                        output.append("    # Options:")
+                        output.append("    #   1. Kong Enterprise: Use 'request-mirror' plugin (set global.kong.version='Enterprise')")
+                        output.append("    #   2. Custom Lua Plugin: Implement mirroring logic")
+                        output.append("    #   3. External Tool: gor, teeproxy, or Nginx")
+                        output.append("    #")
+                        output.append("    # Example Kong Enterprise Plugin Configuration:")
+                        output.append("    # plugins:")
+                        for target in route.mirroring.targets:
+                            output.append(f"    # - name: request-mirror  # Kong Enterprise only")
+                            output.append("    #   config:")
+                            output.append(f"    #     mirror_host: http://{target.upstream.host}:{target.upstream.port}")
+                            output.append(f"    #     mirror_path: {route.path_prefix}")
+                            if target.sample_percentage < 100.0:
+                                output.append(f"    #     sample_rate: {target.sample_percentage / 100.0}")
+                            if target.headers:
+                                output.append("    #     headers:")
+                                for key, value in target.headers.items():
+                                    output.append(f"    #       {key}: {value}")
+                        output.append("    #")
+                        output.append("    # Alternative: Custom Lua Plugin (example skeleton)")
+                        output.append("    # - name: custom-mirror")
                         output.append("    #   config:")
-                        output.append(f"    #     mirror_host: http://{target.upstream.host}:{target.upstream.port}")
-                        output.append(f"    #     mirror_path: {route.path_prefix}")
-                        if target.sample_percentage < 100.0:
-                            output.append(f"    #     sample_rate: {target.sample_percentage / 100.0}")
-                        if target.headers:
-                            output.append("    #     headers:")
-                            for key, value in target.headers.items():
-                                output.append(f"    #       {key}: {value}")
-                    output.append("    #")
-                    output.append("    # Alternative: Custom Lua Plugin (example skeleton)")
-                    output.append("    # - name: custom-mirror")
-                    output.append("    #   config:")
-                    output.append("    #     mirror_upstream: <upstream_name>")
-                    output.append("    # ============================================")
-                    output.append("")
+                        output.append("    #     mirror_upstream: <upstream_name>")
+                        output.append("    # ============================================")
+                        output.append("")
 
                 # Write all route plugins
                 if route_plugins:
@@ -533,6 +564,11 @@ class KongProvider(Provider):
                                             output.append(f"        - '*'")
                                         else:
                                             output.append(f"        - {item}")
+                                elif isinstance(value, dict):
+                                    # Format dict as YAML (e.g., headers)
+                                    output.append(f"        {key}:")
+                                    for k, v in value.items():
+                                        output.append(f"          {k}: {v}")
                                 else:
                                     output.append(f"        {key}: {value}")
 

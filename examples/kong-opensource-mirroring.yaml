@@ -1,0 +1,33 @@
+version: "1.0"
+provider: gal
+
+global:
+  host: 0.0.0.0
+  port: 8000
+  # No kong config = defaults to OpenSource
+
+services:
+  - name: api_service
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: api-v1
+          port: 8080
+    routes:
+      - path_prefix: /api/v1
+        methods: [GET, POST]
+        mirroring:
+          enabled: true
+          mirror_request_body: true
+          mirror_headers: true
+          targets:
+            - name: shadow-v2
+              upstream:
+                host: shadow-api-v2
+                port: 8080
+              sample_percentage: 10.0
+              timeout: "5s"
+              headers:
+                X-Mirror: "true"
+                X-Shadow-Version: "v2"
