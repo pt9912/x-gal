@@ -1,0 +1,159 @@
+version: "1.0"
+provider: "envoy"
+
+global:
+  host: "0.0.0.0"
+  port: 10000
+  timeout: "30s"
+
+services:
+  # Scenario 1: Simple Request Mirroring (100%)
+  # Use Case: Test new version with all production traffic
+  - name: "api_service_simple_mirror"
+    type: "http"
+
+
+    upstream:
+      host: "api-v1"
+      port: 8080
+    routes:
+      - path_prefix: "/api/v1"
+        mirroring:
+          enabled: true
+          mirror_request_body: true
+          mirror_headers: true
+          targets:
+            - name: "shadow-v2"
+              upstream:
+                host: "shadow-api-v2"
+                port: 8080
+              sample_percentage: 100.0
+              timeout: "5s"
+              headers:
+                X-Mirror: "true"
+                X-Shadow-Version: "v2"
+
+  # Scenario 2: Sampled Mirroring (10%)
+  # Use Case: Performance testing with subset of traffic
+  - name: "api_service_sampled_mirror"
+    type: "http"
+
+    upstream:
+      host: "api-v1"
+      port: 8080
+    routes:
+      - path_prefix: "/api/users"
+        mirroring:
+          enabled: true
+          mirror_request_body: true
+          mirror_headers: true
+          targets:
+            - name: "shadow-v2"
+              upstream:
+                host: "shadow-api-v2"
+                port: 8080
+              sample_percentage: 10.0
+              timeout: "3s"
+
+  # Scenario 3: Multiple Shadow Targets
+  # Use Case: Compare multiple versions simultaneously
+  - name: "api_service_multi_mirror"
+    type: "http"
+
+    upstream:
+      host: "api-v1"
+      port: 8080
+    routes:
+      - path_prefix: "/api/orders"
+        mirroring:
+          enabled: true
+          mirror_request_body: true
+          mirror_headers: true
+          targets:
+            - name: "shadow-v2"
+              upstream:
+                host: "shadow-api-v2"
+                port: 8080
+              sample_percentage: 50.0
+              timeout: "5s"
+              headers:
+                X-Shadow-Version: "v2"
+            - name: "shadow-v3"
+              upstream:
+                host: "shadow-api-v3"
+                port: 8080
+              sample_percentage: 10.0
+              timeout: "3s"
+              headers:
+                X-Shadow-Version: "v3"
+
+  # Scenario 4: Headers-Only Mirroring
+  # Use Case: Reduce shadow backend load (no body copying)
+  - name: "api_service_headers_only"
+    type: "http"
+
+    upstream:
+      host: "api-v1"
+      port: 8080
+    routes:
+      - path_prefix: "/api/products"
+        mirroring:
+          enabled: true
+          mirror_request_body: false  # Only copy headers, not body
+          mirror_headers: true
+          targets:
+            - name: "shadow-analytics"
+              upstream:
+                host: "shadow-analytics"
+                port: 8080
+              sample_percentage: 100.0
+              timeout: "2s"
+
+  # Scenario 5: Production Testing Before Rollout
+  # Use Case: Validate new deployment with real traffic
+  - name: "api_service_production_test"
+    type: "http"
+
+    upstream:
+      host: "api-v1-stable"
+      port: 8080
+    routes:
+      - path_prefix: "/api/payments"
+        mirroring:
+          enabled: true
+          mirror_request_body: true
+          mirror_headers: true
+          targets:
+            - name: "shadow-v1-new-deployment"
+              upstream:
+                host: "api-v1-new"
+                port: 8080
+              sample_percentage: 100.0
+              timeout: "10s"
+              headers:
+                X-Mirror: "true"
+                X-Test-Deployment: "true"
+
+  # Scenario 6: Bug Detection Shadow
+  # Use Case: Find bugs in new version with limited traffic
+  - name: "api_service_bug_detection"
+    type: "http"
+
+    upstream:
+      host: "api-v1"
+      port: 8080
+    routes:
+      - path_prefix: "/api/search"
+        mirroring:
+          enabled: true
+          mirror_request_body: true
+          mirror_headers: true
+          targets:
+            - name: "shadow-bugfix-test"
+              upstream:
+                host: "shadow-api-bugfix"
+                port: 8080
+              sample_percentage: 5.0  # Only 5% to find bugs
+              timeout: "5s"
+              headers:
+                X-Shadow-Purpose: "bug-detection"

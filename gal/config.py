@@ -60,6 +60,9 @@ __all__ = [
     "RoutingRules",
     "SplitTarget",
     "TrafficSplitConfig",
+    # Request mirroring (Feature 6)
+    "MirrorTarget",
+    "MirroringConfig",
     # Route & Service
     "Route",
     "Service",
@@ -301,6 +304,7 @@ class Route:
         retry: Optional retry policy configuration for this route
         grpc_transformation: Optional gRPC transformation configuration
         traffic_split: Optional traffic splitting configuration for A/B testing
+        mirroring: Optional request mirroring/shadowing configuration
 
     Example:
         >>> route = Route(path_prefix="/api/users", methods=["GET", "POST"])
@@ -321,6 +325,7 @@ class Route:
     retry: Optional["RetryConfig"] = None
     grpc_transformation: Optional["GrpcTransformation"] = None
     traffic_split: Optional["TrafficSplitConfig"] = None
+    mirroring: Optional["MirroringConfig"] = None
 
 
 @dataclass
@@ -1589,6 +1594,119 @@ class TrafficSplitConfig:
 
 
 @dataclass
+class MirrorTarget:
+    """Shadow backend configuration for request mirroring.
+
+    Defines a mirror/shadow target that receives duplicated requests
+    for testing, analysis, or performance validation without affecting
+    the primary response.
+
+    Attributes:
+        name: Unique identifier for the mirror target
+        upstream: Backend server configuration (host, port, scheme)
+        sample_percentage: Percentage of requests to mirror (0-100, default: 100)
+        timeout: Timeout for mirror requests (default: "5s")
+        headers: Optional additional headers to inject (e.g., X-Mirror: true)
+
+    Example:
+        >>> target = MirrorTarget(
+        ...     name="shadow-v2",
+        ...     upstream=UpstreamTarget("shadow-api-v2", 8080),
+        ...     sample_percentage=50.0,
+        ...     timeout="3s",
+        ...     headers={"X-Mirror": "true", "X-Shadow-Version": "v2"}
+        ... )
+        >>> target.sample_percentage
+        50.0
+    """
+
+    name: str
+    upstream: UpstreamTarget
+    sample_percentage: float = 100.0
+    timeout: str = "5s"
+    headers: Optional[Dict[str, str]] = None
+
+    def __post_init__(self):
+        """Validate mirror target configuration."""
+        if not (0 <= self.sample_percentage <= 100):
+            raise ValueError(
+                f"sample_percentage must be between 0 and 100, got {self.sample_percentage}"
+            )
+
+
+@dataclass
+class MirroringConfig:
+    """Request mirroring/shadowing configuration.
+
+    Enables shadow traffic by duplicating requests to mirror targets
+    while returning responses from the primary backend. Useful for:
+    - Production testing without user impact
+    - Performance validation under real load
+    - Bug detection before full rollout
+    - Data collection from new versions
+
+    Attributes:
+        enabled: Whether request mirroring is enabled
+        targets: List of mirror/shadow backend targets
+        mirror_request_body: Whether to copy request body (default: True)
+        mirror_headers: Whether to copy request headers (default: True)
+
+    Example (Simple Mirroring):
+        >>> config = MirroringConfig(
+        ...     enabled=True,
+        ...     targets=[
+        ...         MirrorTarget("shadow", UpstreamTarget("shadow-api", 8080))
+        ...     ]
+        ... )
+        >>> config.targets[0].sample_percentage
+        100.0
+
+    Example (Sampled Mirroring):
+        >>> config = MirroringConfig(
+        ...     enabled=True,
+        ...     targets=[
+        ...         MirrorTarget(
+        ...             "shadow-v2",
+        ...             UpstreamTarget("shadow-api-v2", 8080),
+        ...             sample_percentage=10.0
+        ...         )
+        ...     ],
+        ...     mirror_headers=True,
+        ...     mirror_request_body=True
+        ... )
+        >>> config.targets[0].sample_percentage
+        10.0
+
+    Example (Multiple Shadows):
+        >>> config = MirroringConfig(
+        ...     enabled=True,
+        ...     targets=[
+        ...         MirrorTarget("shadow-v2", UpstreamTarget("api-v2", 8080), sample_percentage=50.0),
+        ...         MirrorTarget("shadow-v3", UpstreamTarget("api-v3", 8080), sample_percentage=10.0)
+        ...     ]
+        ... )
+        >>> len(config.targets)
+        2
+    """
+
+    enabled: bool = False
+    targets: List[MirrorTarget] = field(default_factory=list)
+    mirror_request_body: bool = True
+    mirror_headers: bool = True
+
+    def __post_init__(self):
+        """Validate mirroring configuration."""
+        if self.enabled:
+            if not self.targets:
+                raise ValueError("At least one mirror target is required when enabled=True")
+
+            # Validate unique target names
+            names = [t.name for t in self.targets]
+            if len(names) != len(set(names)):
+                raise ValueError("Mirror target names must be unique")
+
+
+@dataclass
 class Config:
     """Main GAL configuration container.
 
@@ -1787,6 +1905,31 @@ class Config:
                         fallback_target=ts_data.get("fallback_target"),
                     )
 
+                # Parse mirroring
+                mirroring = None
+                if "mirroring" in route_data:
+                    mir_data = route_data["mirroring"]
+
+                    # Parse mirror targets
+                    mirror_targets = []
+                    for target_data in mir_data.get("targets", []):
+                        upstream_target = UpstreamTarget(**target_data["upstream"])
+                        mirror_target = MirrorTarget(
+                            name=target_data["name"],
+                            upstream=upstream_target,
+                            sample_percentage=target_data.get("sample_percentage", 100.0),
+                            timeout=target_data.get("timeout", "5s"),
+                            headers=target_data.get("headers"),
+                        )
+                        mirror_targets.append(mirror_target)
+
+                    mirroring = MirroringConfig(
+                        enabled=mir_data.get("enabled", False),
+                        targets=mirror_targets,
+                        mirror_request_body=mir_data.get("mirror_request_body", True),
+                        mirror_headers=mir_data.get("mirror_headers", True),
+                    )
+
                 route = Route(
                     path_prefix=route_data["path_prefix"],
                     methods=route_data.get("methods"),
@@ -1800,6 +1943,7 @@ class Config:
                     timeout=timeout,
                     retry=retry,
                     traffic_split=traffic_split,
+                    mirroring=mirroring,
                 )
                 routes.append(route)
 
