@@ -1253,6 +1253,266 @@ GAL testet den Nginx Import mit folgenden Szenarien:
 
 ---
 
+## Request Mirroring/Shadowing
+
+### Übersicht
+
+Nginx unterstützt Request Mirroring nativ mit der `mirror` Directive. GAL generiert automatisch die Mirror-Konfiguration mit Sample Percentage Support.
+
+**Use Cases:**
+- **Canary Testing**: Neuen Backend-Service mit Production Traffic testen
+- **Performance Testing**: Shadow-Backend unter Last testen ohne User Impact
+- **Bug Detection**: Unterschiede zwischen Versionen erkennen
+- **Monitoring & Analytics**: Traffic-Analyse auf Shadow-System
+
+### Konfigurationsbeispiel
+
+```yaml
+services:
+  - name: user_api
+    protocol: http
+    upstream:
+      targets:
+        - host: backend.example.com
+          port: 443
+    routes:
+      - path_prefix: /api/users
+        http_methods: ["GET", "POST", "PUT"]
+        mirroring:
+          enabled: true
+          targets:
+            - name: shadow-v2
+              upstream:
+                host: shadow.example.com
+                port: 443
+              sample_percentage: 50
+              timeout: 5
+              headers:
+                X-Mirror: "true"
+                X-Shadow-Version: "v2"
+```
+
+### Generierte Nginx-Konfiguration
+
+```nginx
+# Mirror backend upstream
+upstream shadow-v2_mirror {
+    server shadow.example.com:443;
+}
+
+# Split Clients für Sample Percentage (50%)
+split_clients "${remote_addr}${msec}" $mirror_target_shadow_v2 {
+    50%     shadow-v2_mirror;
+    *       "";
+}
+
+server {
+    listen 80;
+
+    location /api/users {
+        # Original request zum Primary Backend
+        proxy_pass http://backend.example.com;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+
+        # Mirror request aktivieren
+        mirror /mirror_shadow-v2;
+        mirror_request_body on;  # Body für POST/PUT mirroren
+    }
+
+    # Internal Mirror Location
+    location = /mirror_shadow-v2 {
+        internal;
+
+        # Conditional Mirroring (Sample Percentage)
+        if ($mirror_target_shadow_v2 = "") {
+            return 204;
+        }
+
+        # Mirror Request
+        proxy_pass https://$mirror_target_shadow_v2$request_uri;
+        proxy_http_version 1.1;
+        proxy_set_header Host shadow.example.com;
+        proxy_set_header X-Mirror "true";
+        proxy_set_header X-Shadow-Version "v2";
+        proxy_set_header X-Real-IP $remote_addr;
+
+        # Timeout für Mirror Requests
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 5s;
+        proxy_read_timeout 5s;
+    }
+}
+```
+
+### Sample Percentage Mechanismus
+
+Nginx hat **kein natives Sample Percentage** für `mirror`. GAL verwendet `split_clients` als Workaround:
+
+```nginx
+# split_clients nutzt Hash von remote_addr + msec (Millisekunden)
+split_clients "${remote_addr}${msec}" $mirror_target {
+    50%     shadow_backend;  # 50% der Requests
+    *       "";              # 50% kein Mirror
+}
+
+location = /mirror_endpoint {
+    internal;
+    if ($mirror_target = "") {
+        return 204;  # Kein Mirror, early return
+    }
+    proxy_pass http://$mirror_target;
+}
+```
+
+**Verteilung:**
+- `${remote_addr}${msec}`: Hash-Seed (IP + Millisekunden)
+- `50%`: Erste 50% der Hash-Range → Mirror
+- `*`: Restliche 50% → Kein Mirror
+
+### Multiple Mirror Targets
+
+Nginx unterstützt **multiple mirror Locations**:
+
+```nginx
+location /api {
+    proxy_pass http://primary_backend;
+
+    # Multiple Mirror Targets
+    mirror /mirror_shadow_v2;
+    mirror /mirror_analytics;
+    mirror_request_body on;
+}
+
+location = /mirror_shadow_v2 {
+    internal;
+    proxy_pass https://shadow-v2.example.com;
+}
+
+location = /mirror_analytics {
+    internal;
+    proxy_pass https://analytics.example.com;
+}
+```
+
+### Best Practices
+
+**1. Timeout-Konfiguration:**
+```nginx
+location = /mirror_endpoint {
+    proxy_connect_timeout 5s;   # Connection Timeout
+    proxy_send_timeout 5s;       # Send Timeout
+    proxy_read_timeout 5s;       # Read Timeout (Fire-and-Forget)
+}
+```
+
+**2. Fire-and-Forget:**
+- Mirror Requests blockieren **nicht** das Primary Response
+- Nginx wartet **nicht** auf Mirror Response
+- Mirror Errors beeinflussen **nicht** den Primary Request
+
+**3. Custom Headers:**
+```nginx
+location = /mirror_endpoint {
+    proxy_set_header X-Mirror "true";
+    proxy_set_header X-Original-URI $request_uri;
+    proxy_set_header X-Original-Method $request_method;
+    proxy_set_header X-Mirror-Timestamp $msec;
+}
+```
+
+**4. Mirror Request Body:**
+```nginx
+location /api {
+    mirror /mirror_endpoint;
+    mirror_request_body on;   # ⚠️ Wichtig für POST/PUT/PATCH!
+}
+```
+
+**5. Conditional Mirroring:**
+```nginx
+# Mirror nur für bestimmte Methods
+map $request_method $mirror_method {
+    POST    /mirror_endpoint;
+    PUT     /mirror_endpoint;
+    default "";
+}
+
+location /api {
+    proxy_pass http://backend;
+    mirror $mirror_method;
+    mirror_request_body on;
+}
+```
+
+### Monitoring
+
+**Nginx Access Logs:**
+```nginx
+log_format mirror_log '$remote_addr - $remote_user [$time_local] '
+                      '"$request" $status $body_bytes_sent '
+                      '"$http_referer" "$http_user_agent" '
+                      'mirror=$upstream_addr mirror_status=$upstream_status';
+
+access_log /var/log/nginx/mirror.log mirror_log;
+```
+
+**Prometheus Metrics (via nginx-prometheus-exporter):**
+- `nginx_http_requests_total{location="/mirror_endpoint"}`
+- `nginx_http_request_duration_seconds{location="/mirror_endpoint"}`
+
+### Deployment
+
+```bash
+# GAL Config → Nginx Config generieren
+gal generate -c config.yaml -p nginx -o nginx.conf
+
+# Nginx Config validieren
+nginx -t -c nginx.conf
+
+# Nginx reloaden (ohne Downtime)
+nginx -s reload
+
+# Oder: Docker Container
+docker run -d \
+  -v $(pwd)/nginx.conf:/etc/nginx/nginx.conf:ro \
+  -p 80:80 \
+  openresty/openresty:latest
+```
+
+### Troubleshooting
+
+**Problem 1: Mirror Requests funktionieren nicht**
+```bash
+# Check split_clients Distribution
+nginx -V 2>&1 | grep -o with-http_split_clients_module
+
+# Access Logs prüfen
+tail -f /var/log/nginx/access.log | grep "mirror"
+
+# Mirror Location testen
+curl -H "X-Debug: true" http://localhost/mirror_endpoint
+```
+
+**Problem 2: POST Body wird nicht gespiegelt**
+```nginx
+# mirror_request_body MUSS aktiviert sein!
+location /api {
+    mirror /mirror_endpoint;
+    mirror_request_body on;  # ← WICHTIG!
+}
+```
+
+**Problem 3: Sample Percentage stimmt nicht**
+- `split_clients` Hash-basiert (nicht exakt 50/50)
+- Bei kleinen Request-Counts: Schwankungen normal
+- Bei 1000+ Requests: ±5% Toleranz erwartet
+
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#nginx) für erweiterte Szenarien und E2E Tests.
+
+---
+
 ## Nginx Directive Coverage
 
 Detaillierte Analyse basierend auf dem [offiziellen Nginx Directive Index](https://nginx.org/en/docs/dirindex.html).
