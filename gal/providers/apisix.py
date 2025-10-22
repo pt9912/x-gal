@@ -31,6 +31,7 @@ from ..config import (
     RateLimitConfig,
     Route,
     Service,
+    TrafficSplitConfig,
     Upstream,
     UpstreamTarget,
 )
@@ -334,6 +335,15 @@ class APISIXProvider(Provider):
                         },
                     }
                     route_config["plugins"]["api-breaker"] = cb_config
+
+                # Add traffic splitting plugin if configured
+                if route.traffic_split and route.traffic_split.enabled:
+                    if "plugins" not in route_config:
+                        route_config["plugins"] = {}
+                    traffic_split_config = self._generate_traffic_split_plugin(
+                        service, route, route.traffic_split
+                    )
+                    route_config["plugins"]["traffic-split"] = traffic_split_config
 
                 # Add timeout configuration if specified
                 if route.timeout:
@@ -660,6 +670,120 @@ class APISIXProvider(Provider):
         lua_code.append("end")
 
         return "\n".join(lua_code)
+
+    def _generate_traffic_split_plugin(
+        self, service: Service, route: Route, traffic_split: TrafficSplitConfig
+    ) -> Dict[str, Any]:
+        """Generate APISIX traffic-split plugin configuration.
+
+        Creates plugin configuration for A/B testing and canary deployments using
+        APISIX's native traffic-split plugin with weighted upstreams and match rules.
+
+        Args:
+            service: Service with traffic splitting
+            route: Route with traffic_split configuration
+            traffic_split: Traffic split configuration
+
+        Returns:
+            Dict with traffic-split plugin configuration
+        """
+        plugin_config = {"rules": []}
+
+        # Check if we have routing rules (header/cookie based)
+        has_routing_rules = (
+            traffic_split.routing_rules
+            and (
+                traffic_split.routing_rules.header_rules
+                or traffic_split.routing_rules.cookie_rules
+            )
+        )
+
+        if has_routing_rules:
+            # Generate rules for header-based routing
+            if traffic_split.routing_rules.header_rules:
+                for rule in traffic_split.routing_rules.header_rules:
+                    # Find the target upstream
+                    target = next(
+                        (t for t in traffic_split.targets if t.name == rule.target_name), None
+                    )
+                    if target:
+                        plugin_config["rules"].append(
+                            {
+                                "match": [
+                                    {
+                                        "vars": [
+                                            ["http_" + rule.header_name.lower().replace("-", "_"),
+                                             "==",
+                                             rule.header_value]
+                                        ]
+                                    }
+                                ],
+                                "weighted_upstreams": [
+                                    {
+                                        "upstream": {
+                                            "name": f"{service.name}_{target.name}_upstream",
+                                            "type": "roundrobin",
+                                            "nodes": {
+                                                f"{target.upstream.host}:{target.upstream.port}": 1
+                                            },
+                                        },
+                                        "weight": 1,
+                                    }
+                                ],
+                            }
+                        )
+
+            # Generate rules for cookie-based routing
+            if traffic_split.routing_rules.cookie_rules:
+                for rule in traffic_split.routing_rules.cookie_rules:
+                    target = next(
+                        (t for t in traffic_split.targets if t.name == rule.target_name), None
+                    )
+                    if target:
+                        plugin_config["rules"].append(
+                            {
+                                "match": [
+                                    {
+                                        "vars": [
+                                            ["cookie_" + rule.cookie_name, "==", rule.cookie_value]
+                                        ]
+                                    }
+                                ],
+                                "weighted_upstreams": [
+                                    {
+                                        "upstream": {
+                                            "name": f"{service.name}_{target.name}_upstream",
+                                            "type": "roundrobin",
+                                            "nodes": {
+                                                f"{target.upstream.host}:{target.upstream.port}": 1
+                                            },
+                                        },
+                                        "weight": 1,
+                                    }
+                                ],
+                            }
+                        )
+
+        # Add default weight-based routing (always as fallback or primary)
+        weighted_upstreams = []
+        for target in traffic_split.targets:
+            if target.weight > 0:  # Only add targets with weight > 0
+                weighted_upstreams.append(
+                    {
+                        "upstream": {
+                            "name": f"{service.name}_{target.name}_upstream",
+                            "type": "roundrobin",
+                            "nodes": {f"{target.upstream.host}:{target.upstream.port}": 1},
+                        },
+                        "weight": target.weight,
+                    }
+                )
+
+        # Add weight-based rule (no match = applies to all requests not matched above)
+        if weighted_upstreams:
+            plugin_config["rules"].append({"weighted_upstreams": weighted_upstreams})
+
+        return plugin_config
 
     def _generate_grpc_transformation_apisix(self, route: Route, config: Config) -> Dict[str, Any]:
         """Generate APISIX serverless-pre-function plugin for gRPC transformation.
