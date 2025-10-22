@@ -17,6 +17,7 @@ __all__ = [
     "LoggingConfig",
     "MetricsConfig",
     "AzureAPIMGlobalConfig",
+    "AzureAPIMConfig",
     "AWSAPIGatewayConfig",
     "GCPAPIGatewayConfig",
     # Upstream configuration
@@ -24,6 +25,8 @@ __all__ = [
     "Upstream",
     "ActiveHealthCheck",
     "PassiveHealthCheck",
+    "HealthCheckConfig",
+    "LoadBalancerConfig",
     # Rate limiting
     "RateLimitConfig",
     # Authentication
@@ -32,26 +35,25 @@ __all__ = [
     "JwtConfig",
     "AuthenticationConfig",
     # Headers & CORS
-    "HeaderConfig",
-    "CorsConfig",
+    "HeaderManipulation",
+    "CORSPolicy",
     # Circuit breaker
     "CircuitBreakerConfig",
     # Timeout & retry
     "TimeoutConfig",
-    "RetryPolicyConfig",
+    "RetryConfig",
     # WebSocket
     "WebSocketConfig",
     # Transformations
     "ComputedField",
     "Validation",
-    "BodyTransformation",
-    "RequestTransformation",
-    "ResponseTransformation",
+    "RequestBodyTransformation",
+    "ResponseBodyTransformation",
+    "BodyTransformationConfig",
     "Transformation",
     # gRPC
     "ProtoDescriptor",
-    "GrpcTranscodingRoute",
-    "GrpcServiceConfig",
+    "GrpcTransformation",
     # Traffic splitting (Feature 5)
     "HeaderMatchRule",
     "CookieMatchRule",

@@ -52,7 +52,7 @@ class TestEnvoyTrafficSplitRuntime:
                 ["docker", "compose", "ps", "--format", "json"],
                 cwd=compose_dir,
                 capture_output=True,
-                text=True
+                text=True,
             )
             if i % 10 == 0:  # Log every 10 seconds
                 print(f"  Waiting... ({i}s) - Container status check")
@@ -205,7 +205,7 @@ class TestNginxTrafficSplitRuntime:
                 ["docker", "compose", "ps", "--format", "json"],
                 cwd=compose_dir,
                 capture_output=True,
-                text=True
+                text=True,
             )
             if i % 10 == 0:  # Log every 10 seconds
                 print(f"  Waiting... ({i}s) - Container status check")
@@ -322,7 +322,7 @@ class TestKongTrafficSplitRuntime:
                 ["docker", "compose", "ps", "--format", "json"],
                 cwd=compose_dir,
                 capture_output=True,
-                text=True
+                text=True,
             )
             if i % 10 == 0:  # Log every 10 seconds
                 print(f"  Waiting... ({i}s) - Container status check")
@@ -437,7 +437,7 @@ class TestHAProxyTrafficSplitRuntime:
                 ["docker", "compose", "ps", "--format", "json"],
                 cwd=compose_dir,
                 capture_output=True,
-                text=True
+                text=True,
             )
             if i % 10 == 0:  # Log every 10 seconds
                 print(f"  Waiting... ({i}s) - Container status check")
@@ -533,7 +533,7 @@ class TestTraefikTrafficSplitRuntime:
                 ["docker", "compose", "ps", "--format", "json"],
                 cwd=compose_dir,
                 capture_output=True,
-                text=True
+                text=True,
             )
             if i % 10 == 0:  # Log every 10 seconds
                 print(f"  Waiting... ({i}s) - Container status check")
@@ -629,7 +629,7 @@ class TestAPISIXTrafficSplitRuntime:
                 ["docker", "compose", "ps", "--format", "json"],
                 cwd=compose_dir,
                 capture_output=True,
-                text=True
+                text=True,
             )
             if i % 10 == 0:  # Log every 10 seconds
                 print(f"  Waiting... ({i}s) - Container status check")
