@@ -1,0 +1,28 @@
+routes:
+  - uri: /api/v1*
+    id: 1
+    upstream_id: 1
+    plugins:
+      traffic-split:
+        rules:
+          - weighted_upstreams:
+              - upstream:
+                  name: stable
+                  type: roundrobin
+                  nodes:
+                    backend-stable:8080: 1
+                weight: 90
+              - upstream:
+                  name: canary
+                  type: roundrobin
+                  nodes:
+                    backend-canary:8080: 1
+                weight: 10
+
+upstreams:
+  - id: 1
+    type: roundrobin
+    nodes:
+      backend-stable:8080: 1
+
+#END

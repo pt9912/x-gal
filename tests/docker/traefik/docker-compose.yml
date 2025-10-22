@@ -38,14 +38,14 @@ services:
     image: traefik:v2.10
     command:
       - "--api.insecure=true"
+      - "--api.dashboard=true"
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"
-      - "--entrypoints.web.address=:8080"
+      - "--entrypoints.web.address=:80"
     volumes:
       - ./traefik.yml:/etc/traefik/dynamic/traefik.yml:ro
     ports:
-      - "8080:8080"  # HTTP entrypoint
-      - "8081:8080"  # Dashboard (optional)
+      - "8080:80"  # HTTP entrypoint
     networks:
       - test-network
     depends_on:

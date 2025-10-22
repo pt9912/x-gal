@@ -47,6 +47,16 @@ class TestEnvoyTrafficSplitRuntime:
         print("⏳ Waiting for Envoy to be healthy...")
         max_wait = 30
         for i in range(max_wait):
+            # Check container status
+            result = subprocess.run(
+                ["docker", "compose", "ps", "--format", "json"],
+                cwd=compose_dir,
+                capture_output=True,
+                text=True
+            )
+            if i % 10 == 0:  # Log every 10 seconds
+                print(f"  Waiting... ({i}s) - Container status check")
+
             try:
                 response = requests.get("http://localhost:9901/ready", timeout=2)
                 if response.status_code == 200:
@@ -57,7 +67,9 @@ class TestEnvoyTrafficSplitRuntime:
             time.sleep(1)
         else:
             # Show logs if startup failed
-            subprocess.run(["docker", "compose", "logs"], cwd=compose_dir)
+            print("❌ Envoy did not become ready in time. Showing logs:")
+            subprocess.run(["docker", "compose", "ps"], cwd=compose_dir)
+            subprocess.run(["docker", "compose", "logs", "envoy"], cwd=compose_dir)
             pytest.fail("Envoy did not become ready in time")
 
         # Additional wait for backends
@@ -188,6 +200,16 @@ class TestNginxTrafficSplitRuntime:
         print("⏳ Waiting for Nginx to be healthy...")
         max_wait = 30
         for i in range(max_wait):
+            # Check container status
+            result = subprocess.run(
+                ["docker", "compose", "ps", "--format", "json"],
+                cwd=compose_dir,
+                capture_output=True,
+                text=True
+            )
+            if i % 10 == 0:  # Log every 10 seconds
+                print(f"  Waiting... ({i}s) - Container status check")
+
             try:
                 response = requests.get("http://localhost:8080/api/v1", timeout=2)
                 if response.status_code == 200:
@@ -198,7 +220,9 @@ class TestNginxTrafficSplitRuntime:
             time.sleep(1)
         else:
             # Show logs if startup failed
-            subprocess.run(["docker", "compose", "logs"], cwd=compose_dir)
+            print("❌ Nginx did not become ready in time. Showing logs:")
+            subprocess.run(["docker", "compose", "ps"], cwd=compose_dir)
+            subprocess.run(["docker", "compose", "logs", "nginx"], cwd=compose_dir)
             pytest.fail("Nginx did not become ready in time")
 
         # Additional wait for backends
@@ -293,6 +317,16 @@ class TestKongTrafficSplitRuntime:
         print("⏳ Waiting for Kong to be healthy...")
         max_wait = 30
         for i in range(max_wait):
+            # Check container status
+            result = subprocess.run(
+                ["docker", "compose", "ps", "--format", "json"],
+                cwd=compose_dir,
+                capture_output=True,
+                text=True
+            )
+            if i % 10 == 0:  # Log every 10 seconds
+                print(f"  Waiting... ({i}s) - Container status check")
+
             try:
                 response = requests.get("http://localhost:8001/status", timeout=2)
                 if response.status_code == 200:
@@ -303,7 +337,9 @@ class TestKongTrafficSplitRuntime:
             time.sleep(1)
         else:
             # Show logs if startup failed
-            subprocess.run(["docker", "compose", "logs"], cwd=compose_dir)
+            print("❌ Kong did not become ready in time. Showing logs:")
+            subprocess.run(["docker", "compose", "ps"], cwd=compose_dir)
+            subprocess.run(["docker", "compose", "logs", "kong"], cwd=compose_dir)
             pytest.fail("Kong did not become ready in time")
 
         # Additional wait for backends
@@ -396,6 +432,16 @@ class TestHAProxyTrafficSplitRuntime:
         print("⏳ Waiting for HAProxy to be healthy...")
         max_wait = 30
         for i in range(max_wait):
+            # Check container status
+            result = subprocess.run(
+                ["docker", "compose", "ps", "--format", "json"],
+                cwd=compose_dir,
+                capture_output=True,
+                text=True
+            )
+            if i % 10 == 0:  # Log every 10 seconds
+                print(f"  Waiting... ({i}s) - Container status check")
+
             try:
                 response = requests.get("http://localhost:8080/api/v1", timeout=2)
                 if response.status_code == 200:
@@ -405,7 +451,9 @@ class TestHAProxyTrafficSplitRuntime:
                 pass
             time.sleep(1)
         else:
-            subprocess.run(["docker", "compose", "logs"], cwd=compose_dir)
+            print("❌ HAProxy did not become ready in time. Showing logs:")
+            subprocess.run(["docker", "compose", "ps"], cwd=compose_dir)
+            subprocess.run(["docker", "compose", "logs", "haproxy"], cwd=compose_dir)
             pytest.fail("HAProxy did not become ready in time")
 
         time.sleep(2)
