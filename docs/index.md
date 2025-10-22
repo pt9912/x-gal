@@ -86,6 +86,12 @@ gal generate -c config.yaml -p aws_apigateway
 
     Canary Deployments, Blue/Green, Header/Cookie-Routing - alle Provider.
 
+- :material-content-copy: **Request Mirroring**
+
+    ---
+
+    Shadow Traffic für Production Testing. Sample Percentage, Custom Headers, alle Provider.
+
 - :material-test-tube: **E2E Docker Tests**
 
     ---
@@ -143,6 +149,8 @@ Detaillierte Feature-Dokumentation:
 - **[Body Transformation](guides/BODY_TRANSFORMATION.md)** - Request/Response Transformation
 - **[gRPC Transformations](guides/GRPC_TRANSFORMATIONS.md)** - Protobuf-basierte gRPC Transformationen
 - **[Azure API Management](guides/AZURE_APIM.md)** - Cloud-Native API Gateway für Azure
+- **[Traffic Splitting](guides/TRAFFIC_SPLITTING.md)** - A/B Testing, Canary Deployments, Blue/Green
+- **[Request Mirroring](guides/REQUEST_MIRRORING.md)** - Shadow Traffic, Production Testing, Sample Percentage
 - **[WebSocket](guides/WEBSOCKET.md)** - WebSocket-Unterstützung
 - **[Timeout & Retry](guides/TIMEOUT_RETRY.md)** - Timeout- & Retry-Strategien
 
@@ -191,12 +199,14 @@ Technische Details und Design:
 **Neu in v1.4.0:**
 
 - :white_check_mark: **gRPC Transformations** - Protobuf-basierte Request/Response Transformationen
-- :white_check_mark: **Azure API Management** - Cloud Provider Support mit ARM Templates
+- :white_check_mark: **Cloud Provider Support** - Azure APIM, AWS API Gateway, GCP API Gateway
+- :white_check_mark: **A/B Testing & Traffic Splitting** - Canary Deployments, Header/Cookie-Routing
+- :white_check_mark: **Request Mirroring** - Shadow Traffic für Production Testing (9/9 Provider)
 - :white_check_mark: Proto Descriptor Management (file/inline/url)
-- :white_check_mark: Azure AD JWT Validation & Subscription Keys
-- :white_check_mark: OpenAPI 3.0 Export für APIM
-- :white_check_mark: 71 neue Tests für gRPC, 29 neue Tests für Azure APIM
-- :white_check_mark: 3000+ Zeilen neue Dokumentation
+- :white_check_mark: Azure AD/AWS Cognito/GCP JWT Validation
+- :white_check_mark: OpenAPI 3.0/2.0 Export für Cloud Provider
+- :white_check_mark: 549+ Tests (89% Coverage)
+- :white_check_mark: 5000+ Zeilen neue Dokumentation
 
 [Zum Changelog →](https://github.com/pt9912/x-gal/blob/main/CHANGELOG.md)
 
