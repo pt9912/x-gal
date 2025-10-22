@@ -1072,6 +1072,118 @@ Failed Requests: 0 requests (0.0%)
 - [examples/traffic-split-example.yaml](https://github.com/pt9912/x-gal/blob/develop/examples/traffic-split-example.yaml) - 6 Beispiel-Szenarien
 - [tests/docker/apisix/](../../tests/docker/apisix/) - Docker Compose E2E Tests
 
+### 11. Request Mirroring
+
+✅ **Native Support: proxy-mirror Plugin**
+
+APISIX unterstützt Request Mirroring nativ mit dem `proxy-mirror` Plugin.
+
+**GAL Config:**
+```yaml
+routes:
+  - path_prefix: /api/users
+    mirroring:
+      enabled: true
+      targets:
+        - name: shadow-v2
+          upstream:
+            host: shadow.example.com
+            port: 443
+          sample_percentage: 50
+          headers:
+            X-Mirror: "true"
+            X-Shadow-Version: "v2"
+```
+
+**Generierte APISIX Config:**
+```json
+{
+  "routes": [{
+    "uri": "/api/users/*",
+    "name": "user_api_route",
+    "methods": ["GET", "POST", "PUT", "DELETE"],
+    "plugins": {
+      "proxy-mirror": {
+        "host": "https://shadow.example.com:443",
+        "sample_ratio": 0.5
+      }
+    },
+    "upstream": {
+      "type": "roundrobin",
+      "scheme": "https",
+      "nodes": {
+        "backend.example.com:443": 1
+      }
+    }
+  }]
+}
+```
+
+**Mit Custom Headers (serverless-pre-function):**
+```json
+{
+  "plugins": {
+    "proxy-mirror": {
+      "host": "https://shadow.example.com:443",
+      "sample_ratio": 0.5
+    },
+    "serverless-pre-function": {
+      "phase": "rewrite",
+      "functions": [
+        "return function(conf, ctx)\n  local core = require('apisix.core')\n  core.request.set_header(ctx, 'X-Mirror', 'true')\n  core.request.set_header(ctx, 'X-Shadow-Version', 'v2')\nend"
+      ]
+    }
+  }
+}
+```
+
+**Hinweise:**
+- ✅ Native `proxy-mirror` Plugin
+- ✅ `sample_ratio` für Sample Percentage (0.0-1.0, entspricht 0%-100%)
+- ✅ Fire-and-forget (kein Response Wait)
+- ⚠️ **Nur 1 Mirror Target** pro Route (keine Multiple Targets nativ)
+- ⚠️ Custom Headers via zusätzliches `serverless-pre-function` Plugin
+
+**Deployment:**
+```bash
+# Via Admin API
+curl http://localhost:9180/apisix/admin/routes/1 \
+  -H "X-API-KEY: your-api-key" \
+  -X PUT -d '{
+    "uri": "/api/users/*",
+    "plugins": {
+      "proxy-mirror": {
+        "host": "https://shadow.example.com:443",
+        "sample_ratio": 0.5
+      }
+    },
+    "upstream": {
+      "type": "roundrobin",
+      "nodes": {
+        "backend.example.com:443": 1
+      }
+    }
+  }'
+
+# Via GAL
+gal generate -c config.yaml -p apisix -o apisix.json
+curl http://localhost:9180/apisix/admin/config \
+  -H "X-API-KEY: your-api-key" \
+  -X PUT --data-binary @apisix.json
+```
+
+**Monitoring:**
+```bash
+# Plugin Status
+curl http://localhost:9180/apisix/admin/routes/1 \
+  -H "X-API-KEY: your-api-key"
+
+# Prometheus Metrics
+curl http://localhost:9091/apisix/prometheus/metrics | grep mirror
+```
+
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#3-apache-apisix-native)
+
 ---
 
 ## APISIX-spezifische Details

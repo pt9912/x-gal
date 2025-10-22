@@ -654,6 +654,166 @@ Failed Requests: 0 requests (0.0%)
 - [examples/traffic-split-example.yaml](https://github.com/pt9912/x-gal/blob/develop/examples/traffic-split-example.yaml) - 6 Beispiel-Szenarien
 - [tests/docker/traefik/](../../tests/docker/traefik/) - Docker Compose E2E Tests
 
+### 12. Request Mirroring
+
+⚠️ **Limited Support: Custom Middleware erforderlich**
+
+Traefik hat **kein natives Request Mirroring**. GAL konfiguriert einen **Custom Middleware Workaround**.
+
+**GAL Config:**
+```yaml
+routes:
+  - path_prefix: /api/users
+    mirroring:
+      enabled: true
+      targets:
+        - name: shadow-v2
+          upstream:
+            host: shadow.example.com
+            port: 443
+          sample_percentage: 50
+          headers:
+            X-Mirror: "true"
+            X-Shadow-Version: "v2"
+```
+
+**Generierte Traefik Config (Custom Middleware):**
+```yaml
+http:
+  routers:
+    user_api:
+      rule: "PathPrefix(`/api/users`)"
+      service: user_api_service
+      middlewares:
+        - mirror-middleware  # Custom Plugin erforderlich
+
+  services:
+    user_api_service:
+      loadBalancer:
+        servers:
+          - url: "https://backend.example.com:443"
+
+    shadow-v2_service:
+      loadBalancer:
+        servers:
+          - url: "https://shadow.example.com:443"
+
+  middlewares:
+    mirror-middleware:
+      plugin:
+        traefik-mirror-plugin:
+          shadow_service: shadow-v2_service
+          sample_percentage: 50
+          headers:
+            X-Mirror: "true"
+            X-Shadow-Version: "v2"
+```
+
+**Custom Middleware Plugin (Go):**
+
+Traefik benötigt ein **Custom Middleware Plugin** in Go:
+
+```go
+// traefik-mirror-plugin/mirror.go
+package traefik_mirror_plugin
+
+import (
+    "context"
+    "io"
+    "math/rand"
+    "net/http"
+)
+
+type Config struct {
+    ShadowService    string            `json:"shadow_service"`
+    SamplePercentage float64           `json:"sample_percentage"`
+    Headers          map[string]string `json:"headers"`
+}
+
+type MirrorMiddleware struct {
+    next   http.Handler
+    config *Config
+    client *http.Client
+}
+
+func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
+    return &MirrorMiddleware{
+        next:   next,
+        config: config,
+        client: &http.Client{},
+    }, nil
+}
+
+func (m *MirrorMiddleware) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+    // Sample percentage check
+    if rand.Float64()*100 < m.config.SamplePercentage {
+        // Fire-and-forget mirror request
+        go m.mirrorRequest(req)
+    }
+
+    // Continue with original request
+    m.next.ServeHTTP(rw, req)
+}
+
+func (m *MirrorMiddleware) mirrorRequest(req *http.Request) {
+    // Clone request
+    mirrorReq, _ := http.NewRequest(req.Method, m.config.ShadowService+req.URL.Path, nil)
+
+    // Add custom headers
+    for key, value := range m.config.Headers {
+        mirrorReq.Header.Set(key, value)
+    }
+
+    // Send mirror request (fire-and-forget)
+    resp, err := m.client.Do(mirrorReq)
+    if err == nil {
+        defer resp.Body.Close()
+        io.Copy(io.Discard, resp.Body)
+    }
+}
+```
+
+**Hinweise:**
+- ⚠️ **Custom Middleware Plugin erforderlich**: Kein natives Mirroring in Traefik
+- ⚠️ **Go-Entwicklung**: Plugin muss in Go geschrieben werden
+- ✅ Sample Percentage via Plugin-Config
+- ✅ Custom Headers via Plugin-Config
+- ⚠️ Plugin-Installation und -Kompilierung erforderlich
+
+**Deployment:**
+```bash
+# 1. Plugin kompilieren
+cd traefik-mirror-plugin
+go build -o mirror.so -buildmode=plugin mirror.go
+
+# 2. Plugin in Traefik-Config einbinden
+# traefik.yml (static config)
+experimental:
+  plugins:
+    traefik-mirror-plugin:
+      moduleName: github.com/yourorg/traefik-mirror-plugin
+      version: v0.1.0
+
+# 3. Dynamic Config generieren
+gal generate -c config.yaml -p traefik -o traefik-dynamic.yml
+
+# 4. Traefik starten
+traefik --configFile=traefik.yml
+```
+
+**Alternativen:**
+- **Envoy als Sidecar**: Traefik + Envoy Sidecar für natives Mirroring
+- **Service Mesh (Linkerd, Istio)**: Traffic Mirroring via Service Mesh Layer
+- **HAProxy als Alternative**: HAProxy 2.4+ mit nativem Mirroring
+
+**Limitierungen:**
+- ⚠️ Keine offizielle Traefik-Mirroring-Lösung
+- ⚠️ Custom Plugin benötigt Go-Kenntnisse
+- ⚠️ Plugin muss separat gewartet werden
+- ⚠️ Nicht alle Traefik-Versionen unterstützen Plugins
+
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#6-traefik-limited-custom-middleware)
+
 ---
 
 ## Provider-Vergleich
