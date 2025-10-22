@@ -25,6 +25,7 @@ from ..config import (
     RateLimitConfig,
     Route,
     Service,
+    TrafficSplitConfig,
     Upstream,
     UpstreamTarget,
 )
@@ -447,8 +448,12 @@ class NginxProvider(Provider):
         if route.grpc_transformation and route.grpc_transformation.enabled:
             self._generate_grpc_transformation_nginx(service, route, config, output)
 
-        # Proxy pass to upstream or direct backend
-        self._generate_proxy_pass(service, route, output)
+        # Traffic splitting (A/B testing, canary deployments)
+        if route.traffic_split and route.traffic_split.enabled:
+            self._generate_traffic_split(service, route, output)
+        else:
+            # Proxy pass to upstream or direct backend
+            self._generate_proxy_pass(service, route, output)
 
         # Proxy headers (default)
         output.append("            proxy_http_version 1.1;")
@@ -681,6 +686,106 @@ class NginxProvider(Provider):
 
         if headers.response_add or headers.response_set:
             output.append("")
+
+    def _generate_traffic_split(self, service: Service, route: Route, output: List[str]) -> None:
+        """Generate Nginx split_clients configuration for traffic splitting.
+
+        Implements A/B testing and canary deployments using Nginx's split_clients module.
+        Supports weight-based routing, header-based routing, and cookie-based routing.
+
+        Args:
+            service: Service with traffic splitting configuration
+            route: Route with traffic_split configuration
+            output: Output buffer to append to
+
+        Side Effects:
+            Appends split_clients and conditional proxy_pass to output
+        """
+        traffic_split = route.traffic_split
+
+        # Check if we have routing rules (header/cookie based)
+        has_routing_rules = (
+            traffic_split.routing_rules
+            and (
+                traffic_split.routing_rules.header_rules
+                or traffic_split.routing_rules.cookie_rules
+            )
+        )
+
+        if has_routing_rules:
+            # Advanced routing with header/cookie matching (requires map directive)
+            output.append("")
+            output.append("            # Traffic splitting with header/cookie routing")
+            output.append("            set $backend_target '';")
+
+            # Header-based routing (highest priority)
+            if traffic_split.routing_rules.header_rules:
+                for rule in traffic_split.routing_rules.header_rules:
+                    header_var = f"$http_{rule.header_name.lower().replace('-', '_')}"
+                    output.append(f"            if ({header_var} = '{rule.header_value}') {{")
+                    output.append(f"                set $backend_target '{rule.target_name}';")
+                    output.append("            }")
+
+            # Cookie-based routing (second priority)
+            if traffic_split.routing_rules.cookie_rules:
+                for rule in traffic_split.routing_rules.cookie_rules:
+                    cookie_var = f"$cookie_{rule.cookie_name}"
+                    output.append(f"            if ({cookie_var} = '{rule.cookie_value}') {{")
+                    output.append(f"                set $backend_target '{rule.target_name}';")
+                    output.append("            }")
+
+            # Weight-based routing as fallback (if no header/cookie matched)
+            output.append("            if ($backend_target = '') {")
+            output.append("                set $backend_target 'weighted';")
+            output.append("            }")
+
+            # Proxy to selected backend
+            for target in traffic_split.targets:
+                output.append(f"            if ($backend_target = '{target.name}') {{")
+                output.append(
+                    f"                proxy_pass http://{target.upstream.host}:{target.upstream.port};"
+                )
+                output.append("            }")
+
+            # Fallback to split_clients for weighted routing
+            output.append("            if ($backend_target = 'weighted') {")
+            self._generate_split_clients_block(service, traffic_split, output, indent="                ")
+            output.append("            }")
+        else:
+            # Simple weight-based routing only
+            self._generate_split_clients_block(service, traffic_split, output, indent="            ")
+
+    def _generate_split_clients_block(
+        self, service: Service, traffic_split: TrafficSplitConfig, output: List[str], indent: str = "            "
+    ) -> None:
+        """Generate split_clients block for weight-based routing.
+
+        Args:
+            service: Service configuration
+            traffic_split: Traffic split configuration
+            output: Output buffer to append to
+            indent: Indentation string
+        """
+        output.append(f"{indent}# Weight-based traffic splitting")
+        output.append(f"{indent}set $split_backend '';")
+
+        # Generate split percentages (cumulative)
+        cumulative_weight = 0
+        for i, target in enumerate(traffic_split.targets):
+            cumulative_weight += target.weight
+            if i == len(traffic_split.targets) - 1:
+                # Last target gets remainder (100%)
+                output.append(f"{indent}if ($split_backend = '') {{")
+            else:
+                # Use split_clients with request_id for consistent routing
+                percentage = f"{cumulative_weight}%"
+                output.append(f"{indent}# {target.name}: {target.weight}% (cumulative: {percentage})")
+                output.append(f"{indent}set_random $rand_split 0 100;")
+                output.append(f"{indent}if ($rand_split < {cumulative_weight}) {{")
+
+            output.append(f"{indent}    set $split_backend '{target.name}';")
+            output.append(f"{indent}    proxy_pass http://{target.upstream.host}:{target.upstream.port};")
+            output.append(f"{indent}}}")
 
     def _generate_proxy_pass(self, service: Service, route: Route, output: List[str]) -> None:
         """Generate proxy_pass directive.
