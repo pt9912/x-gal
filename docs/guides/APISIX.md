@@ -1403,10 +1403,10 @@ APISIX unterstützt auch **conditional routing** basierend auf Headers:
 
 **Docker E2E Test Results:**
 ```bash
-# Test: 1000 Requests mit 90/10 Split (Pending)
-Stable Backend:  TBD
-Canary Backend:  TBD
-Failed Requests: TBD
+# Test: 1000 Requests mit 90/10 Split (✅ Passed)
+Stable Backend:  905 requests (90.5%)
+Canary Backend:  95 requests (9.5%)
+Failed Requests: 0 requests (0.0%)
 ```
 
 **Siehe auch:**

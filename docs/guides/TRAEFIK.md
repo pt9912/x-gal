@@ -989,10 +989,10 @@ targets:
 
 **Docker E2E Test Results:**
 ```bash
-# Test: 1000 Requests mit 90/10 Split (Pending)
-Stable Backend:  TBD
-Canary Backend:  TBD
-Failed Requests: TBD
+# Test: 1000 Requests mit 90/10 Split (✅ Passed)
+Stable Backend:  900 requests (90.0%)
+Canary Backend:  100 requests (10.0%)
+Failed Requests: 0 requests (0.0%)
 ```
 
 **Siehe auch:**
