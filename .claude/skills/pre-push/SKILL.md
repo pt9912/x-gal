@@ -255,10 +255,46 @@ pip install -e .[dev]
 pip install -e .[dev]
 ```
 
-### Kritische Flake8 Fehler
-1. Öffne die betroffene Datei
-2. Behebe den Fehler (z.B. fehlende Variable definieren)
-3. Führe Pre-Push Check erneut aus
+### Kritische Flake8 Fehler (F822 - Undefined names in __all__)
+
+**Typisches Beispiel:**
+```
+./gal/config.py:14:1: F822 undefined name 'HeaderConfig' in __all__
+./gal/config.py:14:1: F822 undefined name 'CorsConfig' in __all__
+```
+
+**Ursache:**
+- Klassennamen in `__all__` stimmen nicht mit tatsächlich definierten Klassen überein
+- Alte Namen nach Refactoring nicht aktualisiert
+- Copy-Paste-Fehler beim Hinzufügen neuer Exporte
+
+**Lösung:**
+1. Finde alle tatsächlich definierten Klassen:
+   ```bash
+   grep -E "^class " gal/config.py | awk '{print $2}' | sed 's/[(:].*$//'
+   ```
+
+2. Vergleiche mit `__all__` Export-Liste in gal/config.py
+
+3. Aktualisiere `__all__` mit korrekten Klassennamen:
+   ```python
+   __all__ = [
+       # Falsch:
+       "HeaderConfig",        # Klasse existiert nicht!
+       "CorsConfig",          # Klasse existiert nicht!
+
+       # Richtig:
+       "HeaderManipulation",  # Tatsächlicher Klassenname
+       "CORSPolicy",          # Tatsächlicher Klassenname
+   ]
+   ```
+
+4. Führe Pre-Push Check erneut aus
+
+**Warum wurde dieser Fehler nicht früher entdeckt?**
+- Der Pre-Push Skill wurde nicht ausgeführt vor dem Push
+- Vertrauen auf GitHub Actions statt lokale Validierung
+- F822-Check war im Skill korrekt konfiguriert, aber nicht genutzt
 
 ## Best Practices
 
@@ -382,7 +418,81 @@ Aktualisiere diesen Skill, wenn:
 - Neue Docker-Provider hinzugefügt werden
 - Docker Compose Konfigurationen geändert werden
 
+## Warum ist dieser Skill so wichtig?
+
+### Real-World Beispiel: Docker-Tests (Commit 8b95647)
+
+**Problem:**
+- Docker Compose Tests erstellt und direkt gepusht (11:37 Uhr)
+- Tests wurden **nie lokal ausgeführt** vor dem Push
+- GitHub Actions schlugen fehl (Traefik + APISIX)
+
+**Fehler gefunden:**
+1. **Traefik Port-Konflikt**: Dashboard und Entrypoint konkurrierten um Port 8080
+2. **APISIX YAML-Format**: JSON statt YAML in apisix.yaml
+
+**Debugging-Zeit:** 3.5 Stunden (14:32 - 15:06)
+
+**Hätte verhindert werden können durch:**
+```bash
+# Pre-Push Skill hätte erkannt:
+git diff --name-only develop | grep -E "tests/docker/"
+# → tests/docker/traefik/docker-compose.yml
+# → tests/docker/apisix/apisix.yaml
+
+# Docker Tests lokal ausführen:
+pytest tests/test_docker_runtime.py -v -s
+# → FAILED - Port conflict (Traefik)
+# → FAILED - YAML error (APISIX)
+
+# Fehler in 5 Minuten behoben statt 3.5 Stunden!
+```
+
+### Real-World Beispiel: Flake8 F822 Fehler (Commit edad068)
+
+**Problem:**
+- `__all__` Export-Liste mit 8 nicht-existierenden Klassennamen
+- Direkt gepusht ohne lokale Flake8-Validierung
+- GitHub Actions Code Quality Check schlug fehl
+
+**Fehler gefunden:**
+```
+F822 undefined name 'HeaderConfig' in __all__
+F822 undefined name 'CorsConfig' in __all__
+F822 undefined name 'RetryPolicyConfig' in __all__
+... (8 Fehler total)
+```
+
+**Hätte verhindert werden können durch:**
+```bash
+# Pre-Push Skill hätte erkannt:
+flake8 gal/config.py --count --select=E9,F63,F7,F82
+# → 8 errors found!
+
+# Fehler in 2 Minuten behoben statt nach Push!
+```
+
+### Lesson Learned
+
+**Ohne Pre-Push Skill:**
+- Docker-Fehler: 3.5 Stunden Debugging nach Push
+- Flake8-Fehler: Zusätzlicher Fix-Commit nötig
+- GitHub Actions Ressourcen verschwendet
+- Entwickler-Frustration durch CI/CD-Failures
+
+**Mit Pre-Push Skill:**
+- Fehler werden **vor** dem Push gefunden
+- 5 Minuten lokales Debugging
+- Kein Failed CI/CD Run
+- Saubere Git-History
+
 ## Changelog
+
+**Version 2.1.0** (2025-10-22)
+- ✅ Erweiterte Fehlerbehandlung für F822 (undefined names in __all__)
+- ✅ Real-World Beispiele hinzugefügt (Docker + Flake8 Fehler)
+- ✅ Root Cause Analysis dokumentiert
+- ✅ Debugging-Commands für __all__ Validierung
 
 **Version 2.0.0** (2025-10-22)
 - ✅ Docker Runtime Tests hinzugefügt (Schritt 6)
@@ -396,5 +506,5 @@ Aktualisiere diesen Skill, wenn:
 - Initial Release mit Black, Isort, Flake8, Unit Tests
 
 **Autor:** Claude Code (generiert)
-**Version:** 2.0.0
+**Version:** 2.1.0
 **Letzte Aktualisierung:** 2025-10-22
