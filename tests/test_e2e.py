@@ -594,3 +594,276 @@ services:
             assert "product_catalog" in result or "catalog-api" in result
             assert "order_management" in result or "orders-api" in result
             assert "payment_processing" in result or "payments-api" in result
+
+
+class TestE2ETrafficSplitting:
+    """End-to-end tests for traffic splitting functionality"""
+
+    @pytest.fixture
+    def traffic_split_config(self, tmp_path):
+        """Create traffic splitting test configuration"""
+        config = tmp_path / "traffic-split-config.yaml"
+        config.write_text(
+            """
+version: "1.0"
+provider: envoy
+
+global:
+  host: 0.0.0.0
+  port: 8080
+
+services:
+  - name: canary_api
+    type: rest
+    protocol: http
+    upstream:
+      host: placeholder
+      port: 8080
+    routes:
+      - path_prefix: /api/v1
+        methods: [GET, POST, PUT, DELETE]
+        traffic_split:
+          enabled: true
+          targets:
+            - name: stable
+              weight: 90
+              upstream:
+                host: api-v1-stable
+                port: 8080
+              description: "Stable production version"
+            - name: canary
+              weight: 10
+              upstream:
+                host: api-v1-canary
+                port: 8080
+              description: "Canary deployment for testing"
+"""
+        )
+        return str(config)
+
+    def test_traffic_split_all_providers(self, traffic_split_config, tmp_path):
+        """Test traffic splitting config generation for all providers"""
+        from gal.providers.aws_apigateway import AWSAPIGatewayProvider
+        from gal.providers.azure_apim import AzureAPIMProvider
+        from gal.providers.haproxy import HAProxyProvider
+        from gal.providers.nginx import NginxProvider
+
+        manager = Manager()
+        manager.register_provider(EnvoyProvider())
+        manager.register_provider(NginxProvider())
+        manager.register_provider(KongProvider())
+        manager.register_provider(APISIXProvider())
+        manager.register_provider(TraefikProvider())
+        manager.register_provider(HAProxyProvider())
+        manager.register_provider(AzureAPIMProvider())
+        manager.register_provider(AWSAPIGatewayProvider())
+
+        # Load config
+        base_config = manager.load_config(traffic_split_config)
+
+        # Test all providers
+        providers = {
+            "envoy": "yaml",
+            "nginx": "conf",
+            "kong": "yaml",
+            "apisix": "json",
+            "traefik": "yaml",
+            "haproxy": "cfg",
+            "azure_apim": "json",
+            "aws_apigateway": "json",
+        }
+
+        for provider_name, extension in providers.items():
+            # Switch provider
+            config = Config(
+                version=base_config.version,
+                provider=provider_name,
+                global_config=base_config.global_config,
+                services=base_config.services,
+                plugins=base_config.plugins,
+            )
+
+            # Validate
+            if provider_name not in ["azure_apim"]:  # Azure APIM requires specific config
+                assert manager.validate(config) is True
+
+            # Generate
+            result = manager.generate(config)
+            assert result is not None
+            assert len(result) > 0
+
+            # Write to file
+            output_file = tmp_path / f"{provider_name}-traffic-split.{extension}"
+            with open(output_file, "w") as f:
+                f.write(result)
+
+            # Verify file exists
+            assert output_file.exists()
+            assert output_file.stat().st_size > 0
+
+            # Provider-specific validations
+            self._validate_provider_output(provider_name, result)
+
+    def _validate_provider_output(self, provider_name: str, output: str):
+        """Validate provider-specific traffic splitting output"""
+
+        if provider_name == "envoy":
+            # Envoy: weighted_clusters
+            assert "weighted_clusters:" in output
+            assert "weight: 90" in output
+            assert "weight: 10" in output
+            assert "canary_api_stable_cluster" in output
+            assert "canary_api_canary_cluster" in output
+
+        elif provider_name == "nginx":
+            # Nginx: set_random
+            assert "set_random" in output or "split_clients" in output
+            assert "api-v1-stable" in output
+            assert "api-v1-canary" in output
+
+        elif provider_name == "kong":
+            # Kong: weighted upstream targets
+            assert "weight: 900" in output  # 90 * 10
+            assert "weight: 100" in output  # 10 * 10
+            assert "api-v1-stable:8080" in output
+            assert "api-v1-canary:8080" in output
+
+        elif provider_name == "apisix":
+            # APISIX: traffic-split plugin
+            import json
+            config = json.loads(output)
+            # Find route with traffic-split plugin
+            routes = config.get("routes", [])
+            assert len(routes) > 0
+            for route in routes:
+                if "traffic-split" in route.get("plugins", {}):
+                    plugin = route["plugins"]["traffic-split"]
+                    assert "rules" in plugin
+                    break
+
+        elif provider_name == "traefik":
+            # Traefik: weighted services
+            assert "weighted:" in output
+            assert "weight: 90" in output
+            assert "weight: 10" in output
+            assert "canary_api_stable_service" in output
+            assert "canary_api_canary_service" in output
+
+        elif provider_name == "haproxy":
+            # HAProxy: weighted servers
+            assert "weight 230" in output  # 90 * 2.56 ≈ 230
+            assert "weight 25" in output   # 10 * 2.56 ≈ 25
+            assert "server server_stable api-v1-stable:8080" in output
+            assert "server server_canary api-v1-canary:8080" in output
+
+        elif provider_name == "azure_apim":
+            # Azure APIM: backend pool
+            import json
+            arm_template = json.loads(output)
+            # Find backend pool
+            backends = [
+                r for r in arm_template["resources"]
+                if r["type"] == "Microsoft.ApiManagement/service/backends"
+                and "pool" in r.get("properties", {})
+            ]
+            assert len(backends) > 0
+            pool = backends[0]
+            assert pool["properties"]["type"] == "pool"
+            assert len(pool["properties"]["pool"]["services"]) == 2
+
+        elif provider_name == "aws_apigateway":
+            # AWS API Gateway: VTL template
+            import json
+            spec = json.loads(output)
+            # Find integration with VTL
+            operation = spec["paths"]["/api/v1"]["get"]
+            integration = operation["x-amazon-apigateway-integration"]
+            assert "requestTemplates" in integration
+            vtl = integration["requestTemplates"]["application/json"]
+            assert "#set($random = $context.requestTimeEpoch % 100)" in vtl
+            assert "#if($random < 90)" in vtl
+
+    def test_traffic_split_weight_validation(self, tmp_path):
+        """Test that invalid weights are rejected"""
+        config = tmp_path / "invalid-weights.yaml"
+        config.write_text(
+            """
+version: "1.0"
+provider: envoy
+
+services:
+  - name: api
+    type: rest
+    protocol: http
+    upstream:
+      host: placeholder
+      port: 8080
+    routes:
+      - path_prefix: /api/v1
+        methods: [GET]
+        traffic_split:
+          enabled: true
+          targets:
+            - name: stable
+              weight: 50
+              upstream: {host: api-stable, port: 8080}
+            - name: canary
+              weight: 60  # Invalid: 50 + 60 = 110 ≠ 100
+              upstream: {host: api-canary, port: 8080}
+"""
+        )
+
+        manager = Manager()
+        manager.register_provider(EnvoyProvider())
+
+        # This should raise ValueError due to invalid weight sum
+        with pytest.raises(ValueError, match="must sum to 100"):
+            manager.load_config(str(config))
+
+    def test_traffic_split_multi_target(self, tmp_path):
+        """Test traffic splitting with 3+ targets"""
+        config = tmp_path / "multi-target.yaml"
+        config.write_text(
+            """
+version: "1.0"
+provider: envoy
+
+services:
+  - name: multi_api
+    type: rest
+    protocol: http
+    upstream:
+      host: placeholder
+      port: 8080
+    routes:
+      - path_prefix: /api/multi
+        methods: [GET]
+        traffic_split:
+          enabled: true
+          targets:
+            - name: stable
+              weight: 70
+              upstream: {host: api-stable, port: 8080}
+            - name: beta
+              weight: 20
+              upstream: {host: api-beta, port: 8080}
+            - name: canary
+              weight: 10
+              upstream: {host: api-canary, port: 8080}
+"""
+        )
+
+        manager = Manager()
+        manager.register_provider(EnvoyProvider())
+
+        # Load and generate
+        loaded_config = manager.load_config(str(config))
+        result = manager.generate(loaded_config)
+
+        # Verify 3 targets
+        assert "weight: 70" in result
+        assert "weight: 20" in result
+        assert "weight: 10" in result
+        assert "multi_api_stable_cluster" in result
+        assert "multi_api_beta_cluster" in result
+        assert "multi_api_canary_cluster" in result
