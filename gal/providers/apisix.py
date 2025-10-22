@@ -26,6 +26,7 @@ from ..config import (
     HealthCheckConfig,
     JwtConfig,
     LoadBalancerConfig,
+    MirroringConfig,
     PassiveHealthCheck,
     ProtoDescriptor,
     RateLimitConfig,
@@ -344,6 +345,13 @@ class APISIXProvider(Provider):
                         service, route, route.traffic_split
                     )
                     route_config["plugins"]["traffic-split"] = traffic_split_config
+
+                # Add request mirroring plugin if configured
+                if route.mirroring and route.mirroring.enabled:
+                    if "plugins" not in route_config:
+                        route_config["plugins"] = {}
+                    mirror_config = self._generate_proxy_mirror_plugin(service, route)
+                    route_config["plugins"]["proxy-mirror"] = mirror_config
 
                 # Add timeout configuration if specified
                 if route.timeout:
@@ -781,6 +789,64 @@ class APISIXProvider(Provider):
         # Add weight-based rule (no match = applies to all requests not matched above)
         if weighted_upstreams:
             plugin_config["rules"].append({"weighted_upstreams": weighted_upstreams})
+
+        return plugin_config
+
+    def _generate_proxy_mirror_plugin(self, service: Service, route: Route) -> Dict[str, Any]:
+        """Generate APISIX proxy-mirror plugin configuration.
+
+        Creates plugin configuration for request mirroring/shadowing using
+        APISIX's native proxy-mirror plugin to duplicate requests to shadow backends.
+
+        Args:
+            service: Service with request mirroring
+            route: Route with mirroring configuration
+
+        Returns:
+            Dict with proxy-mirror plugin configuration
+
+        APISIX Docs:
+            https://apisix.apache.org/docs/apisix/plugins/proxy-mirror/
+        """
+        mirroring = route.mirroring
+
+        # APISIX proxy-mirror only supports one mirror target per plugin
+        # For multiple targets, we use the first one and log a warning
+        if len(mirroring.targets) > 1:
+            logger.warning(
+                f"APISIX proxy-mirror supports only one mirror target. "
+                f"Using first target '{mirroring.targets[0].name}'. "
+                f"Remaining targets will be ignored."
+            )
+
+        target = mirroring.targets[0]
+
+        # Build mirror host URL
+        mirror_host = f"http://{target.upstream.host}:{target.upstream.port}"
+
+        plugin_config = {
+            "host": mirror_host,
+            "path": route.path_prefix,  # Mirror to same path
+        }
+
+        # Sampling percentage (0.0-1.0)
+        if target.sample_percentage < 100.0:
+            plugin_config["sample_ratio"] = target.sample_percentage / 100.0
+
+        # Request body mirroring
+        if not mirroring.mirror_request_body:
+            # APISIX mirrors body by default, use sample_ratio=0 to disable
+            logger.warning(
+                "APISIX proxy-mirror always copies request body. "
+                "mirror_request_body=false is not fully supported."
+            )
+
+        # Custom headers via proxy-rewrite (would need separate plugin)
+        if target.headers:
+            logger.warning(
+                f"APISIX proxy-mirror does not support custom headers directly. "
+                f"Target '{target.name}' headers will be ignored: {list(target.headers.keys())}"
+            )
 
         return plugin_config
 
