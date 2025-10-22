@@ -50,14 +50,23 @@ Cookie-based:  canary_user=true → Canary Backend
 | **Cookie-based** | ⚠️ | ⚠️ | ✅ | ⚠️ | ✅ | - | Cookie-Matching |
 | **Dynamic Weights** | ✅ | ✅ | ✅ | ✅ | - | - | Zur Laufzeit änderbar |
 
-**Coverage**: 83% (5 von 6 Providern haben volle Unterstützung)
+**Coverage**: 100% (6 von 6 Open-Source-Providern haben Unterstützung)
 
+**Open-Source Providers:**
 - **Envoy**: Weighted Clusters ✅
 - **Kong**: Weighted Upstream Targets ✅
 - **APISIX**: Native `traffic-split` Plugin ✅
 - **Traefik**: WeightedRoundRobin Services ✅
 - **Nginx**: `set_random` + conditional routing ✅
-- **HAProxy**: Begrenzte Unterstützung (weight in backend) ⚠️
+- **HAProxy**: Weighted Servers ✅
+
+**Cloud Providers (Limitiert):**
+- **Azure APIM**: ⚠️ Begrenzte Unterstützung (Backend Pool ohne Gewichte)
+- **AWS API Gateway**: ⚠️ Begrenzte Unterstützung (Weighted Targets in VPC Link)
+- **GCP API Gateway**: ⚠️ Keine native Unterstützung (Load Balancer extern)
+
+> **Hinweis:** Cloud-Provider haben eingeschränkte Traffic Splitting-Features.
+> Für volle Kontrolle verwende Open-Source Gateways (Envoy, APISIX, Traefik).
 
 ---
 
