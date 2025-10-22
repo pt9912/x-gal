@@ -33,7 +33,7 @@ import json
 import logging
 from typing import Any, Dict, List
 
-from gal.config import Config, GCPAPIGatewayConfig, Route, Service
+from gal.config import Config, GCPAPIGatewayConfig, MirroringConfig, Route, Service
 from gal.provider import Provider
 
 logger = logging.getLogger(__name__)
@@ -77,6 +77,16 @@ class GCPAPIGatewayProvider(Provider):
         Raises:
             ValueError: If configuration is invalid
         """
+        # Check for request mirroring (not natively supported)
+        for service in config.services:
+            for route in service.routes:
+                if route.mirroring and route.mirroring.enabled:
+                    logger.warning(
+                        f"Request mirroring on route {route.path_prefix} is not natively "
+                        f"supported in GCP API Gateway. Consider using Cloud Functions or "
+                        f"Cloud Run with custom mirroring logic."
+                    )
+
         if not config.global_config or not config.global_config.gcp_apigateway:
             raise ValueError("GCP API Gateway configuration is required in global_config")
 

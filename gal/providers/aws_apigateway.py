@@ -37,6 +37,7 @@ from gal.config import (
     Config,
     GlobalConfig,
     JwtConfig,
+    MirroringConfig,
     Route,
     Service,
     TrafficSplitConfig,
@@ -93,6 +94,16 @@ class AWSAPIGatewayProvider(Provider):
         # Check if services exist
         if not config.services:
             raise ValueError("At least one service is required")
+
+        # Check for request mirroring (not natively supported)
+        for service in config.services:
+            for route in service.routes:
+                if route.mirroring and route.mirroring.enabled:
+                    logger.warning(
+                        f"Request mirroring on route {route.path_prefix} is not natively "
+                        f"supported in AWS API Gateway. Consider using Lambda@Edge for custom "
+                        f"mirroring logic or external tools (e.g., CloudWatch Logs + Lambda)."
+                    )
 
         # Validate each service
         for service in config.services:

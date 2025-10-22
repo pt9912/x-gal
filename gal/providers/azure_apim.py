@@ -18,6 +18,7 @@ from ..config import (
     Config,
     GlobalConfig,
     JwtConfig,
+    MirroringConfig,
     Route,
     Service,
     TrafficSplitConfig,
@@ -504,6 +505,39 @@ class AzureAPIMProvider(Provider):
         # Backend Policies
         policies.append("    <backend>")
         policies.append("        <base />")
+
+        # Request Mirroring (send-request policy)
+        if route.mirroring and route.mirroring.enabled:
+            for i, target in enumerate(route.mirroring.targets):
+                mirror_url = f"http://{target.upstream.host}:{target.upstream.port}{route.path_prefix}"
+
+                policies.append(f"        <!-- Mirror request to {target.name} -->")
+                policies.append(f'        <send-request mode="copy" response-variable-name="mirror_response_{i}">')
+                policies.append(f"            <set-url>{mirror_url}</set-url>")
+                policies.append("            <set-method>@(context.Request.Method)</set-method>")
+
+                # Copy headers
+                if route.mirroring.mirror_headers:
+                    policies.append("            <!-- Copy request headers -->")
+
+                # Custom headers for mirror target
+                if target.headers:
+                    for key, value in target.headers.items():
+                        policies.append(f'            <set-header name="{key}" exists-action="override">')
+                        policies.append(f"                <value>{value}</value>")
+                        policies.append("            </set-header>")
+
+                # Copy body if enabled
+                if route.mirroring.mirror_request_body:
+                    policies.append("            <set-body>@(context.Request.Body.As<string>(preserveContent: true))</set-body>")
+
+                # Sampling via condition
+                if target.sample_percentage < 100.0:
+                    sample_pct = int(target.sample_percentage)
+                    policies.append(f'            <condition expression="@(new Random().Next(100) &lt; {sample_pct})" />')
+
+                policies.append("        </send-request>")
+
         policies.append("    </backend>")
 
         # Outbound Policies
