@@ -19,6 +19,7 @@ from ..config import (
     GrpcTransformation,
     HealthCheckConfig,
     LoadBalancerConfig,
+    MirroringConfig,
     PassiveHealthCheck,
     ProtoDescriptor,
     Route,
@@ -184,6 +185,10 @@ class EnvoyProvider(Provider):
                 else:
                     output.append("                route:")
                     output.append(f"                  cluster: {service.name}_cluster")
+
+                # Add request mirroring if configured
+                if route.mirroring and route.mirroring.enabled:
+                    self._generate_request_mirror_policies(service, route, output)
 
                 # Add timeout configuration if specified
                 if route.timeout:
@@ -814,6 +819,11 @@ class EnvoyProvider(Provider):
                 route.traffic_split and route.traffic_split.enabled for route in service.routes
             )
 
+            # Check if any route has mirroring enabled
+            has_mirroring = any(
+                route.mirroring and route.mirroring.enabled for route in service.routes
+            )
+
             if has_traffic_split:
                 # Generate separate clusters for each traffic split target
                 for route in service.routes:
@@ -825,6 +835,14 @@ class EnvoyProvider(Provider):
                 # Generate single cluster for the service
                 self._generate_envoy_cluster(service, output)
                 output.append("")
+
+            # Generate mirror clusters if mirroring is enabled
+            if has_mirroring:
+                for route in service.routes:
+                    if route.mirroring and route.mirroring.enabled:
+                        for target in route.mirroring.targets:
+                            self._generate_mirror_cluster(service, target, output)
+                            output.append("")
 
         # Add JWKS cluster if JWT authentication is configured
         if has_authentication:
@@ -1032,6 +1050,88 @@ class EnvoyProvider(Provider):
                 output.append(f"                      weight: {target.weight}")
 
             output.append("                    total_weight: 100")
+
+    def _generate_request_mirror_policies(self, service: Service, route: Route, output: list) -> None:
+        """Generate Envoy request_mirror_policies for request mirroring/shadowing.
+
+        Implements shadow traffic by duplicating requests to mirror targets while
+        returning responses from the primary backend. Supports:
+        - Multiple shadow targets
+        - Sampling percentage per target
+        - Custom headers per mirror target
+        - Timeout configuration
+
+        Args:
+            service: Service with request mirroring
+            route: Route with mirroring configuration
+            output: Output list to append YAML lines to
+
+        Side Effects:
+            Appends request_mirror_policies to the route configuration
+
+        Envoy Docs:
+            https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#config-route-v3-routeaction-requestmirrorpolicy
+        """
+        mirroring = route.mirroring
+
+        for target in mirroring.targets:
+            mirror_cluster_name = f"{service.name}_{target.name}_mirror_cluster"
+
+            output.append("                  request_mirror_policies:")
+            output.append("                  - cluster: " + mirror_cluster_name)
+
+            # Runtime fraction for sampling (percentage)
+            if target.sample_percentage < 100.0:
+                output.append("                    runtime_fraction:")
+                output.append("                      default_value:")
+                output.append(f"                        numerator: {int(target.sample_percentage * 10000)}")
+                output.append("                        denominator: MILLION")
+
+            # Custom headers for mirror requests
+            if target.headers:
+                output.append("                    request_headers_to_add:")
+                for key, value in target.headers.items():
+                    output.append("                    - header:")
+                    output.append(f"                        key: {key}")
+                    output.append(f"                        value: '{value}'")
+                    output.append("                      append: false")
+
+    def _generate_mirror_cluster(self, service: Service, target, output: list) -> None:
+        """Generate Envoy cluster for a single mirror target.
+
+        Creates a cluster configuration for a shadow/mirror backend target.
+
+        Args:
+            service: Service with request mirroring
+            target: MirrorTarget with upstream configuration
+            output: Output list to append YAML lines to
+
+        Side Effects:
+            Appends mirror cluster configuration to output list
+        """
+        cluster_name = f"{service.name}_{target.name}_mirror_cluster"
+        output.append(f"  - name: {cluster_name}")
+        output.append("    type: STRICT_DNS")
+        output.append("    lb_policy: ROUND_ROBIN")
+
+        # Parse timeout (default 5s)
+        timeout = target.timeout if target.timeout else "5s"
+        output.append(f"    connect_timeout: {timeout}")
+
+        # gRPC support
+        if service.type == "grpc":
+            output.append("    http2_protocol_options: {}")
+
+        # Configure load assignment (single endpoint from target)
+        output.append("    load_assignment:")
+        output.append(f"      cluster_name: {cluster_name}")
+        output.append("      endpoints:")
+        output.append("      - lb_endpoints:")
+        output.append("        - endpoint:")
+        output.append("            address:")
+        output.append("              socket_address:")
+        output.append(f"                address: {target.upstream.host}")
+        output.append(f"                port_value: {target.upstream.port}")
 
     def _generate_traffic_split_cluster(self, service: Service, target, output: list) -> None:
         """Generate Envoy cluster for a single traffic split target.
