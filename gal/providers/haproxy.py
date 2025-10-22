@@ -19,6 +19,7 @@ from gal.config import (
     RateLimitConfig,
     Route,
     Service,
+    TrafficSplitConfig,
     Transformation,
     Upstream,
     UpstreamTarget,
@@ -511,7 +512,31 @@ class HAProxyProvider(Provider):
         output.append("")
         output.append("    # Backend servers")
 
-        if service.upstream and service.upstream.targets:
+        # Check if route has traffic splitting
+        has_traffic_split = any(
+            route.traffic_split and route.traffic_split.enabled for route in service.routes
+        )
+
+        if has_traffic_split:
+            # Use traffic split targets
+            for route in service.routes:
+                if route.traffic_split and route.traffic_split.enabled:
+                    for idx, target in enumerate(route.traffic_split.targets):
+                        server_name = f"server_{target.name}"
+                        server_line = f"    server {server_name} {target.upstream.host}:{target.upstream.port}"
+
+                        # Add health check
+                        server_line += " check inter 10s fall 3 rise 2"
+
+                        # Add weight (HAProxy default is 1, max is 256)
+                        # Convert GAL weight (0-100) to HAProxy weight (0-256)
+                        haproxy_weight = int(target.weight * 2.56) if target.weight > 0 else 1
+                        if haproxy_weight != 1:
+                            server_line += f" weight {haproxy_weight}"
+
+                        output.append(server_line)
+                    break  # Only process first route with traffic splitting
+        elif service.upstream and service.upstream.targets:
             for idx, target in enumerate(service.upstream.targets):
                 # Handle both dict and UpstreamTarget object
                 if isinstance(target, dict):
