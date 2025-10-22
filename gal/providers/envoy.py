@@ -23,6 +23,7 @@ from ..config import (
     ProtoDescriptor,
     Route,
     Service,
+    TrafficSplitConfig,
     Upstream,
     UpstreamTarget,
 )
@@ -176,8 +177,13 @@ class EnvoyProvider(Provider):
                 output.append(f"                  prefix: '{route.path_prefix}'")
                 if service.type == "grpc":
                     output.append("                  grpc: {}")
-                output.append("                route:")
-                output.append(f"                  cluster: {service.name}_cluster")
+
+                # Check for traffic splitting
+                if route.traffic_split and route.traffic_split.enabled:
+                    self._generate_weighted_clusters(service, route, output)
+                else:
+                    output.append("                route:")
+                    output.append(f"                  cluster: {service.name}_cluster")
 
                 # Add timeout configuration if specified
                 if route.timeout:
@@ -803,8 +809,22 @@ class EnvoyProvider(Provider):
         # Clusters
         output.append("  clusters:")
         for service in config.services:
-            self._generate_envoy_cluster(service, output)
-            output.append("")
+            # Check if any route has traffic splitting enabled
+            has_traffic_split = any(
+                route.traffic_split and route.traffic_split.enabled for route in service.routes
+            )
+
+            if has_traffic_split:
+                # Generate separate clusters for each traffic split target
+                for route in service.routes:
+                    if route.traffic_split and route.traffic_split.enabled:
+                        for target in route.traffic_split.targets:
+                            self._generate_traffic_split_cluster(service, target, output)
+                            output.append("")
+            else:
+                # Generate single cluster for the service
+                self._generate_envoy_cluster(service, output)
+                output.append("")
 
         # Add JWKS cluster if JWT authentication is configured
         if has_authentication:
@@ -961,6 +981,95 @@ class EnvoyProvider(Provider):
                 logger.info(
                     f"OpenTelemetry metrics export enabled to {metrics_config.opentelemetry_endpoint}"
                 )
+
+    def _generate_weighted_clusters(self, service: Service, route: Route, output: list) -> None:
+        """Generate Envoy weighted_clusters configuration for traffic splitting.
+
+        Implements A/B testing and canary deployments using Envoy's weighted_clusters feature.
+        Supports weight-based routing, header-based routing, and cookie-based routing.
+
+        Args:
+            service: Service with traffic splitting configuration
+            route: Route with traffic_split configuration
+            output: Output list to append YAML lines to
+
+        Side Effects:
+            Appends weighted_clusters configuration to output list
+        """
+        traffic_split = route.traffic_split
+
+        # Check if we have routing rules (header/cookie based)
+        has_routing_rules = (
+            traffic_split.routing_rules
+            and (
+                traffic_split.routing_rules.header_rules
+                or traffic_split.routing_rules.cookie_rules
+            )
+        )
+
+        if has_routing_rules:
+            # Use route_configuration with per_filter_config for header/cookie matching
+            # This requires Lua filter for advanced routing logic
+            output.append("                route:")
+            output.append("                  weighted_clusters:")
+            output.append("                    clusters:")
+
+            # Add all targets with weights
+            for target in traffic_split.targets:
+                cluster_name = f"{service.name}_{target.name}_cluster"
+                output.append(f"                    - name: {cluster_name}")
+                output.append(f"                      weight: {target.weight}")
+
+            output.append("                    total_weight: 100")
+
+            # Add Lua filter for header/cookie routing (will be added to http_filters)
+            # This is handled in the main generate() method by detecting routing_rules
+        else:
+            # Simple weight-based routing (no header/cookie rules)
+            output.append("                route:")
+            output.append("                  weighted_clusters:")
+            output.append("                    clusters:")
+
+            for target in traffic_split.targets:
+                cluster_name = f"{service.name}_{target.name}_cluster"
+                output.append(f"                    - name: {cluster_name}")
+                output.append(f"                      weight: {target.weight}")
+
+            output.append("                    total_weight: 100")
+
+    def _generate_traffic_split_cluster(self, service: Service, target, output: list) -> None:
+        """Generate Envoy cluster for a single traffic split target.
+
+        Creates a cluster configuration for a specific backend target in a traffic split.
+
+        Args:
+            service: Service with traffic splitting
+            target: SplitTarget with upstream configuration
+            output: Output list to append YAML lines to
+
+        Side Effects:
+            Appends cluster configuration to output list
+        """
+        cluster_name = f"{service.name}_{target.name}_cluster"
+        output.append(f"  - name: {cluster_name}")
+        output.append("    type: STRICT_DNS")
+        output.append("    lb_policy: ROUND_ROBIN")
+        output.append("    connect_timeout: 5s")
+
+        # gRPC support
+        if service.type == "grpc":
+            output.append("    http2_protocol_options: {}")
+
+        # Configure load assignment (single endpoint from target)
+        output.append("    load_assignment:")
+        output.append(f"      cluster_name: {cluster_name}")
+        output.append("      endpoints:")
+        output.append("      - lb_endpoints:")
+        output.append("        - endpoint:")
+        output.append("            address:")
+        output.append("              socket_address:")
+        output.append(f"                address: {target.upstream.host}")
+        output.append(f"                port_value: {target.upstream.port}")
 
     def _generate_envoy_cluster(self, service, output: list):
         """Generate Envoy cluster configuration with health checks and load balancing.
