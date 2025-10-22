@@ -1,446 +1,18 @@
-# HAProxy Provider Anleitung
+# HAProxy Feature-Implementierungen
 
-**Umfassende Anleitung für HAProxy Provider in GAL (Gateway Abstraction Layer)**
+**Detaillierte Implementierung aller Features für HAProxy Provider in GAL**
+
+**Navigation:**
+- [← Zurück zur HAProxy Übersicht](HAPROXY.md)
+- [→ Best Practices & Troubleshooting](HAPROXY_DEPLOYMENT.md)
 
 ## Inhaltsverzeichnis
 
-1. [Übersicht](#ubersicht)
-2. [Installation & Setup](#installation--setup)
-3. [Schnellstart](#schnellstart)
-4. [Konfigurationsoptionen](#konfigurationsoptionen)
-5. [Provider-Vergleich](#provider-vergleich)
-
-**Weitere Dokumentation:**
-- [Feature-Implementierungen](HAPROXY_FEATURES.md) - Details zu ACLs, Auth, Rate Limiting, Health Checks
-- [Best Practices & Troubleshooting](HAPROXY_DEPLOYMENT.md) - Best Practices, Troubleshooting
+1. [Feature-Implementierungen](#feature-implementierungen)
+2. [HAProxy-spezifische Details](#haproxy-spezifische-details)
+3. [HAProxy Feature Coverage](#haproxy-feature-coverage)
 
 ---
-## Übersicht
-
-### Was ist HAProxy?
-
-HAProxy (High Availability Proxy) ist ein äußerst performanter und zuverlässiger TCP/HTTP Load Balancer. Er wird von den größten Websites der Welt eingesetzt (GitHub, Reddit, Stack Overflow, etc.) und ist bekannt für:
-
-- **Extreme Performance**: 100.000+ Requests pro Sekunde
-- **Enterprise-grade Reliability**: Höchste Verfügbarkeit
-- **Advanced Load Balancing**: 10+ Algorithmen
-- **Flexible Health Checks**: Active & Passive
-- **Low Resource Usage**: Minimale CPU/RAM Nutzung
-
-### Feature-Matrix
-
-| Feature | Support Level | Implementierung | Notes |
-|---------|--------------|-----------------|-------|
-| **Load Balancing** |
-| Round Robin | ✅ Full | `balance roundrobin` | Gleichmäßige Verteilung |
-| Least Connections | ✅ Full | `balance leastconn` | Wenigste Verbindungen |
-| IP Hash (Source) | ✅ Full | `balance source` | Session Persistence |
-| Weighted | ✅ Full | `weight` per server | Kapazitätsbasiert |
-| URI Hash | ✅ Full | `balance uri` | URL-basiert |
-| Header Hash | ✅ Full | `balance hdr(name)` | Header-basiert |
-| **Health Checks** |
-| Active HTTP Checks | ✅ Full | `option httpchk` | Periodisches Probing |
-| Active TCP Checks | ✅ Full | `check` | TCP Connection Check |
-| Passive Checks | ✅ Full | `fall/rise` thresholds | Traffic-basiert |
-| Custom Health Checks | ✅ Full | `http-check expect` | Flexible Validierung |
-| **Traffic Management** |
-| Rate Limiting | ✅ Full | `stick-table` | IP & Header-basiert |
-| Sticky Sessions | ✅ Full | `cookie`, `source` | Cookie oder IP-basiert |
-| Connection Pooling | ✅ Full | `http-server-close` | Connection Reuse |
-| Timeouts | ✅ Full | `timeout *` | Granulare Timeouts |
-| **Security** |
-| Basic Authentication | ✅ Full | ACL + auth backend | Via ACLs |
-| Header Manipulation | ✅ Full | `http-request/response` | Add/Set/Remove |
-| CORS | ⚠️ Limited | Custom headers | Via http-response |
-| JWT Authentication | ⚠️ Lua | Lua scripting | Lua-Script erforderlich |
-| **Observability** |
-| Access Logs | ✅ Full | `log global` | Structured logging |
-| Stats Page | ✅ Full | `stats` section | Web UI & API |
-| Runtime API | ✅ Full | `stats socket` | Dynamic config |
-
-**Legende:**
-- ✅ Full: Nativ unterstützt
-- ⚠️ Limited: Eingeschränkt oder benötigt Zusatzmodule
-- ⚠️ Lua: Benötigt Lua Scripting
-- ❌ Not Supported: Nicht verfügbar
-
----
-
-## Installation & Setup
-
-### HAProxy Installation
-
-**Ubuntu/Debian:**
-```bash
-# HAProxy 2.8+ (neueste Stable)
-sudo apt update
-sudo apt install haproxy
-
-# Version prüfen
-haproxy -v
-```
-
-**CentOS/RHEL:**
-```bash
-# EPEL Repository aktivieren
-sudo yum install epel-release
-
-# HAProxy installieren
-sudo yum install haproxy
-
-# Version prüfen
-haproxy -v
-```
-
-**Docker:**
-```bash
-# HAProxy 2.9 Official Image
-docker pull haproxy:2.9-alpine
-
-# Mit Config starten
-docker run -d \
-  -p 80:80 \
-  -v $(pwd)/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro \
-  haproxy:2.9-alpine
-```
-
-### GAL Installation
-
-```bash
-# PyPI Installation
-pip install gal-gateway
-
-# Provider prüfen
-gal list-providers
-# → haproxy - HAProxy Load Balancer
-```
-
----
-
-## Schnellstart
-
-### Beispiel 1: Basic Load Balancing
-
-**config.yaml:**
-```yaml
-version: "1.0"
-provider: haproxy
-
-global:
-  host: "0.0.0.0"
-  port: 80
-
-services:
-  - name: api_service
-    type: rest
-    protocol: http
-    upstream:
-      targets:
-        - host: api-1.internal
-          port: 8080
-        - host: api-2.internal
-          port: 8080
-      load_balancer:
-        algorithm: round_robin  # Gleichmäßige Verteilung
-
-    routes:
-      - path_prefix: /api
-```
-
-**Generierung:**
-```bash
-gal generate --config config.yaml --provider haproxy > haproxy.cfg
-```
-
-**Generierte haproxy.cfg:**
-```haproxy
-global
-    log         127.0.0.1 local0
-    maxconn     4000
-    daemon
-    stats socket /var/lib/haproxy/stats level admin
-
-defaults
-    mode                    http
-    log                     global
-    option                  httplog
-    timeout client          30s
-    timeout server          30s
-    timeout connect         5s
-
-frontend http_frontend
-    bind 0.0.0.0:80
-    
-    acl is_api_service_route0 path_beg /api
-    use_backend backend_api_service if is_api_service_route0
-
-backend backend_api_service
-    balance roundrobin
-    server server1 api-1.internal:8080 check
-    server server2 api-2.internal:8080 check
-```
-
-**Testen:**
-```bash
-# Config validieren
-haproxy -c -f haproxy.cfg
-
-# HAProxy starten
-haproxy -f haproxy.cfg
-
-# Requests testen
-curl http://localhost/api
-```
-
-### Beispiel 2: Load Balancing + Health Checks
-
-```yaml
-services:
-  - name: api_service
-    type: rest
-    protocol: http
-    upstream:
-      targets:
-        - host: api-1.internal
-          port: 8080
-          weight: 2  # Erhält 2x mehr Traffic
-        - host: api-2.internal
-          port: 8080
-          weight: 1
-      health_check:
-        active:
-          enabled: true
-          http_path: /health
-          interval: "10s"
-          healthy_threshold: 2
-          unhealthy_threshold: 3
-          healthy_status_codes: [200, 204]
-      load_balancer:
-        algorithm: least_conn  # Wenigste Verbindungen
-
-    routes:
-      - path_prefix: /api
-```
-
-**Generierte haproxy.cfg (Backend):**
-```haproxy
-backend backend_api_service
-    balance leastconn
-    option httpchk GET /health HTTP/1.1
-    http-check expect status 200|204
-    
-    server server1 api-1.internal:8080 check inter 10s fall 3 rise 2 weight 2
-    server server2 api-2.internal:8080 check inter 10s fall 3 rise 2 weight 1
-```
-
-### Beispiel 3: Rate Limiting + Headers + CORS
-
-```yaml
-services:
-  - name: api_service
-    type: rest
-    protocol: http
-    upstream:
-      host: api.internal
-      port: 8080
-
-    routes:
-      - path_prefix: /api
-        rate_limit:
-          enabled: true
-          requests_per_second: 100
-          burst: 200
-          key_type: ip_address
-          response_status: 429
-        
-        headers:
-          request_add:
-            X-Request-ID: "{{uuid}}"
-            X-Gateway: "HAProxy"
-          response_add:
-            X-Frame-Options: "DENY"
-            X-Content-Type-Options: "nosniff"
-        
-        cors:
-          enabled: true
-          allowed_origins:
-            - "https://app.example.com"
-          allowed_methods:
-            - GET
-            - POST
-            - PUT
-            - DELETE
-          allow_credentials: true
-```
-
-**Generierte haproxy.cfg (Frontend):**
-```haproxy
-frontend http_frontend
-    bind 0.0.0.0:80
-    
-    # Rate Limiting
-    stick-table type ip size 100k expire 30s store http_req_rate(10s)
-    http-request track-sc0 src if is_api_service_route0
-    http-request deny deny_status 429 if is_api_service_route0 { sc_http_req_rate(0) gt 100 }
-    
-    # Request Headers
-    http-request set-header X-Request-ID "%[uuid()]" if is_api_service_route0
-    http-request set-header X-Gateway "HAProxy" if is_api_service_route0
-    
-    # Response Headers
-    http-response set-header X-Frame-Options "DENY" if is_api_service_route0
-    http-response set-header X-Content-Type-Options "nosniff" if is_api_service_route0
-    
-    # CORS
-    http-response set-header Access-Control-Allow-Origin "https://app.example.com" if is_api_service_route0
-    http-response set-header Access-Control-Allow-Methods "GET, POST, PUT, DELETE" if is_api_service_route0
-    http-response set-header Access-Control-Allow-Credentials "true" if is_api_service_route0
-    
-    use_backend backend_api_service if is_api_service_route0
-```
-
----
-
-## Konfigurationsoptionen
-
-### Global Configuration
-
-```yaml
-global:
-  host: "0.0.0.0"        # Listen Address (Standard: 0.0.0.0)
-  port: 80               # Listen Port (Standard: 10000)
-  admin_port: 9901       # Admin/Stats Port (nicht genutzt in HAProxy)
-  timeout: "30s"         # Default Timeout (Standard: 30s)
-```
-
-**Mapping zu haproxy.cfg:**
-- `host:port` → `bind` Direktive im Frontend
-- `timeout` → `timeout client`, `timeout server`
-
-### Upstream Configuration
-
-```yaml
-upstream:
-  # Option 1: Single Host (einfach)
-  host: api.example.com
-  port: 8080
-  
-  # Option 2: Multiple Targets (Load Balancing)
-  targets:
-    - host: api-1.internal
-      port: 8080
-      weight: 2          # Load Balancing Gewichtung (default: 1)
-    - host: api-2.internal
-      port: 8080
-      weight: 1
-  
-  # Health Checks
-  health_check:
-    active:
-      enabled: true
-      http_path: /health        # Health Check Pfad (default: /health)
-      interval: "10s"           # Check Intervall (default: 10s)
-      timeout: "5s"             # Check Timeout (default: 5s)
-      healthy_threshold: 2      # Erfolge bis gesund (default: 2)
-      unhealthy_threshold: 3    # Fehler bis ungesund (default: 3)
-      healthy_status_codes:     # Erfolgreiche Status Codes
-        - 200
-        - 201
-        - 204
-    
-    passive:
-      enabled: true
-      max_failures: 5           # Max Fehler (default: 5)
-      unhealthy_status_codes:   # Fehlerhafte Status Codes
-        - 500
-        - 502
-        - 503
-        - 504
-  
-  # Load Balancing
-  load_balancer:
-    algorithm: round_robin      # round_robin, least_conn, ip_hash, weighted
-    sticky_sessions: false      # Cookie-based Session Persistence
-    cookie_name: "SERVERID"     # Cookie Name (wenn sticky_sessions=true)
-```
-
-**HAProxy Mapping:**
-
-| GAL Option | HAProxy Direktive | Beschreibung |
-|------------|-------------------|--------------|
-| `targets[].host:port` | `server name host:port` | Backend Server |
-| `targets[].weight` | `server ... weight N` | Load Balancing Gewicht |
-| `algorithm: round_robin` | `balance roundrobin` | Round Robin |
-| `algorithm: least_conn` | `balance leastconn` | Least Connections |
-| `algorithm: ip_hash` | `balance source` | IP Hash (Source) |
-| `algorithm: weighted` | `balance roundrobin` + `weight` | Weighted Round Robin |
-| `active.enabled` | `option httpchk` | Active Health Check |
-| `active.http_path` | `option httpchk GET /path` | Health Check Pfad |
-| `active.interval` | `check inter N` | Check Intervall |
-| `active.unhealthy_threshold` | `fall N` | Fehler bis ungesund |
-| `active.healthy_threshold` | `rise N` | Erfolge bis gesund |
-| `passive.max_failures` | `fall N` | Passive Fehlergrenze |
-| `sticky_sessions: true` | `cookie NAME insert` | Cookie Persistence |
-
-### Route Configuration
-
-```yaml
-routes:
-  - path_prefix: /api           # Pfad-Präfix (ACL)
-    methods:                    # HTTP Methoden (optional)
-      - GET
-      - POST
-    
-    # Rate Limiting
-    rate_limit:
-      enabled: true
-      requests_per_second: 100  # RPS Limit
-      burst: 200                # Burst Kapazität
-      key_type: ip_address      # ip_address oder header
-      key_header: X-API-Key     # Header Name (wenn key_type=header)
-      response_status: 429      # HTTP Status bei Limit
-    
-    # Header Manipulation
-    headers:
-      request_add:              # Request Headers hinzufügen
-        X-Request-ID: "{{uuid}}"
-        X-Gateway: "HAProxy"
-      request_set:              # Request Headers setzen
-        User-Agent: "HAProxy/1.0"
-      request_remove:           # Request Headers entfernen
-        - X-Internal-Token
-      
-      response_add:             # Response Headers hinzufügen
-        X-Frame-Options: "DENY"
-      response_set:             # Response Headers setzen
-        Server: "HAProxy"
-      response_remove:          # Response Headers entfernen
-        - X-Powered-By
-    
-    # CORS
-    cors:
-      enabled: true
-      allowed_origins:
-        - "https://app.example.com"
-        - "https://www.example.com"
-      allowed_methods:
-        - GET
-        - POST
-        - PUT
-        - DELETE
-        - OPTIONS
-      allowed_headers:
-        - Content-Type
-        - Authorization
-        - X-API-Key
-      expose_headers:
-        - X-Request-ID
-      allow_credentials: true
-      max_age: 86400            # Preflight Cache (Sekunden)
-```
-
----
-
 ## Feature-Implementierungen
 
 ### 1. Load Balancing Algorithmen
@@ -1129,6 +701,317 @@ Nov 18 12:34:56 localhost haproxy[1234]: 192.168.1.100:54321 [18/Nov/2025:12:34:
 - **Traefik**: Dynamic Configuration, gute Docker Integration
 - **Envoy**: Moderne Service Mesh Integration
 - **Kong/APISIX**: Volles API Gateway mit Plugins
+
+---
+
+## HAProxy Feature Coverage
+
+Detaillierte Analyse basierend auf der [offiziellen HAProxy Dokumentation](https://docs.haproxy.org/).
+
+### Core Configuration Sections
+
+| Section | Import | Export | Status | Bemerkung |
+|---------|--------|--------|--------|-----------|
+| `global` | ⚠️ | ✅ | Export | Global Settings (log, maxconn, etc.) |
+| `defaults` | ⚠️ | ✅ | Export | Default Optionen (mode, timeouts) |
+| `frontend` | ✅ | ✅ | Voll | Listener mit ACLs |
+| `backend` | ✅ | ✅ | Voll | Upstream mit Servers |
+| `listen` | ❌ | ❌ | Nicht | Combined Frontend+Backend |
+
+### Load Balancing Algorithms
+
+| Algorithm | Import | Export | Status | Bemerkung |
+|-----------|--------|--------|--------|-----------|
+| `roundrobin` | ✅ | ✅ | Voll | Round Robin (Default) |
+| `leastconn` | ✅ | ✅ | Voll | Least Connections |
+| `source` | ✅ | ✅ | Voll | Source IP Hash |
+| `uri` | ❌ | ❌ | Nicht | URI Hash |
+| `url_param` | ❌ | ❌ | Nicht | URL Parameter Hash |
+| `hdr` | ❌ | ❌ | Nicht | Header Hash |
+| `rdp-cookie` | ❌ | ❌ | Nicht | RDP Cookie Hash |
+
+### Health Check Features
+
+| Feature | Import | Export | Status | Bemerkung |
+|---------|--------|--------|--------|-----------|
+| `check` (HTTP) | ✅ | ✅ | Voll | Active HTTP Health Checks |
+| `check` (TCP) | ⚠️ | ⚠️ | Teilweise | TCP Connect Check |
+| `check inter` | ✅ | ✅ | Voll | Health Check Interval |
+| `check fall` | ✅ | ✅ | Voll | Failure Threshold |
+| `check rise` | ✅ | ✅ | Voll | Success Threshold |
+| `httpchk` | ✅ | ✅ | Voll | HTTP Request Method/Path |
+| `observe layer4/layer7` | ⚠️ | ⚠️ | Teilweise | Passive Health Checks |
+| `on-marked-down` | ❌ | ❌ | Nicht | Fallback Actions |
+
+### ACL (Access Control Lists)
+
+| ACL Type | Import | Export | Status | Bemerkung |
+|----------|--------|--------|--------|-----------|
+| `path_beg` | ✅ | ✅ | Voll | Path Prefix Matching |
+| `path` | ✅ | ✅ | Voll | Exact Path Matching |
+| `path_reg` | ❌ | ❌ | Nicht | Regex Path Matching |
+| `hdr(host)` | ⚠️ | ⚠️ | Teilweise | Host Header Matching |
+| `method` | ❌ | ❌ | Nicht | HTTP Method Matching |
+| `src` | ❌ | ❌ | Nicht | Source IP Matching |
+| `ssl_fc` | ❌ | ❌ | Nicht | SSL/TLS Matching |
+
+### Stick Tables (Session Persistence)
+
+| Feature | Import | Export | Status | Bemerkung |
+|---------|--------|--------|--------|-----------|
+| `stick-table` | ✅ | ✅ | Voll | Stick Table Definition |
+| `stick on src` | ✅ | ✅ | Voll | IP-based Persistence |
+| `stick on cookie` | ✅ | ✅ | Voll | Cookie-based Persistence |
+| `stick match` | ❌ | ❌ | Nicht | Conditional Matching |
+| `stick store-request` | ❌ | ❌ | Nicht | Store on Request |
+
+### Rate Limiting (Stick Tables)
+
+| Feature | Import | Export | Status | Bemerkung |
+|---------|--------|--------|--------|-----------|
+| `stick-table type ip size` | ✅ | ✅ | Voll | IP-based Rate Limiting Table |
+| `http-request track-sc0` | ✅ | ✅ | Voll | Track Client Requests |
+| `http-request deny if` | ✅ | ✅ | Voll | Deny when limit exceeded |
+| `sc_http_req_rate` | ✅ | ✅ | Voll | HTTP Request Rate Counter |
+| `sc_conn_rate` | ❌ | ❌ | Nicht | Connection Rate Counter |
+
+### Request/Response Headers
+
+| Directive | Import | Export | Status | Bemerkung |
+|-----------|--------|--------|--------|-----------|
+| `http-request set-header` | ✅ | ✅ | Voll | Add Request Header |
+| `http-request del-header` | ✅ | ✅ | Voll | Remove Request Header |
+| `http-response set-header` | ✅ | ✅ | Voll | Add Response Header |
+| `http-response del-header` | ✅ | ✅ | Voll | Remove Response Header |
+| `http-request replace-header` | ❌ | ❌ | Nicht | Replace Header Value |
+| `http-response replace-value` | ❌ | ❌ | Nicht | Replace Response Value |
+
+### CORS Support
+
+| Feature | Import | Export | Status | Bemerkung |
+|---------|--------|--------|--------|-----------|
+| `Access-Control-Allow-Origin` | ✅ | ✅ | Voll | Via http-response set-header |
+| `Access-Control-Allow-Methods` | ✅ | ✅ | Voll | Via http-response set-header |
+| `Access-Control-Allow-Headers` | ✅ | ✅ | Voll | Via http-response set-header |
+| `Access-Control-Allow-Credentials` | ✅ | ✅ | Voll | Via http-response set-header |
+| `Access-Control-Max-Age` | ✅ | ✅ | Voll | Via http-response set-header |
+| Preflight (OPTIONS) Handling | ❌ | ❌ | Nicht | Manuell via ACLs |
+
+### Authentication Features
+
+| Feature | Import | Export | Status | Bemerkung |
+|---------|--------|--------|--------|-----------|
+| Basic Auth (ACL) | ⚠️ | ⚠️ | Teilweise | Via ACL + user list |
+| JWT Auth (Lua) | ❌ | ❌ | Nicht | Benötigt Lua Scripting |
+| API Key (ACL) | ⚠️ | ⚠️ | Teilweise | Via ACL hdr matching |
+
+### Timeouts
+
+| Timeout | Import | Export | Status | Bemerkung |
+|---------|--------|--------|--------|-----------|
+| `timeout connect` | ✅ | ✅ | Voll | Backend Connection Timeout |
+| `timeout client` | ✅ | ✅ | Voll | Client Inactivity Timeout |
+| `timeout server` | ✅ | ✅ | Voll | Server Inactivity Timeout |
+| `timeout http-request` | ⚠️ | ⚠️ | Teilweise | HTTP Request Timeout |
+| `timeout http-keep-alive` | ⚠️ | ⚠️ | Teilweise | Keep-Alive Timeout |
+| `timeout queue` | ❌ | ❌ | Nicht | Queue Timeout |
+| `timeout tunnel` | ❌ | ❌ | Nicht | Tunnel Timeout (WebSocket) |
+
+### Observability
+
+| Feature | Import | Export | Status | Bemerkung |
+|---------|--------|--------|--------|-----------|
+| Access Logs | ⚠️ | ✅ | Export | Syslog/File Logging |
+| Stats Page (HTTP) | ❌ | ✅ | Export | /haproxy?stats Endpoint |
+| Stats Socket | ❌ | ✅ | Export | Admin Socket |
+| Prometheus Exporter | ❌ | ❌ | Nicht | External Exporter |
+| Custom Log Format | ❌ | ❌ | Nicht | log-format Directive |
+
+### Advanced Features
+
+| Feature | Import | Export | Status | Bemerkung |
+|---------|--------|--------|--------|-----------|
+| Lua Scripting | ❌ | ❌ | Nicht | Custom Lua Scripts |
+| SSL/TLS Termination | ❌ | ❌ | Nicht | bind ssl crt |
+| HTTP/2 | ❌ | ❌ | Nicht | alpn h2 |
+| TCP Mode | ❌ | ❌ | Nicht | mode tcp |
+| Server Templates | ❌ | ❌ | Nicht | server-template Directive |
+| Dynamic Scaling | ❌ | ❌ | Nicht | Runtime API |
+
+### Coverage Score nach Kategorie
+
+| Kategorie | Features Total | Unterstützt | Coverage |
+|-----------|----------------|-------------|----------|
+| Core Configuration | 5 | 2 voll, 2 teilweise | ~60% |
+| Load Balancing | 7 | 3 voll | 43% |
+| Health Checks | 8 | 5 voll, 2 teilweise | ~75% |
+| ACL | 7 | 2 voll, 1 teilweise | ~35% |
+| Stick Tables | 5 | 3 voll | 60% |
+| Rate Limiting | 5 | 4 voll | 80% |
+| Headers | 6 | 4 voll | 67% |
+| CORS | 6 | 5 voll | 83% |
+| Authentication | 3 | 0 voll, 2 teilweise | 33% |
+| Timeouts | 7 | 3 voll, 2 teilweise | ~55% |
+| Observability | 5 | 2 export | 40% |
+| Advanced | 6 | 0 | 0% |
+
+**Gesamt (API Gateway relevante Features):** ~55% Coverage
+
+**Import Coverage:** ~50% (Import bestehender HAProxy Configs → GAL)
+**Export Coverage:** ~75% (GAL → HAProxy haproxy.cfg)
+
+### Bidirektionale Feature-Unterstützung
+
+**Vollständig bidirektional (Import ↔ Export):**
+1. ✅ Frontend/Backend Configuration
+2. ✅ Load Balancing (Round Robin, Least Connections, Source Hash)
+3. ✅ Health Checks (Active HTTP)
+4. ✅ Stick Tables (Session Persistence)
+5. ✅ Rate Limiting (Stick Table-based)
+6. ✅ Request/Response Headers
+7. ✅ CORS Headers
+8. ✅ ACL Path Matching (path_beg, path)
+9. ✅ Timeouts (connect, client, server)
+
+**Nur Export (GAL → HAProxy):**
+10. ⚠️ Global/Defaults Sections
+11. ⚠️ Stats Page Configuration
+12. ⚠️ Access Logs
+
+**Features mit Einschränkungen:**
+- **JWT/API Key Auth**: Nur via ACLs/Lua (nicht vollständig)
+- **SSL/TLS**: Keine Auto-Konfiguration
+- **Advanced ACLs**: Regex, Method, Header Matching nicht unterstützt
+- **Lua Scripting**: Nicht generierbar/parsebar
+
+### Import-Beispiel (HAProxy → GAL)
+
+**Input (haproxy.cfg):**
+```haproxy
+frontend http_frontend
+    bind 0.0.0.0:80
+
+    acl is_api path_beg /api
+    use_backend backend_api if is_api
+
+backend backend_api
+    balance roundrobin
+    option httpchk GET /health
+
+    server server1 backend-1:8080 check inter 10s fall 3 rise 2
+    server server2 backend-2:8080 check inter 10s fall 3 rise 2
+
+    # Rate Limiting
+    stick-table type ip size 100k expire 30s store http_req_rate(10s)
+    http-request track-sc0 src
+    http-request deny if { sc_http_req_rate(0) gt 100 }
+
+    # Headers
+    http-request set-header X-Forwarded-Proto https
+    http-response set-header Access-Control-Allow-Origin *
+```
+
+**Output (gal-config.yaml):**
+```yaml
+version: "1.0"
+provider: haproxy
+global:
+  host: 0.0.0.0
+  port: 80
+services:
+  - name: backend_api
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: backend-1
+          port: 8080
+        - host: backend-2
+          port: 8080
+      load_balancer:
+        algorithm: round_robin
+      health_check:
+        active:
+          enabled: true
+          interval: "10s"
+          http_path: "/health"
+          unhealthy_threshold: 3
+          healthy_threshold: 2
+    routes:
+      - path_prefix: /api
+        rate_limit:
+          enabled: true
+          requests_per_second: 10  # 100 requests per 10s
+        headers:
+          request_add:
+            X-Forwarded-Proto: "https"
+          response_add:
+            Access-Control-Allow-Origin: "*"
+```
+
+### Empfehlungen für zukünftige Erweiterungen
+
+**Priorität 1 (High Impact):**
+1. **SSL/TLS Termination** - bind ssl crt Configuration
+2. **Advanced ACLs** - Regex, Method, Header Matching
+3. **Lua Scripting** - JWT Auth, Custom Logic
+4. **Prometheus Metrics** - Native Metrics Export
+5. **TCP Mode** - Layer 4 Load Balancing
+
+**Priorität 2 (Medium Impact):**
+6. **HTTP/2 Support** - alpn h2
+7. **Server Templates** - Dynamic Backend Scaling
+8. **Custom Log Format** - log-format Directive
+9. **Dynamic Scaling** - Runtime API Integration
+10. **WebSocket** - timeout tunnel Configuration
+
+**Priorität 3 (Nice to Have):**
+11. **URI/Header Hashing** - Additional LB Algorithms
+12. **Passive Health Checks** - observe layer7 vollständig
+13. **On-Marked-Down** - Fallback Actions
+14. **TCP Health Checks** - Vollständige TCP Check-Support
+15. **Preflight CORS** - Automatisches OPTIONS Handling
+
+### Test Coverage (Import)
+
+**HAProxy Import Tests:** Noch nicht implementiert (v1.3.0 Feature 6)
+
+| Test Kategorie | Tests | Status |
+|----------------|-------|--------|
+| Basic Import | - | ⏳ Pending |
+| Frontend/Backend | - | ⏳ Pending |
+| Load Balancing | - | ⏳ Pending |
+| Health Checks | - | ⏳ Pending |
+| Rate Limiting | - | ⏳ Pending |
+| Headers | - | ⏳ Pending |
+| CORS | - | ⏳ Pending |
+| Errors & Warnings | - | ⏳ Pending |
+
+**Status:** Feature 6 (HAProxy Import) ist für v1.3.0 geplant (aktuell 5/8 Features fertig)
+
+### Fazit
+
+**HAProxy Import Coverage (geplant):**
+- ✅ **Core Features:** ~75% Coverage erwartet (Frontend, Backend, LB, HC)
+- ⚠️ **Authentication:** Eingeschränkt (ACL-based, kein natives JWT)
+- ❌ **Advanced Features:** Lua, SSL, TCP Mode nicht unterstützt
+
+**HAProxy Export Coverage:**
+- ✅ **Core Features:** 90% Coverage (alle GAL Features → HAProxy)
+- ✅ **Best Practices:** Eingebaut (Health Checks, Rate Limiting, Stats)
+- ✅ **haproxy.cfg:** Vollständig generiert
+
+**Empfehlung:**
+- 🚀 Für High-Performance Workloads: **Perfekt geeignet (100k+ RPS)**
+- ✅ Für Standard Load Balancing: **Excellent Choice**
+- ⚠️ Für API Gateway Features (JWT, Plugins): **Kong/APISIX besser geeignet**
+- ⚠️ Für SSL/TLS Auto-Config: **Traefik besser geeignet**
+
+**Referenzen:**
+- 📚 [HAProxy Configuration Manual](https://docs.haproxy.org/2.8/configuration.html)
+- 📚 [HAProxy Load Balancing](https://www.haproxy.com/documentation/haproxy-configuration-manual/latest/#4)
+- 📚 [HAProxy Health Checks](https://www.haproxy.com/documentation/haproxy-configuration-manual/latest/#5.2-check)
+- 📚 [HAProxy ACLs](https://www.haproxy.com/documentation/haproxy-configuration-manual/latest/#7)
 
 ---
 
