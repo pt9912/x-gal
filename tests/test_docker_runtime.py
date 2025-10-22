@@ -478,7 +478,7 @@ class TestTraefikTrafficSplitRuntime:
         )
 
         print("⏳ Waiting for Traefik to be healthy...")
-        max_wait = 30
+        max_wait = 60  # Traefik needs more time to start in CI
         for i in range(max_wait):
             try:
                 response = requests.get("http://localhost:8080/api/v1", timeout=2)
@@ -562,7 +562,7 @@ class TestAPISIXTrafficSplitRuntime:
         )
 
         print("⏳ Waiting for APISIX to be healthy...")
-        max_wait = 30
+        max_wait = 60  # APISIX needs more time to start in CI
         for i in range(max_wait):
             try:
                 response = requests.get("http://localhost:9080/api/v1", timeout=2)
