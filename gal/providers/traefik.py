@@ -27,6 +27,7 @@ from ..config import (
     RateLimitConfig,
     Route,
     Service,
+    TrafficSplitConfig,
     Upstream,
     UpstreamTarget,
 )
@@ -180,7 +181,12 @@ class TraefikProvider(Provider):
                 router_name = f"{service.name}_router_{i}"
                 output.append(f"    {router_name}:")
                 output.append(f"      rule: 'PathPrefix(`{route.path_prefix}`)'")
-                output.append(f"      service: {service.name}_service")
+
+                # Check if route has traffic splitting
+                if route.traffic_split and route.traffic_split.enabled:
+                    output.append(f"      service: {service.name}_route{i}_service")
+                else:
+                    output.append(f"      service: {service.name}_service")
 
                 # Collect middlewares for this route
                 middlewares = []
@@ -220,8 +226,21 @@ class TraefikProvider(Provider):
 
         output.append("  services:")
         for service in config.services:
-            self._generate_traefik_service(service, output)
-            output.append("")
+            # Check if service has traffic splitting
+            has_traffic_split = any(
+                route.traffic_split and route.traffic_split.enabled for route in service.routes
+            )
+
+            if has_traffic_split:
+                # Generate weighted services for traffic splitting
+                for i, route in enumerate(service.routes):
+                    if route.traffic_split and route.traffic_split.enabled:
+                        self._generate_traffic_split_service(service, route, i, output)
+                        output.append("")
+            else:
+                # Generate standard service
+                self._generate_traefik_service(service, output)
+                output.append("")
 
         # Middlewares for authentication, transformations, rate limiting, headers, and CORS
         has_authentication = any(
@@ -590,6 +609,45 @@ class TraefikProvider(Provider):
                     output.append(f"            responseHeaderTimeout: {timeout.read}")
                     output.append(f"            idleConnTimeout: {timeout.idle}")
                     break
+
+    def _generate_traffic_split_service(
+        self, service: Service, route: Route, route_idx: int, output: list
+    ) -> None:
+        """Generate Traefik WeightedRoundRobin service for traffic splitting.
+
+        Creates a weighted service with multiple backend targets for A/B testing
+        and canary deployments using Traefik's weighted round robin feature.
+
+        Args:
+            service: Service with traffic splitting
+            route: Route with traffic_split configuration
+            route_idx: Index of the route
+            output: Output list to append YAML lines to
+
+        Side Effects:
+            Appends weighted service configuration to output
+        """
+        traffic_split = route.traffic_split
+        service_name = f"{service.name}_route{route_idx}_service"
+
+        output.append(f"    {service_name}:")
+        output.append("      weighted:")
+        output.append("        services:")
+
+        # Generate weighted services for each target
+        for target in traffic_split.targets:
+            output.append(f"        - name: {service.name}_{target.name}_service")
+            output.append(f"          weight: {target.weight}")
+
+        # Note: Header/cookie-based routing requires middleware or router-level matching
+        # Traefik doesn't support conditional routing in weighted services directly
+
+        # Generate individual backend services for each target
+        for target in traffic_split.targets:
+            output.append(f"    {service.name}_{target.name}_service:")
+            output.append("      loadBalancer:")
+            output.append("        servers:")
+            output.append(f"        - url: 'http://{target.upstream.host}:{target.upstream.port}'")
 
     def deploy(
         self, config: Config, output_file: Optional[str] = None, api_url: Optional[str] = None
