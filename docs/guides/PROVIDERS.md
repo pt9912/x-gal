@@ -295,6 +295,72 @@ services:
     port: 9090
 ```
 
+### Request Mirroring
+
+⚠️ **Plugin/Enterprise Support**
+
+Kong unterstützt Request Mirroring via **Enterprise Plugin** oder **request-transformer + post-function** Workaround.
+
+**GAL Config:**
+```yaml
+global_config:
+  kong_mirroring_enable_enterprise: true  # Für Enterprise Plugin
+
+services:
+  - name: user_api
+    routes:
+      - path_prefix: /api/users
+        mirroring:
+          enabled: true
+          targets:
+            - name: shadow-v2
+              upstream:
+                host: shadow.example.com
+                port: 443
+              sample_percentage: 50
+              headers:
+                X-Mirror: "true"
+```
+
+**Generierte Kong Config (Enterprise):**
+```yaml
+plugins:
+  - name: request-mirroring
+    config:
+      mirror_targets:
+        - url: https://shadow.example.com
+          sample_rate: 0.5
+      headers:
+        - name: X-Mirror
+          value: "true"
+```
+
+**OpenSource Workaround (Lua):**
+```yaml
+plugins:
+  - name: post-function
+    config:
+      access:
+        - |
+          local http = require "resty.http"
+          if math.random() < 0.5 then
+            local httpc = http.new()
+            httpc:request_uri("https://shadow.example.com" .. kong.request.get_path(), {
+              method = kong.request.get_method(),
+              headers = { ["X-Mirror"] = "true" },
+              body = kong.request.get_raw_body()
+            })
+          end
+```
+
+**Hinweise:**
+- ⚠️ Enterprise Plugin empfohlen (`kong_mirroring_enable_enterprise: true`)
+- ⚠️ OpenSource: post-function Lua Script (fire-and-forget)
+- ✅ Sample Percentage Support
+- ✅ Custom Headers
+
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#kong)
+
 ### Deployment
 
 GAL unterstützt direktes Deployment für Kong via Admin API:
@@ -434,6 +500,56 @@ end
 - Computed Fields mit UUIDs
 - Timestamp-Generierung
 
+### Request Mirroring
+
+✅ **Native Support: proxy-mirror Plugin**
+
+APISIX unterstützt Request Mirroring nativ mit dem `proxy-mirror` Plugin.
+
+**GAL Config:**
+```yaml
+routes:
+  - path_prefix: /api/users
+    mirroring:
+      enabled: true
+      targets:
+        - name: shadow-v2
+          upstream:
+            host: shadow.example.com
+            port: 443
+          sample_percentage: 50
+```
+
+**Generierte APISIX Config:**
+```json
+{
+  "routes": [{
+    "uri": "/api/users/*",
+    "plugins": {
+      "proxy-mirror": {
+        "host": "https://shadow.example.com:443",
+        "sample_ratio": 0.5
+      }
+    },
+    "upstream": {
+      "type": "roundrobin",
+      "nodes": {
+        "backend.example.com:443": 1
+      }
+    }
+  }]
+}
+```
+
+**Hinweise:**
+- ✅ Native proxy-mirror Plugin
+- ✅ `sample_ratio` für Sample Percentage (0.0-1.0)
+- ✅ Fire-and-forget (kein Response Wait)
+- ⚠️ Nur 1 Mirror Target pro Route (keine Multiple Targets)
+- ⚠️ Custom Headers via zusätzliches serverless-pre-function Plugin
+
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#apisix)
+
 ### Deployment
 
 GAL unterstützt direktes Deployment für APISIX via Admin API:
@@ -537,6 +653,62 @@ middlewares:
 - Plugin-Entwicklung benötigt Go
 - Keine nativen Transformationen
 - Fokus auf Routing/Load Balancing
+
+### Request Mirroring
+
+⚠️ **Limited Support: Middleware**
+
+Traefik hat **kein natives Request Mirroring**. Custom Middleware oder externe Lösung erforderlich.
+
+**GAL Config:**
+```yaml
+routes:
+  - path_prefix: /api/users
+    mirroring:
+      enabled: true
+      targets:
+        - name: shadow-v2
+          upstream:
+            host: shadow.example.com
+            port: 443
+```
+
+**Traefik Config (Custom Middleware erforderlich):**
+```yaml
+http:
+  routers:
+    user_api:
+      rule: "PathPrefix(`/api/users`)"
+      service: user_api_service
+      middlewares:
+        - mirror-middleware  # Custom Plugin erforderlich
+
+  services:
+    user_api_service:
+      loadBalancer:
+        servers:
+          - url: "http://backend.example.com"
+
+  middlewares:
+    mirror-middleware:
+      plugin:
+        # Custom Go Plugin für Mirroring
+        # Keine native Unterstützung
+```
+
+**Workarounds:**
+1. **Custom Traefik Plugin (Go)**: Entwickle eigenes Mirroring-Plugin
+2. **Externe Service Mesh**: Nutze Linkerd/Istio für Traffic Mirroring
+3. **ForwardAuth Middleware**: Proxy zu externem Mirroring-Service
+4. **Alternative Provider**: Envoy, Nginx, APISIX für native Mirroring
+
+**Hinweise:**
+- ⚠️ Kein natives Request Mirroring
+- ⚠️ Custom Plugin-Entwicklung erforderlich (Go)
+- ⚠️ Komplexe Integration
+- ✅ Alternative: Service Mesh (Linkerd, Istio)
+
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#traefik)
 
 ### Deployment
 
@@ -672,6 +844,67 @@ server {
 }
 ```
 
+### Request Mirroring
+
+✅ **Native Support: mirror Directive**
+
+Nginx unterstützt Request Mirroring nativ mit der `mirror` Directive.
+
+**GAL Config:**
+```yaml
+routes:
+  - path_prefix: /api/users
+    mirroring:
+      enabled: true
+      targets:
+        - name: shadow-v2
+          upstream:
+            host: shadow.example.com
+            port: 443
+          sample_percentage: 50
+```
+
+**Generierte Nginx Config:**
+```nginx
+# Mirror backend
+upstream shadow-v2_mirror {
+    server shadow.example.com:443;
+}
+
+# Split Clients für Sample Percentage
+split_clients "${remote_addr}${msec}" $mirror_target {
+    50%     shadow-v2_mirror;
+    *       "";
+}
+
+location /api/users {
+    # Original request
+    proxy_pass http://backend;
+
+    # Mirror request (conditional)
+    mirror /mirror_shadow-v2;
+    mirror_request_body on;
+}
+
+location = /mirror_shadow-v2 {
+    internal;
+    if ($mirror_target = "") {
+        return 204;
+    }
+    proxy_pass http://$mirror_target$request_uri;
+    proxy_set_header X-Mirror "true";
+}
+```
+
+**Hinweise:**
+- ✅ Native `mirror` Directive
+- ✅ `split_clients` für Sample Percentage
+- ✅ `mirror_request_body on` für POST/PUT
+- ✅ Custom Headers via `proxy_set_header`
+- ⚠️ Kein natives Sample Percentage (workaround via split_clients)
+
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#nginx)
+
 ### Deployment
 
 GAL unterstützt direktes Deployment für Nginx:
@@ -771,6 +1004,66 @@ backend api_backend
 - ACL-basiertes Routing
 - Sticky Sessions
 - Rate Limiting via stick-tables
+
+### Request Mirroring
+
+✅ **Native Support: http-request mirror (HAProxy 2.4+)**
+
+HAProxy 2.4+ unterstützt Request Mirroring nativ mit der `http-request mirror` Directive.
+
+**GAL Config:**
+```yaml
+routes:
+  - path_prefix: /api/users
+    mirroring:
+      enabled: true
+      targets:
+        - name: shadow-v2
+          upstream:
+            host: shadow.example.com
+            port: 443
+          sample_percentage: 50
+```
+
+**Generierte HAProxy Config (2.4+):**
+```haproxy
+backend shadow-v2_mirror
+    server mirror1 shadow.example.com:443 check
+
+frontend http_front
+    bind *:80
+    default_backend user_backend
+
+backend user_backend
+    # Sample Percentage via ACL
+    acl mirror_sample rand(100) lt 50
+    http-request mirror shadow-v2_mirror if mirror_sample
+
+    # Custom Headers für Mirror
+    http-request set-header X-Mirror true if mirror_sample
+
+    server srv1 backend.example.com:443 check
+```
+
+**HAProxy 2.3 oder älter (Lua Script Workaround):**
+```haproxy
+# global section
+global
+    lua-load /etc/haproxy/lua/mirror.lua
+
+backend user_backend
+    http-request lua.mirror_request
+    server srv1 backend.example.com:443
+```
+
+**Hinweise:**
+- ✅ Native `http-request mirror` (HAProxy 2.4+)
+- ✅ Sample Percentage via `rand(100) lt 50` ACL
+- ✅ Custom Headers via `http-request set-header`
+- ⚠️ HAProxy 2.3 oder älter: Lua Script erforderlich
+- ⚠️ Fire-and-forget (kein Response Wait)
+
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#haproxy)
 
 ### Deployment
 
