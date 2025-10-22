@@ -6,13 +6,12 @@ then verify traffic distribution works as expected.
 
 Requirements:
 - Docker and Docker Compose installed
-- pytest-docker-compose (pip install pytest-docker-compose)
+- pytest (pip install pytest requests)
 
 Run with:
-    pytest tests/test_docker_runtime.py -v --docker-compose-no-build
+    pytest tests/test_docker_runtime.py -v -s
 """
 
-import os
 import subprocess
 import time
 from collections import Counter
@@ -159,6 +158,212 @@ class TestEnvoyTrafficSplitRuntime:
         assert "canary_deployment_api_canary_cluster" in stats
 
         print("\n✅ Envoy admin stats test PASSED!")
+
+
+class TestNginxTrafficSplitRuntime:
+    """Test Nginx traffic splitting with real Docker containers"""
+
+    @pytest.fixture(scope="class")
+    def docker_compose_file(self):
+        """Path to Docker Compose file"""
+        return str(Path(__file__).parent / "docker" / "nginx" / "docker-compose.yml")
+
+    @pytest.fixture(scope="class")
+    def nginx_setup(self, docker_compose_file):
+        """Setup and teardown Docker Compose environment"""
+        compose_dir = Path(docker_compose_file).parent
+
+        # Build and start containers
+        print("\n🐳 Starting Nginx Docker Compose environment...")
+        subprocess.run(
+            ["docker", "compose", "up", "-d", "--build"],
+            cwd=compose_dir,
+            check=True,
+            capture_output=True
+        )
+
+        # Wait for Nginx to be ready
+        print("⏳ Waiting for Nginx to be healthy...")
+        max_wait = 30
+        for i in range(max_wait):
+            try:
+                response = requests.get("http://localhost:8080/api/v1", timeout=2)
+                if response.status_code == 200:
+                    print("✅ Nginx is ready!")
+                    break
+            except requests.exceptions.RequestException:
+                pass
+            time.sleep(1)
+        else:
+            # Show logs if startup failed
+            subprocess.run(["docker", "compose", "logs"], cwd=compose_dir)
+            pytest.fail("Nginx did not become ready in time")
+
+        # Additional wait for backends
+        time.sleep(2)
+
+        yield
+
+        # Cleanup
+        print("\n🧹 Stopping Nginx Docker Compose environment...")
+        subprocess.run(
+            ["docker", "compose", "down", "-v"],
+            cwd=compose_dir,
+            check=True,
+            capture_output=True
+        )
+
+    def test_traffic_distribution_90_10(self, nginx_setup):
+        """Test that traffic is distributed 90% stable, 10% canary"""
+        results = Counter()
+        failed = 0
+
+        print("\n📊 Sending 1000 requests to test Nginx traffic distribution...")
+
+        for i in range(1000):
+            try:
+                response = requests.get(
+                    "http://localhost:8080/api/v1",
+                    timeout=5
+                )
+
+                if response.status_code == 200:
+                    backend = response.headers.get("X-Backend-Name")
+                    if backend:
+                        results[backend] += 1
+                    else:
+                        data = response.json()
+                        backend = data.get("backend")
+                        if backend:
+                            results[backend] += 1
+                        else:
+                            failed += 1
+                else:
+                    failed += 1
+
+            except Exception as e:
+                failed += 1
+
+            if (i + 1) % 100 == 0:
+                print(f"  Progress: {i + 1}/1000 requests")
+
+        # Print results
+        print(f"\n📈 Nginx Traffic Distribution Results:")
+        print(f"  Stable: {results['stable']} requests ({results['stable']/10:.1f}%)")
+        print(f"  Canary: {results['canary']} requests ({results['canary']/10:.1f}%)")
+        print(f"  Failed: {failed} requests")
+
+        # Verify distribution (90/10 ± 5% tolerance)
+        assert results['stable'] >= 850, f"Stable backend received too few requests: {results['stable']} < 850"
+        assert results['stable'] <= 950, f"Stable backend received too many requests: {results['stable']} > 950"
+        assert results['canary'] >= 50, f"Canary backend received too few requests: {results['canary']} < 50"
+        assert results['canary'] <= 150, f"Canary backend received too many requests: {results['canary']} > 150"
+        assert failed < 50, f"Too many failed requests: {failed}"
+
+        print("\n✅ Nginx traffic distribution test PASSED!")
+
+
+class TestKongTrafficSplitRuntime:
+    """Test Kong traffic splitting with real Docker containers"""
+
+    @pytest.fixture(scope="class")
+    def docker_compose_file(self):
+        """Path to Docker Compose file"""
+        return str(Path(__file__).parent / "docker" / "kong" / "docker-compose.yml")
+
+    @pytest.fixture(scope="class")
+    def kong_setup(self, docker_compose_file):
+        """Setup and teardown Docker Compose environment"""
+        compose_dir = Path(docker_compose_file).parent
+
+        # Build and start containers
+        print("\n🐳 Starting Kong Docker Compose environment...")
+        subprocess.run(
+            ["docker", "compose", "up", "-d", "--build"],
+            cwd=compose_dir,
+            check=True,
+            capture_output=True
+        )
+
+        # Wait for Kong to be ready
+        print("⏳ Waiting for Kong to be healthy...")
+        max_wait = 30
+        for i in range(max_wait):
+            try:
+                response = requests.get("http://localhost:8001/status", timeout=2)
+                if response.status_code == 200:
+                    print("✅ Kong is ready!")
+                    break
+            except requests.exceptions.RequestException:
+                pass
+            time.sleep(1)
+        else:
+            # Show logs if startup failed
+            subprocess.run(["docker", "compose", "logs"], cwd=compose_dir)
+            pytest.fail("Kong did not become ready in time")
+
+        # Additional wait for backends
+        time.sleep(2)
+
+        yield
+
+        # Cleanup
+        print("\n🧹 Stopping Kong Docker Compose environment...")
+        subprocess.run(
+            ["docker", "compose", "down", "-v"],
+            cwd=compose_dir,
+            check=True,
+            capture_output=True
+        )
+
+    def test_traffic_distribution_90_10(self, kong_setup):
+        """Test that traffic is distributed 90% stable, 10% canary"""
+        results = Counter()
+        failed = 0
+
+        print("\n📊 Sending 1000 requests to test Kong traffic distribution...")
+
+        for i in range(1000):
+            try:
+                response = requests.get(
+                    "http://localhost:8000/api/v1",
+                    timeout=5
+                )
+
+                if response.status_code == 200:
+                    backend = response.headers.get("X-Backend-Name")
+                    if backend:
+                        results[backend] += 1
+                    else:
+                        data = response.json()
+                        backend = data.get("backend")
+                        if backend:
+                            results[backend] += 1
+                        else:
+                            failed += 1
+                else:
+                    failed += 1
+
+            except Exception as e:
+                failed += 1
+
+            if (i + 1) % 100 == 0:
+                print(f"  Progress: {i + 1}/1000 requests")
+
+        # Print results
+        print(f"\n📈 Kong Traffic Distribution Results:")
+        print(f"  Stable: {results['stable']} requests ({results['stable']/10:.1f}%)")
+        print(f"  Canary: {results['canary']} requests ({results['canary']/10:.1f}%)")
+        print(f"  Failed: {failed} requests")
+
+        # Verify distribution (90/10 ± 5% tolerance)
+        assert results['stable'] >= 850, f"Stable backend received too few requests: {results['stable']} < 850"
+        assert results['stable'] <= 950, f"Stable backend received too many requests: {results['stable']} > 950"
+        assert results['canary'] >= 50, f"Canary backend received too few requests: {results['canary']} < 50"
+        assert results['canary'] <= 150, f"Canary backend received too many requests: {results['canary']} > 150"
+        assert failed < 50, f"Too many failed requests: {failed}"
+
+        print("\n✅ Kong traffic distribution test PASSED!")
 
 
 @pytest.mark.skip(reason="Docker Compose test - run manually with: pytest tests/test_docker_runtime.py -v -m docker")

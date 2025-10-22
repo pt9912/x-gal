@@ -40,7 +40,7 @@ End-to-End tests that use **real Docker containers** to verify traffic splitting
 
 ### 1. Envoy Traffic Splitting (tests/docker/envoy/)
 
-**Config:** 90% Stable, 10% Canary
+**Config:** 90% Stable, 10% Canary (weighted_clusters)
 
 **Tests:**
 - `test_traffic_distribution_90_10`: Sends 1000 requests, verifies 90/10 ± 5% distribution
@@ -53,6 +53,44 @@ Stable: 905 requests (90.5%) ✅
 Canary: 95 requests (9.5%)   ✅
 Failed: 0 requests           ✅
 ```
+
+### 2. Nginx Traffic Splitting (tests/docker/nginx/)
+
+**Config:** 90% Stable, 10% Canary (split_clients with $msec)
+
+**Tests:**
+- `test_traffic_distribution_90_10`: Sends 1000 requests, verifies 90/10 ± 5% distribution
+
+**Results:**
+```
+Stable: 900 requests (90.0%) ✅
+Canary: 100 requests (10.0%) ✅
+Failed: 0 requests           ✅
+```
+
+**Notes:**
+- Uses `split_clients "${remote_addr}${msec}"` for random distribution
+- Requires DNS resolver (127.0.0.11) for Docker service discovery
+- Upstream blocks with variable proxy_pass
+
+### 3. Kong Traffic Splitting (tests/docker/kong/)
+
+**Config:** 90% Stable, 10% Canary (upstream targets with weights)
+
+**Tests:**
+- `test_traffic_distribution_90_10`: Sends 1000 requests, verifies 90/10 ± 5% distribution
+
+**Results:**
+```
+Stable: 900 requests (90.0%) ✅
+Canary: 100 requests (10.0%) ✅
+Failed: 0 requests           ✅
+```
+
+**Notes:**
+- Kong DB-less mode with declarative config
+- Upstream targets with weight: 900 (stable) and 100 (canary)
+- Native load balancing support
 
 ## Running Tests
 
