@@ -29,6 +29,7 @@ from ..config import (
     RateLimitConfig,
     Route,
     Service,
+    TrafficSplitConfig,
     Upstream,
     UpstreamTarget,
 )
@@ -177,10 +178,27 @@ class KongProvider(Provider):
                             output.append(f"    {key}: {value}")
             output.append("")
 
-        # Generate upstreams first (if needed for load balancing or health checks)
+        # Generate upstreams first (if needed for load balancing, health checks, or traffic splitting)
         upstreams_needed = []
+        traffic_split_upstreams = {}  # service_name:route_index -> upstream config
+
         for service in config.services:
-            if (
+            # Check if any route has traffic splitting enabled
+            has_traffic_split = any(
+                route.traffic_split and route.traffic_split.enabled for route in service.routes
+            )
+
+            if has_traffic_split:
+                # Create upstreams for each route with traffic splitting
+                for route_idx, route in enumerate(service.routes):
+                    if route.traffic_split and route.traffic_split.enabled:
+                        traffic_split_upstreams[f"{service.name}:{route_idx}"] = (
+                            service,
+                            route,
+                            route_idx,
+                        )
+                upstreams_needed.append(service)
+            elif (
                 service.upstream.targets
                 or service.upstream.health_check
                 or service.upstream.load_balancer
@@ -190,7 +208,22 @@ class KongProvider(Provider):
         if upstreams_needed:
             output.append("upstreams:")
             for service in upstreams_needed:
-                self._generate_kong_upstream(service, output)
+                # Check if this service has traffic splitting
+                has_traffic_split = any(
+                    route.traffic_split and route.traffic_split.enabled
+                    for route in service.routes
+                )
+
+                if has_traffic_split:
+                    # Generate separate upstreams for each route with traffic splitting
+                    for route_idx, route in enumerate(service.routes):
+                        if route.traffic_split and route.traffic_split.enabled:
+                            self._generate_traffic_split_upstream(
+                                service, route, route_idx, output
+                            )
+                else:
+                    # Generate standard upstream
+                    self._generate_kong_upstream(service, output)
             output.append("")
 
         output.append("services:")
@@ -202,9 +235,19 @@ class KongProvider(Provider):
             else:
                 output.append("  protocol: http")
 
-            # If using upstream (for LB/HC), reference it; otherwise use direct host/port
+            # Check if service has traffic splitting
+            has_traffic_split = any(
+                route.traffic_split and route.traffic_split.enabled for route in service.routes
+            )
+
+            # If using upstream (for LB/HC/TS), reference it; otherwise use direct host/port
             if service in upstreams_needed:
-                output.append(f"  host: {service.name}_upstream")
+                if has_traffic_split:
+                    # For traffic splitting, use first route's upstream (simplified approach)
+                    # Note: Kong doesn't support per-route upstreams, so all routes share the same upstream
+                    output.append(f"  host: {service.name}_route0_upstream")
+                else:
+                    output.append(f"  host: {service.name}_upstream")
             else:
                 output.append(f"  host: {service.upstream.host}")
                 output.append(f"  port: {service.upstream.port}")
@@ -648,6 +691,39 @@ class KongProvider(Provider):
             # Simple mode (single host/port)
             output.append(f"  - target: {service.upstream.host}:{service.upstream.port}")
             output.append("    weight: 100")
+
+    def _generate_traffic_split_upstream(
+        self, service: Service, route: Route, route_idx: int, output: list
+    ) -> None:
+        """Generate Kong upstream for traffic splitting with weighted targets.
+
+        Creates an upstream with weighted targets for A/B testing and canary deployments.
+        Kong's load balancer will distribute traffic according to target weights.
+
+        Args:
+            service: Service with traffic splitting
+            route: Route with traffic_split configuration
+            route_idx: Index of the route
+            output: Output list to append YAML lines to
+
+        Side Effects:
+            Appends upstream configuration with weighted targets
+        """
+        traffic_split = route.traffic_split
+        upstream_name = f"{service.name}_route{route_idx}_upstream"
+
+        output.append(f"- name: {upstream_name}")
+        output.append("  algorithm: round-robin")  # Round-robin respects weights
+
+        # Configure targets with weights
+        output.append("  targets:")
+        for target in traffic_split.targets:
+            output.append(f"  - target: {target.upstream.host}:{target.upstream.port}")
+            # Kong uses 0-1000 scale, we use 0-100, so multiply by 10
+            output.append(f"    weight: {target.weight * 10}")
+
+        # Note: Header/cookie-based routing not supported natively by Kong upstreams
+        # Would require request-transformer or serverless plugin for advanced routing
 
     def _parse_kong_duration(self, duration: str) -> int:
         """Parse duration string to seconds for Kong configuration.
