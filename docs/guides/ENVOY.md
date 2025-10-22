@@ -1512,6 +1512,270 @@ tracing:
 
 ---
 
+## Request Mirroring/Shadowing
+
+**Status:** ✅ Native Support (`request_mirror_policies`)
+
+Request Mirroring (Shadow Traffic) ermöglicht es, Requests an Shadow-Backends zu duplizieren, ohne die primäre Response zu beeinflussen. Ideal für Production Testing ohne User Impact.
+
+### Übersicht
+
+Envoy unterstützt Request Mirroring nativ mit `request_mirror_policies`. GAL generiert automatisch die Mirror-Konfiguration mit Sample Percentage Support.
+
+**Features:**
+- ✅ Native `request_mirror_policies` support
+- ✅ Sample percentage via `runtime_fraction`
+- ✅ Multiple mirror targets
+- ✅ Fire-and-forget (keine Response-Wartezeit)
+- ⚠️ Custom headers via zusätzliche Filter Chains
+
+### GAL-Konfiguration
+
+```yaml
+version: "1.0"
+provider: envoy
+
+services:
+  - name: api_service
+    protocol: http
+    upstream:
+      host: api-v1
+      port: 8080
+    routes:
+      - path_prefix: /api/users
+        methods: [GET, POST]
+
+        # Request Mirroring Configuration
+        mirroring:
+          enabled: true
+          mirror_request_body: true
+          mirror_headers: true
+          targets:
+            - name: shadow-v2
+              upstream:
+                host: shadow-api-v2
+                port: 8080
+              sample_percentage: 50.0  # 50% of traffic
+              timeout: "5s"
+              headers:
+                X-Mirror: "true"
+                X-Shadow-Version: "v2"
+```
+
+### Generierte Envoy-Konfiguration
+
+```yaml
+# Envoy Config (generiert von GAL)
+static_resources:
+  clusters:
+    - name: primary_cluster
+      connect_timeout: 5s
+      type: STRICT_DNS
+      load_assignment:
+        cluster_name: primary_cluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: api-v1
+                    port_value: 8080
+
+    - name: shadow_cluster
+      connect_timeout: 5s
+      type: STRICT_DNS
+      load_assignment:
+        cluster_name: shadow_cluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: shadow-api-v2
+                    port_value: 8080
+
+  listeners:
+    - name: listener_0
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 8080
+      filter_chains:
+        - filters:
+          - name: envoy.filters.network.http_connection_manager
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+              stat_prefix: ingress_http
+              route_config:
+                name: local_route
+                virtual_hosts:
+                  - name: api_service
+                    domains: ["*"]
+                    routes:
+                      - match:
+                          prefix: "/api/users"
+                        route:
+                          cluster: primary_cluster
+                          timeout: 30s
+                          # Request Mirroring
+                          request_mirror_policies:
+                            - cluster: shadow_cluster
+                              runtime_fraction:
+                                default_value:
+                                  numerator: 50    # 50% sampling
+                                  denominator: HUNDRED
+```
+
+### Use Cases
+
+**1. Canary Deployment Testing (10% Shadow Traffic)**
+```yaml
+mirroring:
+  enabled: true
+  targets:
+    - name: canary-v2
+      upstream:
+        host: api-v2-canary
+        port: 8080
+      sample_percentage: 10.0  # Only 10% to detect issues
+```
+
+**2. Performance Testing (100% Shadow Traffic)**
+```yaml
+mirroring:
+  enabled: true
+  targets:
+    - name: load-test
+      upstream:
+        host: api-loadtest
+        port: 8080
+      sample_percentage: 100.0  # All traffic for performance testing
+      timeout: "3s"
+```
+
+**3. Multiple Shadow Targets (A/B/C Testing)**
+```yaml
+mirroring:
+  enabled: true
+  targets:
+    - name: shadow-v2
+      upstream:
+        host: api-v2
+        port: 8080
+      sample_percentage: 50.0
+    - name: shadow-v3
+      upstream:
+        host: api-v3
+        port: 8080
+      sample_percentage: 10.0
+```
+
+### Deployment
+
+```bash
+# 1. GAL → Envoy Config generieren
+gal generate --config config.yaml --provider envoy --output envoy.yaml
+
+# 2. Envoy deployen (Docker)
+docker run --rm -v $(pwd)/envoy.yaml:/etc/envoy/envoy.yaml \
+  -p 8080:8080 -p 9901:9901 \
+  envoyproxy/envoy:v1.31-latest
+
+# 3. Mirroring testen
+for i in {1..100}; do
+  curl -s http://localhost:8080/api/users
+done
+
+# 4. Shadow Backend Metrics prüfen
+curl http://shadow-api-v2:8080/metrics | grep request_count
+```
+
+### Monitoring
+
+**Admin API Stats:**
+```bash
+# Mirror Cluster Stats
+curl http://localhost:9901/stats | grep shadow_cluster
+
+# Expected Output:
+# cluster.shadow_cluster.upstream_rq_total: 50  # ~50 requests (50%)
+# cluster.shadow_cluster.upstream_rq_time: 15ms
+# cluster.shadow_cluster.upstream_rq_success: 48
+# cluster.shadow_cluster.upstream_rq_error: 2
+```
+
+**Envoy Logs:**
+```bash
+# Mirror requests in logs
+docker logs envoy-container 2>&1 | grep shadow_cluster
+
+# Example:
+# [info] upstream_rq_total: cluster.shadow_cluster: 1
+# [info] response_code: 200, cluster: shadow_cluster
+```
+
+### Limitierungen
+
+- ⚠️ **Custom Headers:** Keine direkte Header-Injection für Mirror-Requests (nutze Lua Filter als Workaround)
+- ⚠️ **Sample Percentage:** Runtime-basiert (nicht exakt, nutzt `runtime_fraction`)
+- ⚠️ **Response Ignored:** Shadow-Backend-Response wird komplett ignoriert (fire-and-forget)
+- ⚠️ **Timeouts:** Mirror-Request-Timeout unabhängig vom Primary Request
+
+### Best Practices
+
+1. **Start with Low Sample Percentage (5-10%)**
+   - Verhindert Shadow-Backend-Überlastung
+   - Findet Bugs mit minimalem Traffic
+
+2. **Monitor Shadow Backend Metrics**
+   - Separate Metrics-Erfassung für Shadow Traffic
+   - Alert bei hoher Error-Rate im Shadow
+
+3. **Set Appropriate Timeouts**
+   - Shadow-Timeouts sollten kürzer sein als Primary (z.B. 3s vs 30s)
+   - Verhindert lange Mirror-Request-Blockierung
+
+4. **Use Headers to Identify Mirror Traffic**
+   - `X-Mirror: true` Header für Shadow-Backend-Identifikation
+   - Ermöglicht separate Log-Filtering
+
+### Troubleshooting
+
+**Problem:** Mirror Requests erreichen Shadow Backend nicht
+
+**Diagnose:**
+```bash
+# Cluster Status prüfen
+curl http://localhost:9901/clusters | grep shadow_cluster
+
+# Expected:
+# cluster.shadow_cluster.membership_healthy: 1
+# cluster.shadow_cluster.membership_total: 1
+```
+
+**Lösung:**
+- DNS-Auflösung prüfen: `nslookup shadow-api-v2`
+- Shadow Backend Health: `curl http://shadow-api-v2:8080/health`
+- Envoy Logs prüfen: `docker logs envoy-container`
+
+**Problem:** Zu viele/zu wenige Mirror Requests
+
+**Diagnose:**
+```bash
+# Ratio berechnen
+PRIMARY=$(curl -s http://localhost:9901/stats | grep primary_cluster.upstream_rq_total | awk '{print $2}')
+SHADOW=$(curl -s http://localhost:9901/stats | grep shadow_cluster.upstream_rq_total | awk '{print $2}')
+echo "Mirror Ratio: $(echo "scale=2; $SHADOW / $PRIMARY * 100" | bc)%"
+```
+
+**Lösung:**
+- `runtime_fraction.default_value.numerator` anpassen (50 = 50%)
+- Bei 1000+ Requests: ±5% Toleranz ist normal
+
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#1-envoy-native)
+
+---
+
 ## Migration zu/von Envoy Gateway
 
 ### Migrations-Flow
