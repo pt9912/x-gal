@@ -939,7 +939,7 @@ Failed Requests: 0 (0.0%)
 
 **Siehe auch:**
 - [Traffic Splitting Guide](TRAFFIC_SPLITTING.md) - Vollständige Dokumentation
-- [examples/traffic-split-example.yaml](../../examples/traffic-split-example.yaml) - 6 Beispiel-Szenarien
+- [examples/traffic-split-example.yaml](https://github.com/pt9912/x-gal/blob/develop/examples/traffic-split-example.yaml) - 6 Beispiel-Szenarien
 - [tests/docker/haproxy/](../../tests/docker/haproxy/) - Docker Compose E2E Tests
 
 ---

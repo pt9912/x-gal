@@ -1259,8 +1259,8 @@ fallback_target: "production"
 - [Google: Deployment Patterns](https://cloud.google.com/architecture/application-deployment-and-testing-strategies)
 
 ### GAL Beispiele
-- [examples/traffic-split-example.yaml](../../examples/traffic-split-example.yaml)
-- [tests/test_traffic_split.py](../../tests/test_traffic_split.py)
+- [examples/traffic-split-example.yaml](https://github.com/pt9912/x-gal/blob/develop/examples/traffic-split-example.yaml)
+- [tests/test_traffic_split.py](https://github.com/pt9912/x-gal/blob/develop/tests/test_traffic_split.py)
 
 ---
 

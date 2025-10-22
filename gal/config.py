@@ -10,6 +10,63 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
+# Export all public classes
+__all__ = [
+    # Global configuration
+    "GlobalConfig",
+    "LoggingConfig",
+    "MetricsConfig",
+    "AzureAPIMGlobalConfig",
+    "AWSAPIGatewayConfig",
+    "GCPAPIGatewayConfig",
+    # Upstream configuration
+    "UpstreamTarget",
+    "Upstream",
+    "ActiveHealthCheck",
+    "PassiveHealthCheck",
+    # Rate limiting
+    "RateLimitConfig",
+    # Authentication
+    "BasicAuthConfig",
+    "ApiKeyConfig",
+    "JwtConfig",
+    "AuthenticationConfig",
+    # Headers & CORS
+    "HeaderConfig",
+    "CorsConfig",
+    # Circuit breaker
+    "CircuitBreakerConfig",
+    # Timeout & retry
+    "TimeoutConfig",
+    "RetryPolicyConfig",
+    # WebSocket
+    "WebSocketConfig",
+    # Transformations
+    "ComputedField",
+    "Validation",
+    "BodyTransformation",
+    "RequestTransformation",
+    "ResponseTransformation",
+    "Transformation",
+    # gRPC
+    "ProtoDescriptor",
+    "GrpcTranscodingRoute",
+    "GrpcServiceConfig",
+    # Traffic splitting (Feature 5)
+    "HeaderMatchRule",
+    "CookieMatchRule",
+    "RoutingRules",
+    "SplitTarget",
+    "TrafficSplitConfig",
+    # Route & Service
+    "Route",
+    "Service",
+    # Plugin
+    "Plugin",
+    # Config
+    "Config",
+]
+
 
 @dataclass
 class GlobalConfig:
