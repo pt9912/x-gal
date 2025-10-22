@@ -144,7 +144,7 @@ routes:
 - ✅ Multiple Mirror Targets (Array)
 - ⚠️ Keine Custom Headers direkt (nutze Lua Filter)
 
-> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#envoy)
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#1-envoy-native)
 
 ### Deployment
 
@@ -359,7 +359,7 @@ plugins:
 - ✅ Sample Percentage Support
 - ✅ Custom Headers
 
-> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#kong)
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#5-kong-partial-pluginworkaround)
 
 ### Deployment
 
@@ -548,7 +548,7 @@ routes:
 - ⚠️ Nur 1 Mirror Target pro Route (keine Multiple Targets)
 - ⚠️ Custom Headers via zusätzliches serverless-pre-function Plugin
 
-> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#apisix)
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#3-apache-apisix-native)
 
 ### Deployment
 
@@ -708,7 +708,7 @@ http:
 - ⚠️ Komplexe Integration
 - ✅ Alternative: Service Mesh (Linkerd, Istio)
 
-> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#traefik)
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#6-traefik-limited-custom-middleware)
 
 ### Deployment
 
@@ -903,7 +903,7 @@ location = /mirror_shadow-v2 {
 - ✅ Custom Headers via `proxy_set_header`
 - ⚠️ Kein natives Sample Percentage (workaround via split_clients)
 
-> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#nginx)
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#2-nginx-native)
 
 ### Deployment
 
@@ -1063,7 +1063,7 @@ backend user_backend
 - ⚠️ HAProxy 2.3 oder älter: Lua Script erforderlich
 - ⚠️ Fire-and-forget (kein Response Wait)
 
-> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#haproxy)
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#4-haproxy-native-haproxy-24)
 
 ### Deployment
 

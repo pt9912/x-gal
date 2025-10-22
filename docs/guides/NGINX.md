@@ -1509,7 +1509,7 @@ location /api {
 - Bei kleinen Request-Counts: Schwankungen normal
 - Bei 1000+ Requests: ±5% Toleranz erwartet
 
-> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#nginx) für erweiterte Szenarien und E2E Tests.
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#2-nginx-native) für erweiterte Szenarien und E2E Tests.
 
 ---
 
