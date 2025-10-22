@@ -84,7 +84,8 @@ class HealthCheckConfig:
 - Füge Feature zur Feature-Liste hinzu (mit ✅ oder 🚧)
 - Füge Verwendungs-Beispiel zur Usage-Sektion hinzu
 - Aktualisiere Provider-Kompatibilitäts-Matrix
-
+- Aktualisiere Provider-Guide 
+  
 **Bei neuen Providern:**
 - Füge Provider zur unterstützten Provider-Liste hinzu
 - Aktualisiere Feature-Matrix (welche Features der Provider unterstützt)
