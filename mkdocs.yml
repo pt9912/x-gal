@@ -52,15 +52,42 @@ nav:
     - Konfigurationsbeispiele: guides/EXAMPLES.md
     - Best Practices: guides/BEST_PRACTICES.md
     - Provider Übersicht: guides/PROVIDERS.md
-    - Nginx: guides/NGINX.md
-    - Envoy: guides/ENVOY.md
-    - Kong: guides/KONG.md
-    - APISIX: guides/APISIX.md
-    - Traefik: guides/TRAEFIK.md
-    - HAProxy: guides/HAPROXY.md
-    - Azure API Management: guides/AZURE_APIM.md
-    - AWS API Gateway: guides/AWS_APIGATEWAY.md
-    - GCP API Gateway: guides/GCP_APIGATEWAY.md
+    - Nginx:
+      - Übersicht: guides/NGINX.md
+      - Features: guides/NGINX_FEATURES.md
+      - Deployment & Migration: guides/NGINX_DEPLOYMENT.md
+    - Envoy:
+      - Übersicht: guides/ENVOY.md
+      - Features: guides/ENVOY_FEATURES.md
+      - Migration & Best Practices: guides/ENVOY_DEPLOYMENT.md
+    - Kong:
+      - Übersicht: guides/KONG.md
+      - Features: guides/KONG_FEATURES.md
+      - Migration & Best Practices: guides/KONG_DEPLOYMENT.md
+    - APISIX:
+      - Übersicht: guides/APISIX.md
+      - Features: guides/APISIX_FEATURES.md
+      - Best Practices & Troubleshooting: guides/APISIX_DEPLOYMENT.md
+    - Traefik:
+      - Übersicht: guides/TRAEFIK.md
+      - Features: guides/TRAEFIK_FEATURES.md
+      - Best Practices & Troubleshooting: guides/TRAEFIK_DEPLOYMENT.md
+    - HAProxy:
+      - Übersicht: guides/HAPROXY.md
+      - Features: guides/HAPROXY_FEATURES.md
+      - Best Practices & Troubleshooting: guides/HAPROXY_DEPLOYMENT.md
+    - Azure API Management:
+      - Übersicht: guides/AZURE_APIM.md
+      - Features: guides/AZURE_APIM_FEATURES.md
+      - Deployment & Migration: guides/AZURE_APIM_DEPLOYMENT.md
+    - AWS API Gateway:
+      - Übersicht: guides/AWS_APIGATEWAY.md
+      - Features: guides/AWS_APIGATEWAY_FEATURES.md
+      - Deployment & Migration: guides/AWS_APIGATEWAY_DEPLOYMENT.md
+    - GCP API Gateway:
+      - Übersicht: guides/GCP_APIGATEWAY.md
+      - Features: guides/GCP_APIGATEWAY_FEATURES.md
+      - Deployment & Migration: guides/GCP_APIGATEWAY_DEPLOYMENT.md
     - Transformationen: guides/TRANSFORMATIONS.md
     - Entwicklung: guides/DEVELOPMENT.md
   - Features:
