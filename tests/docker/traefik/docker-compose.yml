@@ -38,10 +38,11 @@ services:
     image: traefik:v2.10
     command:
       - "--api.insecure=true"
-      - "--providers.file.filename=/etc/traefik/traefik.yml"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
       - "--entrypoints.web.address=:8080"
     volumes:
-      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik.yml:/etc/traefik/dynamic/traefik.yml:ro
     ports:
       - "8080:8080"  # HTTP entrypoint
       - "8081:8080"  # Dashboard (optional)

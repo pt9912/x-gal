@@ -480,6 +480,16 @@ class TestTraefikTrafficSplitRuntime:
         print("⏳ Waiting for Traefik to be healthy...")
         max_wait = 60  # Traefik needs more time to start in CI
         for i in range(max_wait):
+            # Check container status
+            result = subprocess.run(
+                ["docker", "compose", "ps", "--format", "json"],
+                cwd=compose_dir,
+                capture_output=True,
+                text=True
+            )
+            if i % 10 == 0:  # Log every 10 seconds
+                print(f"  Waiting... ({i}s) - Container status check")
+
             try:
                 response = requests.get("http://localhost:8080/api/v1", timeout=2)
                 if response.status_code == 200:
@@ -489,7 +499,9 @@ class TestTraefikTrafficSplitRuntime:
                 pass
             time.sleep(1)
         else:
-            subprocess.run(["docker", "compose", "logs"], cwd=compose_dir)
+            print("❌ Traefik did not become ready in time. Showing logs:")
+            subprocess.run(["docker", "compose", "ps"], cwd=compose_dir)
+            subprocess.run(["docker", "compose", "logs", "traefik"], cwd=compose_dir)
             pytest.fail("Traefik did not become ready in time")
 
         time.sleep(2)
@@ -564,6 +576,16 @@ class TestAPISIXTrafficSplitRuntime:
         print("⏳ Waiting for APISIX to be healthy...")
         max_wait = 60  # APISIX needs more time to start in CI
         for i in range(max_wait):
+            # Check container status
+            result = subprocess.run(
+                ["docker", "compose", "ps", "--format", "json"],
+                cwd=compose_dir,
+                capture_output=True,
+                text=True
+            )
+            if i % 10 == 0:  # Log every 10 seconds
+                print(f"  Waiting... ({i}s) - Container status check")
+
             try:
                 response = requests.get("http://localhost:9080/api/v1", timeout=2)
                 if response.status_code == 200:
@@ -573,7 +595,9 @@ class TestAPISIXTrafficSplitRuntime:
                 pass
             time.sleep(1)
         else:
-            subprocess.run(["docker", "compose", "logs"], cwd=compose_dir)
+            print("❌ APISIX did not become ready in time. Showing logs:")
+            subprocess.run(["docker", "compose", "ps"], cwd=compose_dir)
+            subprocess.run(["docker", "compose", "logs", "apisix"], cwd=compose_dir)
             pytest.fail("APISIX did not become ready in time")
 
         time.sleep(2)
