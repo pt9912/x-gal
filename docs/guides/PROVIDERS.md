@@ -2,7 +2,7 @@
 
 ## Übersicht
 
-GAL unterstützt zehn führende API-Gateway-Provider - sechs selbst-gehostete und vier Cloud-native Provider. Jeder Provider hat spezifische Eigenschaften, Stärken und ideale Use Cases.
+GAL unterstützt neun führende API-Gateway-Provider - sechs selbst-gehostete und drei Cloud-native Provider. Jeder Provider hat spezifische Eigenschaften, Stärken und ideale Use Cases.
 
 ## Unterstützte Provider
 
@@ -103,6 +103,48 @@ clusters:
   - name: grpc_service_cluster
     http2_protocol_options: {}  # Aktiviert HTTP/2
 ```
+
+### Request Mirroring
+
+✅ **Native Support: request_mirror_policies**
+
+Envoy unterstützt Request Mirroring nativ mit `request_mirror_policies`.
+
+**GAL Config:**
+```yaml
+routes:
+  - path_prefix: /api/users
+    mirroring:
+      enabled: true
+      targets:
+        - name: shadow-v2
+          upstream:
+            host: shadow.example.com
+            port: 443
+          sample_percentage: 50
+```
+
+**Generierte Envoy Config:**
+```yaml
+routes:
+  - match: { prefix: "/api/users" }
+    route:
+      cluster: primary_cluster
+      request_mirror_policies:
+        - cluster: shadow-v2_cluster
+          runtime_fraction:
+            default_value:
+              numerator: 50
+              denominator: 100
+```
+
+**Hinweise:**
+- ✅ Native request_mirror_policies
+- ✅ runtime_fraction für Sample Percentage
+- ✅ Multiple Mirror Targets (Array)
+- ⚠️ Keine Custom Headers direkt (nutze Lua Filter)
+
+> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#envoy)
 
 ### Deployment
 
@@ -882,6 +924,102 @@ azure_apim:
 - Standard: Production APIs mit VNet
 - Premium: Enterprise (Multi-Region, 99.99% SLA)
 
+### Request Mirroring
+
+✅ **Native Support: send-request Policy**
+
+Azure APIM unterstützt Request Mirroring nativ über die `send-request` Policy.
+
+**GAL Config:**
+```yaml
+services:
+  - name: user_api
+    protocol: http
+    upstream:
+      targets:
+        - host: backend.example.com
+          port: 443
+    routes:
+      - path_prefix: /api/users
+        mirroring:
+          enabled: true
+          targets:
+            - name: shadow-backend
+              upstream:
+                host: shadow.example.com
+                port: 443
+              sample_percentage: 50
+              timeout: 5
+              headers:
+                X-Mirror: "true"
+                X-Shadow-Version: "v2"
+```
+
+**Generierte APIM Policy XML:**
+```xml
+<policies>
+  <inbound>
+    <base />
+    <!-- Original request processing -->
+  </inbound>
+
+  <backend>
+    <base />
+  </backend>
+
+  <outbound>
+    <base />
+    <!-- Request Mirroring (fire-and-forget) -->
+    <choose>
+      <when condition="@(new Random().Next(100) < 50)">
+        <send-request mode="new" response-variable-name="mirrorResponse" timeout="5" ignore-error="true">
+          <set-url>https://shadow.example.com/api/users</set-url>
+          <set-method>@(context.Request.Method)</set-method>
+          <set-header name="X-Mirror" exists-action="override">
+            <value>true</value>
+          </set-header>
+          <set-header name="X-Shadow-Version" exists-action="override">
+            <value>v2</value>
+          </set-header>
+          <set-body>@(context.Request.Body.As<string>(preserveContent: true))</set-body>
+        </send-request>
+      </when>
+    </choose>
+  </outbound>
+
+  <on-error>
+    <base />
+  </on-error>
+</policies>
+```
+
+**Deployment:**
+```bash
+# GAL Config → ARM Template mit Mirroring Policy
+gal generate -c config.yaml -p azure_apim -o azure-apim-template.json
+
+# ARM Template deployen
+az deployment group create \
+  --resource-group gal-rg \
+  --template-file azure-apim-template.json
+
+# Policy validieren
+az apim api operation policy show \
+  --resource-group gal-rg \
+  --service-name my-apim-service \
+  --api-id user_api \
+  --operation-id getUsers
+```
+
+**Hinweise:**
+- ✅ Native `send-request` Policy (keine externe Funktion erforderlich)
+- ✅ Sample Percentage über `@(new Random().Next(100) < 50)` Condition
+- ✅ Custom Headers über `set-header` Tags
+- ✅ Fire-and-Forget: `ignore-error="true"` + `response-variable-name` (nicht verwendet)
+- ✅ Timeout-Konfiguration (1-30s)
+- ⚠️ Kosten pro Mirror Request (APIM Requests werden gezählt)
+- ⚠️ Latenz durch outbound Policy Execution
+
 ### Deployment
 
 GAL unterstützt Azure CLI Deployment:
@@ -1090,6 +1228,91 @@ GCP API Gateway hat **keine native Transformation-Engine** wie Envoy/Kong.
 - Cloud Run: Automatische Health Checks
 - Cloud Functions: Built-in Health Monitoring
 - Load Balancer: Konfigurierbare Health Checks
+
+### Request Mirroring
+
+⚠️ **Workaround: Cloud Functions**
+
+GCP API Gateway unterstützt Request Mirroring nicht nativ. GAL konfiguriert einen **Cloud Functions Workaround** über `mirroring_cloud_function_url`.
+
+**GAL Config:**
+```yaml
+services:
+  - name: user_api
+    protocol: http
+    upstream:
+      targets:
+        - host: backend.example.com
+          port: 443
+    routes:
+      - path_prefix: /api/users
+        mirroring:
+          enabled: true
+          mirroring_cloud_function_url: "https://us-central1-my-project.cloudfunctions.net/mirror-function"
+          targets:
+            - name: shadow-backend
+              upstream:
+                host: shadow.example.com
+                port: 443
+              sample_percentage: 50
+              headers:
+                X-Mirror: "true"
+                X-Shadow-Version: "v2"
+```
+
+**Cloud Function Implementation:**
+```javascript
+// Cloud Functions HTTP Trigger
+exports.mirrorRequest = async (req, res) => {
+  const axios = require('axios');
+
+  // Mirror request to shadow backend
+  const shadowUrl = process.env.SHADOW_BACKEND_URL;
+  const sampleRate = parseFloat(process.env.SAMPLE_PERCENTAGE || '100');
+
+  // Sample percentage logic
+  if (Math.random() * 100 < sampleRate) {
+    try {
+      await axios({
+        method: req.method,
+        url: `${shadowUrl}${req.path}`,
+        headers: {
+          ...req.headers,
+          'X-Mirror': 'true',
+          'X-Shadow-Version': 'v2'
+        },
+        data: req.body,
+        timeout: 5000
+      });
+    } catch (error) {
+      console.error('Mirror failed:', error);
+      // Ignore errors (fire-and-forget)
+    }
+  }
+
+  res.status(200).send('OK');
+};
+```
+
+**Deployment:**
+```bash
+# Deploy Cloud Function
+gcloud functions deploy mirror-function \
+  --runtime nodejs18 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --set-env-vars SHADOW_BACKEND_URL=https://shadow.example.com,SAMPLE_PERCENTAGE=50
+
+# Get Function URL
+gcloud functions describe mirror-function --format="value(httpsTrigger.url)"
+```
+
+**Hinweise:**
+- ⚠️ Erfordert externe Cloud Function
+- ⚠️ Zusätzliche Kosten für Function Invocations
+- ⚠️ Latenz durch Function Trigger
+- ✅ Vollständige Kontrolle über Mirroring-Logik
+- ✅ Support für Sample Percentage, Custom Headers
 
 ### Deployment-Befehle
 
@@ -1366,6 +1589,105 @@ aws apigateway create-usage-plan-key \
 - **HTTP Backend:** Health Check via Route 53 Health Checks
 - **ECS/EKS:** Target Group Health Checks
 
+### Request Mirroring
+
+⚠️ **Workaround: Lambda@Edge**
+
+AWS API Gateway unterstützt Request Mirroring nicht nativ. GAL konfiguriert einen **Lambda@Edge Workaround** über `mirroring_lambda_edge_arn`.
+
+**GAL Config:**
+```yaml
+services:
+  - name: user_api
+    protocol: http
+    upstream:
+      targets:
+        - host: backend.example.com
+          port: 443
+    routes:
+      - path_prefix: /api/users
+        mirroring:
+          enabled: true
+          mirroring_lambda_edge_arn: "arn:aws:lambda:us-east-1:123456789012:function:mirror-function:1"
+          targets:
+            - name: shadow-backend
+              upstream:
+                host: shadow.example.com
+                port: 443
+              sample_percentage: 50
+              headers:
+                X-Mirror: "true"
+                X-Shadow-Version: "v2"
+```
+
+**Lambda@Edge Function Implementation:**
+```javascript
+// Lambda@Edge Viewer Request Handler
+exports.handler = async (event) => {
+  const request = event.Records[0].cf.request;
+  const https = require('https');
+
+  // Sample percentage logic
+  const sampleRate = parseInt(process.env.SAMPLE_PERCENTAGE || '100');
+  if (Math.random() * 100 < sampleRate) {
+    // Mirror request to shadow backend (fire-and-forget)
+    const mirrorRequest = {
+      hostname: process.env.SHADOW_HOST,
+      port: 443,
+      path: request.uri,
+      method: request.method,
+      headers: {
+        ...request.headers,
+        'x-mirror': [{ value: 'true' }],
+        'x-shadow-version': [{ value: 'v2' }]
+      }
+    };
+
+    https.request(mirrorRequest, (res) => {
+      // Ignore response (fire-and-forget)
+      res.on('data', () => {});
+      res.on('end', () => {});
+    }).on('error', (error) => {
+      console.error('Mirror failed:', error);
+    }).end();
+  }
+
+  // Return original request (continue to origin)
+  return request;
+};
+```
+
+**Deployment:**
+```bash
+# Lambda Function erstellen (us-east-1 for CloudFront/Lambda@Edge)
+aws lambda create-function \
+  --region us-east-1 \
+  --function-name mirror-function \
+  --runtime nodejs18.x \
+  --role arn:aws:iam::123456789012:role/lambda-edge-role \
+  --handler index.handler \
+  --zip-file fileb://function.zip \
+  --environment Variables="{SHADOW_HOST=shadow.example.com,SAMPLE_PERCENTAGE=50}"
+
+# Lambda@Edge Version publizieren
+aws lambda publish-version \
+  --region us-east-1 \
+  --function-name mirror-function
+
+# CloudFront Distribution mit Lambda@Edge verknüpfen
+aws cloudfront update-distribution \
+  --id DISTRIBUTION_ID \
+  --distribution-config file://distribution-config.json
+```
+
+**Hinweise:**
+- ⚠️ Erfordert Lambda@Edge (nur us-east-1 Region)
+- ⚠️ Zusätzliche Kosten für Lambda Invocations
+- ⚠️ 29s Timeout Limit (Lambda@Edge: 5s für Viewer Request)
+- ⚠️ CloudFront Distribution erforderlich
+- ✅ Vollständige Kontrolle über Mirroring-Logik
+- ✅ Support für Sample Percentage, Custom Headers
+
 ### Deployment-Befehle
 
 ```bash
@@ -1502,6 +1824,32 @@ aws apigateway update-stage \
 | Rate Limiting | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Built-in | ❌ Backend | ✅ Usage Plans |
 | JWT Auth | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ Azure AD | ✅ Google JWT | ✅ Cognito/Lambda |
 | Header Manipulation | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Policy | ⚠️ Limited | ✅ Mapping |
+
+### Request Mirroring/Shadowing-Vergleich
+
+| Provider | Request Mirroring | Implementation | Notes |
+|----------|-------------------|----------------|-------|
+| Envoy | ✅ Native | request_mirror_policies | Full support, sample percentage, custom headers |
+| Nginx | ✅ Native | mirror directive | Full support, sample percentage, multiple targets |
+| APISIX | ✅ Native | proxy-mirror plugin | Full support, sample percentage, sample_ratio |
+| HAProxy | ✅ Native (2.4+) | http-request mirror | Requires HAProxy 2.4+, Lua scripts for older versions |
+| Kong | ⚠️ Plugin/Enterprise | request-transformer or Enterprise plugin | `kong_mirroring_enable_enterprise: true` for full support |
+| Traefik | ⚠️ Limited | Middleware | Custom solution required, limited native support |
+| Azure APIM | ✅ Native | send-request policy | Full support, cloud-based mirroring |
+| AWS API Gateway | ⚠️ Workaround | Lambda@Edge | Requires `mirroring_lambda_edge_arn` config |
+| GCP API Gateway | ⚠️ Workaround | Cloud Functions | Requires `mirroring_cloud_function_url` config |
+
+**Legend:**
+- ✅ Native: Built-in gateway feature
+- ⚠️ Plugin/Enterprise: Requires plugin or Enterprise version
+- ⚠️ Limited: Partial support or custom solution required
+- ⚠️ Workaround: Requires external service (Lambda, Cloud Functions)
+
+**Key Features:**
+- **Sample Percentage**: All native providers support 0-100% traffic sampling
+- **Custom Headers**: Add `X-Mirror`, `X-Shadow-Version` to mirrored requests
+- **Multiple Targets**: Mirror to 2+ shadow backends simultaneously
+- **Cloud Workarounds**: AWS/GCP use serverless functions for mirroring
 
 ### Use Case Matrix
 
