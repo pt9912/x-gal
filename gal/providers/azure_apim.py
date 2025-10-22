@@ -20,6 +20,7 @@ from ..config import (
     JwtConfig,
     Route,
     Service,
+    TrafficSplitConfig,
     Upstream,
     UpstreamTarget,
 )
@@ -252,10 +253,32 @@ class AzureAPIMProvider(Provider):
                 product = self._generate_product(service)
                 arm_template["resources"].append(product)
 
-            # Backend
-            if service.upstream and service.upstream.targets:
+            # Backend (Traffic Splitting or Single Backend)
+            # Check if any route uses traffic splitting
+            has_traffic_split = any(
+                route.traffic_split and route.traffic_split.enabled
+                for route in service.routes
+            )
+
+            if has_traffic_split:
+                # Generate individual backends for each target
+                for route in service.routes:
+                    if route.traffic_split and route.traffic_split.enabled:
+                        for target in route.traffic_split.targets:
+                            individual_backend = self._generate_individual_backend(
+                                service, target.name, target.upstream
+                            )
+                            arm_template["resources"].append(individual_backend)
+                        break  # Only process first traffic split route
+
+                # Generate load-balanced backend pool
+                backend_pool = self._generate_traffic_split_backend(service)
+                arm_template["resources"].append(backend_pool)
+            elif service.upstream:
+                # Generate single backend (if upstream has host/port or targets)
                 backend = self._generate_backend(service)
-                arm_template["resources"].append(backend)
+                if backend:  # Only append if backend was generated
+                    arm_template["resources"].append(backend)
 
         return json.dumps(arm_template, indent=2)
 
@@ -471,8 +494,12 @@ class AzureAPIMProvider(Provider):
                 policies.append(f'            <value>{value}</value>')
                 policies.append('        </set-header>')
 
-        # Backend URL
-        if service.upstream and service.upstream.targets:
+        # Backend URL or Backend Pool
+        if route.traffic_split and route.traffic_split.enabled:
+            # Use load-balanced backend pool
+            policies.append(f'        <set-backend-service backend-id="{service.name}-backend-pool" />')
+        elif service.upstream and service.upstream.targets:
+            # Use single backend URL
             target = service.upstream.targets[0]
             protocol = "https" if target.port in [443, 8443] else "http"
             backend_url = f"{protocol}://{target.host}:{target.port}"
@@ -534,6 +561,37 @@ class AzureAPIMProvider(Provider):
             }
         }
 
+    def _generate_individual_backend(
+        self, service: Service, target_name: str, upstream: UpstreamTarget
+    ) -> Dict[str, Any]:
+        """Generate individual backend resource for a traffic split target.
+
+        Args:
+            service: GAL service configuration
+            target_name: Name of the traffic split target
+            upstream: Upstream target configuration
+
+        Returns:
+            ARM Template resource for individual backend
+        """
+        protocol = "https" if upstream.port in [443, 8443] else "http"
+        url = f"{protocol}://{upstream.host}:{upstream.port}"
+
+        return {
+            "type": "Microsoft.ApiManagement/service/backends",
+            "apiVersion": "2021-08-01",
+            "name": f"[concat(parameters('apimServiceName'), '/{service.name}-{target_name}-backend')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+            ],
+            "properties": {
+                "description": f"Backend for {service.name} - {target_name}",
+                "url": url,
+                "protocol": "http",
+                "resourceId": ""
+            }
+        }
+
     def _generate_backend(self, service: Service) -> Dict[str, Any]:
         """Generate Backend Resource.
 
@@ -564,6 +622,83 @@ class AzureAPIMProvider(Provider):
                 "resourceId": ""
             }
         }
+
+    def _generate_traffic_split_backend(self, service: Service) -> Dict[str, Any]:
+        """Generate Load-Balanced Backend Pool for Traffic Splitting.
+
+        Azure APIM supports load-balanced backend pools with weighted targets.
+        This generates a backend pool containing all traffic split targets
+        with their respective weights.
+
+        Args:
+            service: GAL service configuration
+
+        Returns:
+            ARM Template resource for load-balanced backend pool
+
+        Example ARM Template:
+            {
+              "type": "Microsoft.ApiManagement/service/backends",
+              "properties": {
+                "description": "Load-balanced backend pool",
+                "type": "pool",
+                "pool": {
+                  "services": [
+                    {
+                      "id": "/backends/stable-backend",
+                      "priority": 1,
+                      "weight": 90
+                    },
+                    {
+                      "id": "/backends/canary-backend",
+                      "priority": 1,
+                      "weight": 10
+                    }
+                  ]
+                }
+              }
+            }
+        """
+        # Find the first route with traffic splitting enabled
+        traffic_split = None
+        for route in service.routes:
+            if route.traffic_split and route.traffic_split.enabled:
+                traffic_split = route.traffic_split
+                break
+
+        if not traffic_split:
+            # Fallback to single backend
+            return self._generate_backend(service)
+
+        # Generate backend pool services
+        pool_services = []
+        for target in traffic_split.targets:
+            protocol = "https" if target.upstream.port in [443, 8443] else "http"
+            backend_url = f"{protocol}://{target.upstream.host}:{target.upstream.port}"
+
+            pool_services.append({
+                "id": f"/subscriptions/{{subscriptionId}}/resourceGroups/{{resourceGroup}}/providers/Microsoft.ApiManagement/service/[parameters('apimServiceName')]/backends/{service.name}-{target.name}-backend",
+                "priority": 1,  # All targets have same priority
+                "weight": target.weight
+            })
+
+        backend_pool = {
+            "type": "Microsoft.ApiManagement/service/backends",
+            "apiVersion": "2021-08-01",
+            "name": f"[concat(parameters('apimServiceName'), '/{service.name}-backend-pool')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+            ],
+            "properties": {
+                "description": f"Load-balanced backend pool for {service.name}",
+                "type": "pool",
+                "pool": {
+                    "services": pool_services
+                }
+            }
+        }
+
+        return backend_pool
 
     def generate_openapi(self, config: Config) -> str:
         """Generate OpenAPI 3.0 Specification for Azure APIM import.

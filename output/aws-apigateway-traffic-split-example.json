@@ -1,0 +1,843 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "GAL-API",
+    "description": "API managed by GAL",
+    "version": "1.0"
+  },
+  "servers": [
+    {
+      "url": "https://{api_id}.execute-api.{region}.amazonaws.com/{stage}",
+      "variables": {
+        "api_id": {
+          "default": "example",
+          "description": "API Gateway API ID (auto-generated)"
+        },
+        "region": {
+          "default": "us-east-1",
+          "description": "AWS Region"
+        },
+        "stage": {
+          "default": "prod",
+          "description": "API Gateway Stage"
+        }
+      }
+    }
+  ],
+  "paths": {
+    "/api/v1": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "GET",
+          "uri": "${stageVariables.backend_url}/api/v1",
+          "connectionType": "INTERNET",
+          "timeoutInMillis": 29000,
+          "passthroughBehavior": "when_no_templates",
+          "requestTemplates": {
+            "application/json": "## AWS API Gateway Traffic Splitting via VTL\\n## Random selection based on requestTimeEpoch modulo 100\\n#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 90)\\n  #set($backend_url = $stageVariables.canary_deployment_api_stable_url)\\n#elseif($random < 100)\\n  #set($backend_url = $stageVariables.canary_deployment_api_canary_url)\\n#end\\n\\n## Set backend URL in context\\n#set($context.requestOverride.path.backend_url = $backend_url)"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200"
+            }
+          }
+        }
+      },
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "POST",
+          "uri": "${stageVariables.backend_url}/api/v1",
+          "connectionType": "INTERNET",
+          "timeoutInMillis": 29000,
+          "passthroughBehavior": "when_no_templates",
+          "requestTemplates": {
+            "application/json": "## AWS API Gateway Traffic Splitting via VTL\\n## Random selection based on requestTimeEpoch modulo 100\\n#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 90)\\n  #set($backend_url = $stageVariables.canary_deployment_api_stable_url)\\n#elseif($random < 100)\\n  #set($backend_url = $stageVariables.canary_deployment_api_canary_url)\\n#end\\n\\n## Set backend URL in context\\n#set($context.requestOverride.path.backend_url = $backend_url)"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200"
+            }
+          }
+        }
+      },
+      "put": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "PUT",
+          "uri": "${stageVariables.backend_url}/api/v1",
+          "connectionType": "INTERNET",
+          "timeoutInMillis": 29000,
+          "passthroughBehavior": "when_no_templates",
+          "requestTemplates": {
+            "application/json": "## AWS API Gateway Traffic Splitting via VTL\\n## Random selection based on requestTimeEpoch modulo 100\\n#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 90)\\n  #set($backend_url = $stageVariables.canary_deployment_api_stable_url)\\n#elseif($random < 100)\\n  #set($backend_url = $stageVariables.canary_deployment_api_canary_url)\\n#end\\n\\n## Set backend URL in context\\n#set($context.requestOverride.path.backend_url = $backend_url)"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200"
+            }
+          }
+        }
+      },
+      "delete": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "DELETE",
+          "uri": "${stageVariables.backend_url}/api/v1",
+          "connectionType": "INTERNET",
+          "timeoutInMillis": 29000,
+          "passthroughBehavior": "when_no_templates",
+          "requestTemplates": {
+            "application/json": "## AWS API Gateway Traffic Splitting via VTL\\n## Random selection based on requestTimeEpoch modulo 100\\n#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 90)\\n  #set($backend_url = $stageVariables.canary_deployment_api_stable_url)\\n#elseif($random < 100)\\n  #set($backend_url = $stageVariables.canary_deployment_api_canary_url)\\n#end\\n\\n## Set backend URL in context\\n#set($context.requestOverride.path.backend_url = $backend_url)"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200"
+            }
+          }
+        }
+      },
+      "options": {
+        "responses": {
+          "200": {
+            "description": "CORS preflight response",
+            "headers": {
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Methods": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Headers": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "mock",
+          "requestTemplates": {
+            "application/json": "{\"statusCode\": 200}"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200",
+              "responseParameters": {
+                "method.response.header.Access-Control-Allow-Origin": "'*'",
+                "method.response.header.Access-Control-Allow-Methods": "'GET,POST,PUT,DELETE,OPTIONS'",
+                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Api-Key'"
+              },
+              "responseTemplates": {
+                "application/json": "{}"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "GET",
+          "uri": "${stageVariables.backend_url}/api/v2",
+          "connectionType": "INTERNET",
+          "timeoutInMillis": 29000,
+          "passthroughBehavior": "when_no_templates",
+          "requestTemplates": {
+            "application/json": "## AWS API Gateway Traffic Splitting via VTL\\n## Random selection based on requestTimeEpoch modulo 100\\n#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 50)\\n  #set($backend_url = $stageVariables.ab_testing_api_version_a_url)\\n#elseif($random < 100)\\n  #set($backend_url = $stageVariables.ab_testing_api_version_b_url)\\n#end\\n\\n## Set backend URL in context\\n#set($context.requestOverride.path.backend_url = $backend_url)"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200"
+            }
+          }
+        }
+      },
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "POST",
+          "uri": "${stageVariables.backend_url}/api/v2",
+          "connectionType": "INTERNET",
+          "timeoutInMillis": 29000,
+          "passthroughBehavior": "when_no_templates",
+          "requestTemplates": {
+            "application/json": "## AWS API Gateway Traffic Splitting via VTL\\n## Random selection based on requestTimeEpoch modulo 100\\n#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 50)\\n  #set($backend_url = $stageVariables.ab_testing_api_version_a_url)\\n#elseif($random < 100)\\n  #set($backend_url = $stageVariables.ab_testing_api_version_b_url)\\n#end\\n\\n## Set backend URL in context\\n#set($context.requestOverride.path.backend_url = $backend_url)"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200"
+            }
+          }
+        }
+      },
+      "options": {
+        "responses": {
+          "200": {
+            "description": "CORS preflight response",
+            "headers": {
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Methods": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Headers": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "mock",
+          "requestTemplates": {
+            "application/json": "{\"statusCode\": 200}"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200",
+              "responseParameters": {
+                "method.response.header.Access-Control-Allow-Origin": "'*'",
+                "method.response.header.Access-Control-Allow-Methods": "'GET,POST,PUT,DELETE,OPTIONS'",
+                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Api-Key'"
+              },
+              "responseTemplates": {
+                "application/json": "{}"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/beta": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "GET",
+          "uri": "${stageVariables.backend_url}/api/beta",
+          "connectionType": "INTERNET",
+          "timeoutInMillis": 29000,
+          "passthroughBehavior": "when_no_templates",
+          "requestTemplates": {
+            "application/json": "## AWS API Gateway Traffic Splitting via VTL\\n## Random selection based on requestTimeEpoch modulo 100\\n#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 100)\\n  #set($backend_url = $stageVariables.beta_testing_api_production_url)\\n#elseif($random < 100)\\n  #set($backend_url = $stageVariables.beta_testing_api_beta_url)\\n#end\\n\\n## Set backend URL in context\\n#set($context.requestOverride.path.backend_url = $backend_url)"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200"
+            }
+          }
+        }
+      },
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "POST",
+          "uri": "${stageVariables.backend_url}/api/beta",
+          "connectionType": "INTERNET",
+          "timeoutInMillis": 29000,
+          "passthroughBehavior": "when_no_templates",
+          "requestTemplates": {
+            "application/json": "## AWS API Gateway Traffic Splitting via VTL\\n## Random selection based on requestTimeEpoch modulo 100\\n#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 100)\\n  #set($backend_url = $stageVariables.beta_testing_api_production_url)\\n#elseif($random < 100)\\n  #set($backend_url = $stageVariables.beta_testing_api_beta_url)\\n#end\\n\\n## Set backend URL in context\\n#set($context.requestOverride.path.backend_url = $backend_url)"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200"
+            }
+          }
+        }
+      },
+      "put": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "PUT",
+          "uri": "${stageVariables.backend_url}/api/beta",
+          "connectionType": "INTERNET",
+          "timeoutInMillis": 29000,
+          "passthroughBehavior": "when_no_templates",
+          "requestTemplates": {
+            "application/json": "## AWS API Gateway Traffic Splitting via VTL\\n## Random selection based on requestTimeEpoch modulo 100\\n#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 100)\\n  #set($backend_url = $stageVariables.beta_testing_api_production_url)\\n#elseif($random < 100)\\n  #set($backend_url = $stageVariables.beta_testing_api_beta_url)\\n#end\\n\\n## Set backend URL in context\\n#set($context.requestOverride.path.backend_url = $backend_url)"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200"
+            }
+          }
+        }
+      },
+      "delete": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "DELETE",
+          "uri": "${stageVariables.backend_url}/api/beta",
+          "connectionType": "INTERNET",
+          "timeoutInMillis": 29000,
+          "passthroughBehavior": "when_no_templates",
+          "requestTemplates": {
+            "application/json": "## AWS API Gateway Traffic Splitting via VTL\\n## Random selection based on requestTimeEpoch modulo 100\\n#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 100)\\n  #set($backend_url = $stageVariables.beta_testing_api_production_url)\\n#elseif($random < 100)\\n  #set($backend_url = $stageVariables.beta_testing_api_beta_url)\\n#end\\n\\n## Set backend URL in context\\n#set($context.requestOverride.path.backend_url = $backend_url)"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200"
+            }
+          }
+        }
+      },
+      "options": {
+        "responses": {
+          "200": {
+            "description": "CORS preflight response",
+            "headers": {
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Methods": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Headers": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "mock",
+          "requestTemplates": {
+            "application/json": "{\"statusCode\": 200}"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200",
+              "responseParameters": {
+                "method.response.header.Access-Control-Allow-Origin": "'*'",
+                "method.response.header.Access-Control-Allow-Methods": "'GET,POST,PUT,DELETE,OPTIONS'",
+                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Api-Key'"
+              },
+              "responseTemplates": {
+                "application/json": "{}"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "GET",
+          "uri": "${stageVariables.backend_url}/api/users",
+          "connectionType": "INTERNET",
+          "timeoutInMillis": 29000,
+          "passthroughBehavior": "when_no_templates",
+          "requestTemplates": {
+            "application/json": "## AWS API Gateway Traffic Splitting via VTL\\n## Random selection based on requestTimeEpoch modulo 100\\n#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 100)\\n  #set($backend_url = $stageVariables.user_segment_api_stable_url)\\n#elseif($random < 100)\\n  #set($backend_url = $stageVariables.user_segment_api_canary_users_url)\\n#end\\n\\n## Set backend URL in context\\n#set($context.requestOverride.path.backend_url = $backend_url)"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200"
+            }
+          }
+        }
+      },
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "POST",
+          "uri": "${stageVariables.backend_url}/api/users",
+          "connectionType": "INTERNET",
+          "timeoutInMillis": 29000,
+          "passthroughBehavior": "when_no_templates",
+          "requestTemplates": {
+            "application/json": "## AWS API Gateway Traffic Splitting via VTL\\n## Random selection based on requestTimeEpoch modulo 100\\n#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 100)\\n  #set($backend_url = $stageVariables.user_segment_api_stable_url)\\n#elseif($random < 100)\\n  #set($backend_url = $stageVariables.user_segment_api_canary_users_url)\\n#end\\n\\n## Set backend URL in context\\n#set($context.requestOverride.path.backend_url = $backend_url)"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200"
+            }
+          }
+        }
+      },
+      "put": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "PUT",
+          "uri": "${stageVariables.backend_url}/api/users",
+          "connectionType": "INTERNET",
+          "timeoutInMillis": 29000,
+          "passthroughBehavior": "when_no_templates",
+          "requestTemplates": {
+            "application/json": "## AWS API Gateway Traffic Splitting via VTL\\n## Random selection based on requestTimeEpoch modulo 100\\n#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 100)\\n  #set($backend_url = $stageVariables.user_segment_api_stable_url)\\n#elseif($random < 100)\\n  #set($backend_url = $stageVariables.user_segment_api_canary_users_url)\\n#end\\n\\n## Set backend URL in context\\n#set($context.requestOverride.path.backend_url = $backend_url)"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200"
+            }
+          }
+        }
+      },
+      "delete": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "DELETE",
+          "uri": "${stageVariables.backend_url}/api/users",
+          "connectionType": "INTERNET",
+          "timeoutInMillis": 29000,
+          "passthroughBehavior": "when_no_templates",
+          "requestTemplates": {
+            "application/json": "## AWS API Gateway Traffic Splitting via VTL\\n## Random selection based on requestTimeEpoch modulo 100\\n#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 100)\\n  #set($backend_url = $stageVariables.user_segment_api_stable_url)\\n#elseif($random < 100)\\n  #set($backend_url = $stageVariables.user_segment_api_canary_users_url)\\n#end\\n\\n## Set backend URL in context\\n#set($context.requestOverride.path.backend_url = $backend_url)"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200"
+            }
+          }
+        }
+      },
+      "options": {
+        "responses": {
+          "200": {
+            "description": "CORS preflight response",
+            "headers": {
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Methods": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Headers": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "mock",
+          "requestTemplates": {
+            "application/json": "{\"statusCode\": 200}"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200",
+              "responseParameters": {
+                "method.response.header.Access-Control-Allow-Origin": "'*'",
+                "method.response.header.Access-Control-Allow-Methods": "'GET,POST,PUT,DELETE,OPTIONS'",
+                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Api-Key'"
+              },
+              "responseTemplates": {
+                "application/json": "{}"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/multi": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "GET",
+          "uri": "${stageVariables.backend_url}/api/multi",
+          "connectionType": "INTERNET",
+          "timeoutInMillis": 29000,
+          "passthroughBehavior": "when_no_templates",
+          "requestTemplates": {
+            "application/json": "## AWS API Gateway Traffic Splitting via VTL\\n## Random selection based on requestTimeEpoch modulo 100\\n#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 70)\\n  #set($backend_url = $stageVariables.multi_rule_api_stable_url)\\n#elseif($random < 90)\\n  #set($backend_url = $stageVariables.multi_rule_api_beta_url)\\n#elseif($random < 100)\\n  #set($backend_url = $stageVariables.multi_rule_api_canary_url)\\n#end\\n\\n## Set backend URL in context\\n#set($context.requestOverride.path.backend_url = $backend_url)"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200"
+            }
+          }
+        }
+      },
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "POST",
+          "uri": "${stageVariables.backend_url}/api/multi",
+          "connectionType": "INTERNET",
+          "timeoutInMillis": 29000,
+          "passthroughBehavior": "when_no_templates",
+          "requestTemplates": {
+            "application/json": "## AWS API Gateway Traffic Splitting via VTL\\n## Random selection based on requestTimeEpoch modulo 100\\n#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 70)\\n  #set($backend_url = $stageVariables.multi_rule_api_stable_url)\\n#elseif($random < 90)\\n  #set($backend_url = $stageVariables.multi_rule_api_beta_url)\\n#elseif($random < 100)\\n  #set($backend_url = $stageVariables.multi_rule_api_canary_url)\\n#end\\n\\n## Set backend URL in context\\n#set($context.requestOverride.path.backend_url = $backend_url)"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200"
+            }
+          }
+        }
+      },
+      "options": {
+        "responses": {
+          "200": {
+            "description": "CORS preflight response",
+            "headers": {
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Methods": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Headers": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "mock",
+          "requestTemplates": {
+            "application/json": "{\"statusCode\": 200}"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200",
+              "responseParameters": {
+                "method.response.header.Access-Control-Allow-Origin": "'*'",
+                "method.response.header.Access-Control-Allow-Methods": "'GET,POST,PUT,DELETE,OPTIONS'",
+                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Api-Key'"
+              },
+              "responseTemplates": {
+                "application/json": "{}"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rollout": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "GET",
+          "uri": "${stageVariables.backend_url}/api/rollout",
+          "connectionType": "INTERNET",
+          "timeoutInMillis": 29000,
+          "passthroughBehavior": "when_no_templates",
+          "requestTemplates": {
+            "application/json": "## AWS API Gateway Traffic Splitting via VTL\\n## Random selection based on requestTimeEpoch modulo 100\\n#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 95)\\n  #set($backend_url = $stageVariables.gradual_rollout_api_current_version_url)\\n#elseif($random < 100)\\n  #set($backend_url = $stageVariables.gradual_rollout_api_new_version_url)\\n#end\\n\\n## Set backend URL in context\\n#set($context.requestOverride.path.backend_url = $backend_url)"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200"
+            }
+          }
+        }
+      },
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "POST",
+          "uri": "${stageVariables.backend_url}/api/rollout",
+          "connectionType": "INTERNET",
+          "timeoutInMillis": 29000,
+          "passthroughBehavior": "when_no_templates",
+          "requestTemplates": {
+            "application/json": "## AWS API Gateway Traffic Splitting via VTL\\n## Random selection based on requestTimeEpoch modulo 100\\n#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 95)\\n  #set($backend_url = $stageVariables.gradual_rollout_api_current_version_url)\\n#elseif($random < 100)\\n  #set($backend_url = $stageVariables.gradual_rollout_api_new_version_url)\\n#end\\n\\n## Set backend URL in context\\n#set($context.requestOverride.path.backend_url = $backend_url)"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200"
+            }
+          }
+        }
+      },
+      "options": {
+        "responses": {
+          "200": {
+            "description": "CORS preflight response",
+            "headers": {
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Methods": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Access-Control-Allow-Headers": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "mock",
+          "requestTemplates": {
+            "application/json": "{\"statusCode\": 200}"
+          },
+          "responses": {
+            "default": {
+              "statusCode": "200",
+              "responseParameters": {
+                "method.response.header.Access-Control-Allow-Origin": "'*'",
+                "method.response.header.Access-Control-Allow-Methods": "'GET,POST,PUT,DELETE,OPTIONS'",
+                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Api-Key'"
+              },
+              "responseTemplates": {
+                "application/json": "{}"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {},
+    "schemas": {}
+  }
+}

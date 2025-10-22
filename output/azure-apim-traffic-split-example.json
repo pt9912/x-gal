@@ -1,0 +1,973 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "apimServiceName": {
+      "type": "string",
+      "defaultValue": "gal-apim-service",
+      "metadata": {
+        "description": "The name of the API Management service instance"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "type": "Microsoft.ApiManagement/service",
+      "apiVersion": "2021-08-01",
+      "name": "[parameters('apimServiceName')]",
+      "location": "westeurope",
+      "sku": {
+        "name": "Developer",
+        "capacity": 1
+      },
+      "properties": {
+        "publisherEmail": "admin@example.com",
+        "publisherName": "GAL Admin"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/canary_deployment_api')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "displayName": "canary_deployment_api",
+        "apiRevision": "1",
+        "apiVersion": null,
+        "subscriptionRequired": true,
+        "path": "canary_deployment_api",
+        "protocols": [
+          "https"
+        ],
+        "isCurrent": true
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/canary_deployment_api/get_api_v1')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'canary_deployment_api')]"
+      ],
+      "properties": {
+        "displayName": "GET /api/v1",
+        "method": "GET",
+        "urlTemplate": "/api/v1",
+        "templateParameters": [],
+        "responses": []
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/canary_deployment_api/get_api_v1/policy')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'canary_deployment_api', 'get_api_v1')]"
+      ],
+      "properties": {
+        "value": "<policies>\n    <inbound>\n        <base />\n        <set-backend-service backend-id=\"canary_deployment_api-backend-pool\" />\n    </inbound>\n    <backend>\n        <base />\n    </backend>\n    <outbound>\n        <base />\n    </outbound>\n    <on-error>\n        <base />\n    </on-error>\n</policies>",
+        "format": "xml"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/canary_deployment_api/post_api_v1')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'canary_deployment_api')]"
+      ],
+      "properties": {
+        "displayName": "POST /api/v1",
+        "method": "POST",
+        "urlTemplate": "/api/v1",
+        "templateParameters": [],
+        "responses": []
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/canary_deployment_api/post_api_v1/policy')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'canary_deployment_api', 'post_api_v1')]"
+      ],
+      "properties": {
+        "value": "<policies>\n    <inbound>\n        <base />\n        <set-backend-service backend-id=\"canary_deployment_api-backend-pool\" />\n    </inbound>\n    <backend>\n        <base />\n    </backend>\n    <outbound>\n        <base />\n    </outbound>\n    <on-error>\n        <base />\n    </on-error>\n</policies>",
+        "format": "xml"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/canary_deployment_api/put_api_v1')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'canary_deployment_api')]"
+      ],
+      "properties": {
+        "displayName": "PUT /api/v1",
+        "method": "PUT",
+        "urlTemplate": "/api/v1",
+        "templateParameters": [],
+        "responses": []
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/canary_deployment_api/put_api_v1/policy')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'canary_deployment_api', 'put_api_v1')]"
+      ],
+      "properties": {
+        "value": "<policies>\n    <inbound>\n        <base />\n        <set-backend-service backend-id=\"canary_deployment_api-backend-pool\" />\n    </inbound>\n    <backend>\n        <base />\n    </backend>\n    <outbound>\n        <base />\n    </outbound>\n    <on-error>\n        <base />\n    </on-error>\n</policies>",
+        "format": "xml"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/canary_deployment_api/delete_api_v1')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'canary_deployment_api')]"
+      ],
+      "properties": {
+        "displayName": "DELETE /api/v1",
+        "method": "DELETE",
+        "urlTemplate": "/api/v1",
+        "templateParameters": [],
+        "responses": []
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/canary_deployment_api/delete_api_v1/policy')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'canary_deployment_api', 'delete_api_v1')]"
+      ],
+      "properties": {
+        "value": "<policies>\n    <inbound>\n        <base />\n        <set-backend-service backend-id=\"canary_deployment_api-backend-pool\" />\n    </inbound>\n    <backend>\n        <base />\n    </backend>\n    <outbound>\n        <base />\n    </outbound>\n    <on-error>\n        <base />\n    </on-error>\n</policies>",
+        "format": "xml"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/backends",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/canary_deployment_api-stable-backend')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "description": "Backend for canary_deployment_api - stable",
+        "url": "http://api-v1-stable:8080",
+        "protocol": "http",
+        "resourceId": ""
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/backends",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/canary_deployment_api-canary-backend')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "description": "Backend for canary_deployment_api - canary",
+        "url": "http://api-v1-canary:8080",
+        "protocol": "http",
+        "resourceId": ""
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/backends",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/canary_deployment_api-backend-pool')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "description": "Load-balanced backend pool for canary_deployment_api",
+        "type": "pool",
+        "pool": {
+          "services": [
+            {
+              "id": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.ApiManagement/service/[parameters('apimServiceName')]/backends/canary_deployment_api-stable-backend",
+              "priority": 1,
+              "weight": 90
+            },
+            {
+              "id": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.ApiManagement/service/[parameters('apimServiceName')]/backends/canary_deployment_api-canary-backend",
+              "priority": 1,
+              "weight": 10
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/ab_testing_api')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "displayName": "ab_testing_api",
+        "apiRevision": "1",
+        "apiVersion": null,
+        "subscriptionRequired": true,
+        "path": "ab_testing_api",
+        "protocols": [
+          "https"
+        ],
+        "isCurrent": true
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/ab_testing_api/get_api_v2')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'ab_testing_api')]"
+      ],
+      "properties": {
+        "displayName": "GET /api/v2",
+        "method": "GET",
+        "urlTemplate": "/api/v2",
+        "templateParameters": [],
+        "responses": []
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/ab_testing_api/get_api_v2/policy')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'ab_testing_api', 'get_api_v2')]"
+      ],
+      "properties": {
+        "value": "<policies>\n    <inbound>\n        <base />\n        <set-backend-service backend-id=\"ab_testing_api-backend-pool\" />\n    </inbound>\n    <backend>\n        <base />\n    </backend>\n    <outbound>\n        <base />\n    </outbound>\n    <on-error>\n        <base />\n    </on-error>\n</policies>",
+        "format": "xml"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/ab_testing_api/post_api_v2')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'ab_testing_api')]"
+      ],
+      "properties": {
+        "displayName": "POST /api/v2",
+        "method": "POST",
+        "urlTemplate": "/api/v2",
+        "templateParameters": [],
+        "responses": []
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/ab_testing_api/post_api_v2/policy')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'ab_testing_api', 'post_api_v2')]"
+      ],
+      "properties": {
+        "value": "<policies>\n    <inbound>\n        <base />\n        <set-backend-service backend-id=\"ab_testing_api-backend-pool\" />\n    </inbound>\n    <backend>\n        <base />\n    </backend>\n    <outbound>\n        <base />\n    </outbound>\n    <on-error>\n        <base />\n    </on-error>\n</policies>",
+        "format": "xml"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/backends",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/ab_testing_api-version_a-backend')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "description": "Backend for ab_testing_api - version_a",
+        "url": "http://api-v2-a:8080",
+        "protocol": "http",
+        "resourceId": ""
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/backends",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/ab_testing_api-version_b-backend')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "description": "Backend for ab_testing_api - version_b",
+        "url": "http://api-v2-b:8080",
+        "protocol": "http",
+        "resourceId": ""
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/backends",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/ab_testing_api-backend-pool')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "description": "Load-balanced backend pool for ab_testing_api",
+        "type": "pool",
+        "pool": {
+          "services": [
+            {
+              "id": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.ApiManagement/service/[parameters('apimServiceName')]/backends/ab_testing_api-version_a-backend",
+              "priority": 1,
+              "weight": 50
+            },
+            {
+              "id": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.ApiManagement/service/[parameters('apimServiceName')]/backends/ab_testing_api-version_b-backend",
+              "priority": 1,
+              "weight": 50
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/beta_testing_api')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "displayName": "beta_testing_api",
+        "apiRevision": "1",
+        "apiVersion": null,
+        "subscriptionRequired": true,
+        "path": "beta_testing_api",
+        "protocols": [
+          "https"
+        ],
+        "isCurrent": true
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/beta_testing_api/get_api_beta')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'beta_testing_api')]"
+      ],
+      "properties": {
+        "displayName": "GET /api/beta",
+        "method": "GET",
+        "urlTemplate": "/api/beta",
+        "templateParameters": [],
+        "responses": []
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/beta_testing_api/get_api_beta/policy')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'beta_testing_api', 'get_api_beta')]"
+      ],
+      "properties": {
+        "value": "<policies>\n    <inbound>\n        <base />\n        <set-backend-service backend-id=\"beta_testing_api-backend-pool\" />\n    </inbound>\n    <backend>\n        <base />\n    </backend>\n    <outbound>\n        <base />\n    </outbound>\n    <on-error>\n        <base />\n    </on-error>\n</policies>",
+        "format": "xml"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/beta_testing_api/post_api_beta')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'beta_testing_api')]"
+      ],
+      "properties": {
+        "displayName": "POST /api/beta",
+        "method": "POST",
+        "urlTemplate": "/api/beta",
+        "templateParameters": [],
+        "responses": []
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/beta_testing_api/post_api_beta/policy')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'beta_testing_api', 'post_api_beta')]"
+      ],
+      "properties": {
+        "value": "<policies>\n    <inbound>\n        <base />\n        <set-backend-service backend-id=\"beta_testing_api-backend-pool\" />\n    </inbound>\n    <backend>\n        <base />\n    </backend>\n    <outbound>\n        <base />\n    </outbound>\n    <on-error>\n        <base />\n    </on-error>\n</policies>",
+        "format": "xml"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/beta_testing_api/put_api_beta')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'beta_testing_api')]"
+      ],
+      "properties": {
+        "displayName": "PUT /api/beta",
+        "method": "PUT",
+        "urlTemplate": "/api/beta",
+        "templateParameters": [],
+        "responses": []
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/beta_testing_api/put_api_beta/policy')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'beta_testing_api', 'put_api_beta')]"
+      ],
+      "properties": {
+        "value": "<policies>\n    <inbound>\n        <base />\n        <set-backend-service backend-id=\"beta_testing_api-backend-pool\" />\n    </inbound>\n    <backend>\n        <base />\n    </backend>\n    <outbound>\n        <base />\n    </outbound>\n    <on-error>\n        <base />\n    </on-error>\n</policies>",
+        "format": "xml"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/beta_testing_api/delete_api_beta')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'beta_testing_api')]"
+      ],
+      "properties": {
+        "displayName": "DELETE /api/beta",
+        "method": "DELETE",
+        "urlTemplate": "/api/beta",
+        "templateParameters": [],
+        "responses": []
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/beta_testing_api/delete_api_beta/policy')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'beta_testing_api', 'delete_api_beta')]"
+      ],
+      "properties": {
+        "value": "<policies>\n    <inbound>\n        <base />\n        <set-backend-service backend-id=\"beta_testing_api-backend-pool\" />\n    </inbound>\n    <backend>\n        <base />\n    </backend>\n    <outbound>\n        <base />\n    </outbound>\n    <on-error>\n        <base />\n    </on-error>\n</policies>",
+        "format": "xml"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/backends",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/beta_testing_api-production-backend')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "description": "Backend for beta_testing_api - production",
+        "url": "http://api-prod:8080",
+        "protocol": "http",
+        "resourceId": ""
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/backends",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/beta_testing_api-beta-backend')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "description": "Backend for beta_testing_api - beta",
+        "url": "http://api-beta:8080",
+        "protocol": "http",
+        "resourceId": ""
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/backends",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/beta_testing_api-backend-pool')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "description": "Load-balanced backend pool for beta_testing_api",
+        "type": "pool",
+        "pool": {
+          "services": [
+            {
+              "id": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.ApiManagement/service/[parameters('apimServiceName')]/backends/beta_testing_api-production-backend",
+              "priority": 1,
+              "weight": 100
+            },
+            {
+              "id": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.ApiManagement/service/[parameters('apimServiceName')]/backends/beta_testing_api-beta-backend",
+              "priority": 1,
+              "weight": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/user_segment_api')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "displayName": "user_segment_api",
+        "apiRevision": "1",
+        "apiVersion": null,
+        "subscriptionRequired": true,
+        "path": "user_segment_api",
+        "protocols": [
+          "https"
+        ],
+        "isCurrent": true
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/user_segment_api/get_api_users')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'user_segment_api')]"
+      ],
+      "properties": {
+        "displayName": "GET /api/users",
+        "method": "GET",
+        "urlTemplate": "/api/users",
+        "templateParameters": [],
+        "responses": []
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/user_segment_api/get_api_users/policy')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'user_segment_api', 'get_api_users')]"
+      ],
+      "properties": {
+        "value": "<policies>\n    <inbound>\n        <base />\n        <set-backend-service backend-id=\"user_segment_api-backend-pool\" />\n    </inbound>\n    <backend>\n        <base />\n    </backend>\n    <outbound>\n        <base />\n    </outbound>\n    <on-error>\n        <base />\n    </on-error>\n</policies>",
+        "format": "xml"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/user_segment_api/post_api_users')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'user_segment_api')]"
+      ],
+      "properties": {
+        "displayName": "POST /api/users",
+        "method": "POST",
+        "urlTemplate": "/api/users",
+        "templateParameters": [],
+        "responses": []
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/user_segment_api/post_api_users/policy')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'user_segment_api', 'post_api_users')]"
+      ],
+      "properties": {
+        "value": "<policies>\n    <inbound>\n        <base />\n        <set-backend-service backend-id=\"user_segment_api-backend-pool\" />\n    </inbound>\n    <backend>\n        <base />\n    </backend>\n    <outbound>\n        <base />\n    </outbound>\n    <on-error>\n        <base />\n    </on-error>\n</policies>",
+        "format": "xml"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/user_segment_api/put_api_users')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'user_segment_api')]"
+      ],
+      "properties": {
+        "displayName": "PUT /api/users",
+        "method": "PUT",
+        "urlTemplate": "/api/users",
+        "templateParameters": [],
+        "responses": []
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/user_segment_api/put_api_users/policy')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'user_segment_api', 'put_api_users')]"
+      ],
+      "properties": {
+        "value": "<policies>\n    <inbound>\n        <base />\n        <set-backend-service backend-id=\"user_segment_api-backend-pool\" />\n    </inbound>\n    <backend>\n        <base />\n    </backend>\n    <outbound>\n        <base />\n    </outbound>\n    <on-error>\n        <base />\n    </on-error>\n</policies>",
+        "format": "xml"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/user_segment_api/delete_api_users')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'user_segment_api')]"
+      ],
+      "properties": {
+        "displayName": "DELETE /api/users",
+        "method": "DELETE",
+        "urlTemplate": "/api/users",
+        "templateParameters": [],
+        "responses": []
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/user_segment_api/delete_api_users/policy')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'user_segment_api', 'delete_api_users')]"
+      ],
+      "properties": {
+        "value": "<policies>\n    <inbound>\n        <base />\n        <set-backend-service backend-id=\"user_segment_api-backend-pool\" />\n    </inbound>\n    <backend>\n        <base />\n    </backend>\n    <outbound>\n        <base />\n    </outbound>\n    <on-error>\n        <base />\n    </on-error>\n</policies>",
+        "format": "xml"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/backends",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/user_segment_api-stable-backend')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "description": "Backend for user_segment_api - stable",
+        "url": "http://api-stable:8080",
+        "protocol": "http",
+        "resourceId": ""
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/backends",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/user_segment_api-canary_users-backend')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "description": "Backend for user_segment_api - canary_users",
+        "url": "http://api-canary:8080",
+        "protocol": "http",
+        "resourceId": ""
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/backends",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/user_segment_api-backend-pool')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "description": "Load-balanced backend pool for user_segment_api",
+        "type": "pool",
+        "pool": {
+          "services": [
+            {
+              "id": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.ApiManagement/service/[parameters('apimServiceName')]/backends/user_segment_api-stable-backend",
+              "priority": 1,
+              "weight": 100
+            },
+            {
+              "id": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.ApiManagement/service/[parameters('apimServiceName')]/backends/user_segment_api-canary_users-backend",
+              "priority": 1,
+              "weight": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/multi_rule_api')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "displayName": "multi_rule_api",
+        "apiRevision": "1",
+        "apiVersion": null,
+        "subscriptionRequired": true,
+        "path": "multi_rule_api",
+        "protocols": [
+          "https"
+        ],
+        "isCurrent": true
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/multi_rule_api/get_api_multi')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'multi_rule_api')]"
+      ],
+      "properties": {
+        "displayName": "GET /api/multi",
+        "method": "GET",
+        "urlTemplate": "/api/multi",
+        "templateParameters": [],
+        "responses": []
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/multi_rule_api/get_api_multi/policy')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'multi_rule_api', 'get_api_multi')]"
+      ],
+      "properties": {
+        "value": "<policies>\n    <inbound>\n        <base />\n        <set-backend-service backend-id=\"multi_rule_api-backend-pool\" />\n    </inbound>\n    <backend>\n        <base />\n    </backend>\n    <outbound>\n        <base />\n    </outbound>\n    <on-error>\n        <base />\n    </on-error>\n</policies>",
+        "format": "xml"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/multi_rule_api/post_api_multi')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'multi_rule_api')]"
+      ],
+      "properties": {
+        "displayName": "POST /api/multi",
+        "method": "POST",
+        "urlTemplate": "/api/multi",
+        "templateParameters": [],
+        "responses": []
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/multi_rule_api/post_api_multi/policy')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'multi_rule_api', 'post_api_multi')]"
+      ],
+      "properties": {
+        "value": "<policies>\n    <inbound>\n        <base />\n        <set-backend-service backend-id=\"multi_rule_api-backend-pool\" />\n    </inbound>\n    <backend>\n        <base />\n    </backend>\n    <outbound>\n        <base />\n    </outbound>\n    <on-error>\n        <base />\n    </on-error>\n</policies>",
+        "format": "xml"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/backends",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/multi_rule_api-stable-backend')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "description": "Backend for multi_rule_api - stable",
+        "url": "http://api-stable:8080",
+        "protocol": "http",
+        "resourceId": ""
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/backends",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/multi_rule_api-beta-backend')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "description": "Backend for multi_rule_api - beta",
+        "url": "http://api-beta:8080",
+        "protocol": "http",
+        "resourceId": ""
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/backends",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/multi_rule_api-canary-backend')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "description": "Backend for multi_rule_api - canary",
+        "url": "http://api-canary:8080",
+        "protocol": "http",
+        "resourceId": ""
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/backends",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/multi_rule_api-backend-pool')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "description": "Load-balanced backend pool for multi_rule_api",
+        "type": "pool",
+        "pool": {
+          "services": [
+            {
+              "id": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.ApiManagement/service/[parameters('apimServiceName')]/backends/multi_rule_api-stable-backend",
+              "priority": 1,
+              "weight": 70
+            },
+            {
+              "id": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.ApiManagement/service/[parameters('apimServiceName')]/backends/multi_rule_api-beta-backend",
+              "priority": 1,
+              "weight": 20
+            },
+            {
+              "id": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.ApiManagement/service/[parameters('apimServiceName')]/backends/multi_rule_api-canary-backend",
+              "priority": 1,
+              "weight": 10
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/gradual_rollout_api')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "displayName": "gradual_rollout_api",
+        "apiRevision": "1",
+        "apiVersion": null,
+        "subscriptionRequired": true,
+        "path": "gradual_rollout_api",
+        "protocols": [
+          "https"
+        ],
+        "isCurrent": true
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/gradual_rollout_api/get_api_rollout')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'gradual_rollout_api')]"
+      ],
+      "properties": {
+        "displayName": "GET /api/rollout",
+        "method": "GET",
+        "urlTemplate": "/api/rollout",
+        "templateParameters": [],
+        "responses": []
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/gradual_rollout_api/get_api_rollout/policy')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'gradual_rollout_api', 'get_api_rollout')]"
+      ],
+      "properties": {
+        "value": "<policies>\n    <inbound>\n        <base />\n        <set-backend-service backend-id=\"gradual_rollout_api-backend-pool\" />\n    </inbound>\n    <backend>\n        <base />\n    </backend>\n    <outbound>\n        <base />\n    </outbound>\n    <on-error>\n        <base />\n    </on-error>\n</policies>",
+        "format": "xml"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/gradual_rollout_api/post_api_rollout')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis', parameters('apimServiceName'), 'gradual_rollout_api')]"
+      ],
+      "properties": {
+        "displayName": "POST /api/rollout",
+        "method": "POST",
+        "urlTemplate": "/api/rollout",
+        "templateParameters": [],
+        "responses": []
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/apis/operations/policies",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/gradual_rollout_api/post_api_rollout/policy')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), 'gradual_rollout_api', 'post_api_rollout')]"
+      ],
+      "properties": {
+        "value": "<policies>\n    <inbound>\n        <base />\n        <set-backend-service backend-id=\"gradual_rollout_api-backend-pool\" />\n    </inbound>\n    <backend>\n        <base />\n    </backend>\n    <outbound>\n        <base />\n    </outbound>\n    <on-error>\n        <base />\n    </on-error>\n</policies>",
+        "format": "xml"
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/backends",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/gradual_rollout_api-current_version-backend')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "description": "Backend for gradual_rollout_api - current_version",
+        "url": "http://api-v1:8080",
+        "protocol": "http",
+        "resourceId": ""
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/backends",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/gradual_rollout_api-new_version-backend')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "description": "Backend for gradual_rollout_api - new_version",
+        "url": "http://api-v2:8080",
+        "protocol": "http",
+        "resourceId": ""
+      }
+    },
+    {
+      "type": "Microsoft.ApiManagement/service/backends",
+      "apiVersion": "2021-08-01",
+      "name": "[concat(parameters('apimServiceName'), '/gradual_rollout_api-backend-pool')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ApiManagement/service', parameters('apimServiceName'))]"
+      ],
+      "properties": {
+        "description": "Load-balanced backend pool for gradual_rollout_api",
+        "type": "pool",
+        "pool": {
+          "services": [
+            {
+              "id": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.ApiManagement/service/[parameters('apimServiceName')]/backends/gradual_rollout_api-current_version-backend",
+              "priority": 1,
+              "weight": 95
+            },
+            {
+              "id": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.ApiManagement/service/[parameters('apimServiceName')]/backends/gradual_rollout_api-new_version-backend",
+              "priority": 1,
+              "weight": 5
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

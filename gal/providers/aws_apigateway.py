@@ -39,6 +39,7 @@ from gal.config import (
     AuthenticationConfig,
     JwtConfig,
     ApiKeyConfig,
+    TrafficSplitConfig,
 )
 from gal.provider import Provider
 from gal.parsers.aws_apigateway_parser import AWSAPIGatewayParser
@@ -488,12 +489,22 @@ class AWSAPIGatewayProvider(Provider):
             operation["security"] = [{"api_key": []}]
 
         # Add AWS integration extension
-        operation["x-amazon-apigateway-integration"] = self._build_integration(
-            service,
-            route,
-            method,
-            aws_config
-        )
+        if route.traffic_split and route.traffic_split.enabled:
+            # Traffic splitting integration
+            operation["x-amazon-apigateway-integration"] = self._build_traffic_split_integration(
+                service,
+                route,
+                method,
+                aws_config
+            )
+        else:
+            # Standard integration
+            operation["x-amazon-apigateway-integration"] = self._build_integration(
+                service,
+                route,
+                method,
+                aws_config
+            )
 
         return operation
 
@@ -525,6 +536,100 @@ class AWSAPIGatewayProvider(Provider):
         else:
             # HTTP_PROXY (default)
             return self._build_http_proxy_integration(service, route, method, aws_config)
+
+    def _build_traffic_split_integration(
+        self,
+        service: Service,
+        route: Route,
+        method: str,
+        aws_config: AWSAPIGatewayConfig
+    ) -> Dict[str, Any]:
+        """
+        Build traffic splitting integration for AWS API Gateway.
+
+        AWS API Gateway supports traffic splitting through:
+        1. VTL (Velocity Template Language) request templates with random selection
+        2. Weighted Lambda aliases (for Lambda backends)
+        3. VPC Link weighted targets (for private integration)
+
+        This implementation uses VTL with stageVariables for flexibility.
+        Deploy with stage variables like:
+          stable_backend_url=https://api-stable.example.com:8080
+          canary_backend_url=https://api-canary.example.com:8080
+
+        VTL Template generates random number (0-100) and routes based on weights.
+
+        Args:
+            service: GAL service configuration
+            route: Route with traffic_split enabled
+            method: HTTP method
+            aws_config: AWS API Gateway configuration
+
+        Returns:
+            AWS API Gateway integration object with VTL template
+
+        Example Integration:
+            {
+              "type": "http_proxy",
+              "httpMethod": "GET",
+              "uri": "${stageVariables.backend_url}/api/v1",
+              "requestTemplates": {
+                "application/json": "#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 90)\\n#set($context.requestOverride.path.backend_url = $stageVariables.stable_backend_url)\\n#else\\n#set($context.requestOverride.path.backend_url = $stageVariables.canary_backend_url)\\n#end"
+              }
+            }
+        """
+        traffic_split = route.traffic_split
+
+        # Build VTL template for weighted routing
+        vtl_lines = [
+            "## AWS API Gateway Traffic Splitting via VTL",
+            "## Random selection based on requestTimeEpoch modulo 100",
+            "#set($random = $context.requestTimeEpoch % 100)",
+        ]
+
+        # Sort targets by weight (descending) for cumulative logic
+        sorted_targets = sorted(traffic_split.targets, key=lambda t: t.weight, reverse=True)
+
+        # Build cumulative weight conditions
+        cumulative_weight = 0
+        for i, target in enumerate(sorted_targets):
+            cumulative_weight += target.weight
+
+            if i == 0:
+                vtl_lines.append(f"#if($random < {cumulative_weight})")
+            else:
+                vtl_lines.append(f"#elseif($random < {cumulative_weight})")
+
+            # Set stage variable for this target
+            vtl_lines.append(f'  #set($backend_url = $stageVariables.{service.name}_{target.name}_url)')
+
+        vtl_lines.append("#end")
+        vtl_lines.append("")
+        vtl_lines.append("## Set backend URL in context")
+        vtl_lines.append('#set($context.requestOverride.path.backend_url = $backend_url)')
+
+        vtl_template = "\\n".join(vtl_lines)
+
+        # Build integration with VTL template
+        path = route.path_prefix or "/"
+        integration = {
+            "type": "http_proxy",
+            "httpMethod": method,
+            "uri": "${stageVariables.backend_url}" + path,
+            "connectionType": "INTERNET",
+            "timeoutInMillis": aws_config.integration_timeout_ms,
+            "passthroughBehavior": "when_no_templates",
+            "requestTemplates": {
+                "application/json": vtl_template
+            },
+            "responses": {
+                "default": {
+                    "statusCode": "200"
+                }
+            }
+        }
+
+        return integration
 
     def _build_http_proxy_integration(
         self,
