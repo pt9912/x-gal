@@ -36,7 +36,7 @@ def proto_manager(temp_proto_dir):
 @pytest.fixture
 def sample_proto_content():
     """Sample valid proto3 content."""
-    return '''
+    return """
 syntax = "proto3";
 package user.v1;
 
@@ -57,7 +57,7 @@ message GetUserRequest {
 message GetUserResponse {
     User user = 1;
 }
-'''
+"""
 
 
 class TestProtoManagerInit:
@@ -66,7 +66,7 @@ class TestProtoManagerInit:
     def test_proto_manager_init_default(self):
         """Test ProtoManager with default directory."""
         # Mock mkdir to avoid permission issues
-        with patch.object(Path, 'mkdir'):
+        with patch.object(Path, "mkdir"):
             manager = ProtoManager()
             assert manager.proto_dir == Path("/etc/gal/protos")
             assert manager.descriptors == {}
@@ -88,11 +88,7 @@ class TestProtoManagerFileDescriptor:
         desc_file = Path(temp_proto_dir) / "user.desc"
         desc_file.write_bytes(b"fake descriptor content")
 
-        descriptor = ProtoDescriptor(
-            name="user_service",
-            source="file",
-            path=str(desc_file)
-        )
+        descriptor = ProtoDescriptor(name="user_service", source="file", path=str(desc_file))
 
         proto_manager.register_descriptor(descriptor)
 
@@ -101,21 +97,19 @@ class TestProtoManagerFileDescriptor:
         assert registered is not None
         assert registered.path == str(desc_file)
 
-    def test_register_descriptor_file_proto_with_mock(self, proto_manager, temp_proto_dir, sample_proto_content):
+    def test_register_descriptor_file_proto_with_mock(
+        self, proto_manager, temp_proto_dir, sample_proto_content
+    ):
         """Test registering .proto file with mocked protoc compilation."""
         # Create a real .proto file
         proto_file = Path(temp_proto_dir) / "user.proto"
         proto_file.write_text(sample_proto_content, encoding="utf-8")
 
-        descriptor = ProtoDescriptor(
-            name="user_service",
-            source="file",
-            path=str(proto_file)
-        )
+        descriptor = ProtoDescriptor(name="user_service", source="file", path=str(proto_file))
 
         # Mock _compile_proto to avoid needing real protoc
         desc_file = Path(temp_proto_dir) / "user.desc"
-        with patch.object(proto_manager, '_compile_proto', return_value=desc_file):
+        with patch.object(proto_manager, "_compile_proto", return_value=desc_file):
             proto_manager.register_descriptor(descriptor)
 
         assert "user_service" in proto_manager.descriptors
@@ -126,9 +120,7 @@ class TestProtoManagerFileDescriptor:
     def test_register_descriptor_file_not_found(self, proto_manager):
         """Test registering non-existent file raises FileNotFoundError."""
         descriptor = ProtoDescriptor(
-            name="user_service",
-            source="file",
-            path="/nonexistent/user.proto"
+            name="user_service", source="file", path="/nonexistent/user.proto"
         )
 
         with pytest.raises(FileNotFoundError, match="Proto file not found"):
@@ -140,11 +132,7 @@ class TestProtoManagerFileDescriptor:
         invalid_file = Path(temp_proto_dir) / "user.txt"
         invalid_file.write_text("content", encoding="utf-8")
 
-        descriptor = ProtoDescriptor(
-            name="user_service",
-            source="file",
-            path=str(invalid_file)
-        )
+        descriptor = ProtoDescriptor(name="user_service", source="file", path=str(invalid_file))
 
         with pytest.raises(ValueError, match="Invalid proto file extension"):
             proto_manager.register_descriptor(descriptor)
@@ -156,9 +144,7 @@ class TestProtoManagerInlineDescriptor:
     def test_register_descriptor_inline(self, proto_manager, temp_proto_dir, sample_proto_content):
         """Test registering inline proto content."""
         descriptor = ProtoDescriptor(
-            name="user_service",
-            source="inline",
-            content=sample_proto_content
+            name="user_service", source="inline", content=sample_proto_content
         )
 
         # Mock _compile_proto
@@ -166,7 +152,7 @@ class TestProtoManagerInlineDescriptor:
         expected_proto_file = Path(temp_proto_dir) / f"user_service_{content_hash}.proto"
         expected_desc_file = Path(temp_proto_dir) / f"user_service_{content_hash}.desc"
 
-        with patch.object(proto_manager, '_compile_proto', return_value=expected_desc_file):
+        with patch.object(proto_manager, "_compile_proto", return_value=expected_desc_file):
             proto_manager.register_descriptor(descriptor)
 
         # Check proto file was written
@@ -192,7 +178,7 @@ class TestProtoManagerInlineDescriptor:
         desc_file1 = Path(temp_proto_dir) / f"test1_{hash1}.desc"
         desc_file2 = Path(temp_proto_dir) / f"test2_{hash2}.desc"
 
-        with patch.object(proto_manager, '_compile_proto', side_effect=[desc_file1, desc_file2]):
+        with patch.object(proto_manager, "_compile_proto", side_effect=[desc_file1, desc_file2]):
             proto_manager.register_descriptor(desc1)
             proto_manager.register_descriptor(desc2)
 
@@ -211,9 +197,7 @@ class TestProtoManagerURLDescriptor:
     def test_register_descriptor_url(self, proto_manager, temp_proto_dir, sample_proto_content):
         """Test registering proto from URL."""
         descriptor = ProtoDescriptor(
-            name="user_service",
-            source="url",
-            url="https://api.example.com/protos/user.proto"
+            name="user_service", source="url", url="https://api.example.com/protos/user.proto"
         )
 
         # Mock requests.get
@@ -223,15 +207,14 @@ class TestProtoManagerURLDescriptor:
 
         expected_desc_file = Path(temp_proto_dir) / "user_service.desc"
 
-        with patch('gal.proto_manager.requests') as mock_requests:
+        with patch("gal.proto_manager.requests") as mock_requests:
             mock_requests.get.return_value = mock_response
-            with patch.object(proto_manager, '_compile_proto', return_value=expected_desc_file):
+            with patch.object(proto_manager, "_compile_proto", return_value=expected_desc_file):
                 proto_manager.register_descriptor(descriptor)
 
         # Check requests.get was called
         mock_requests.get.assert_called_once_with(
-            "https://api.example.com/protos/user.proto",
-            timeout=30
+            "https://api.example.com/protos/user.proto", timeout=30
         )
 
         # Check proto file was written
@@ -246,26 +229,22 @@ class TestProtoManagerURLDescriptor:
     def test_register_descriptor_url_without_requests(self, proto_manager):
         """Test URL descriptor without requests library raises ImportError."""
         descriptor = ProtoDescriptor(
-            name="user_service",
-            source="url",
-            url="https://api.example.com/protos/user.proto"
+            name="user_service", source="url", url="https://api.example.com/protos/user.proto"
         )
 
         # Mock requests as None (not installed)
-        with patch('gal.proto_manager.requests', None):
+        with patch("gal.proto_manager.requests", None):
             with pytest.raises(ImportError, match="requests library is required"):
                 proto_manager.register_descriptor(descriptor)
 
     def test_register_descriptor_url_download_failure(self, proto_manager):
         """Test URL download failure raises RuntimeError."""
         descriptor = ProtoDescriptor(
-            name="user_service",
-            source="url",
-            url="https://api.example.com/protos/user.proto"
+            name="user_service", source="url", url="https://api.example.com/protos/user.proto"
         )
 
         # Mock requests to raise exception
-        with patch('gal.proto_manager.requests') as mock_requests:
+        with patch("gal.proto_manager.requests") as mock_requests:
             mock_requests.get.side_effect = Exception("Connection error")
             mock_requests.RequestException = Exception
 
@@ -306,9 +285,15 @@ class TestProtoManagerRetrieval:
         desc3.write_bytes(b"content3")
 
         # Register in random order
-        proto_manager.register_descriptor(ProtoDescriptor(name="payment_svc", source="file", path=str(desc3)))
-        proto_manager.register_descriptor(ProtoDescriptor(name="user_svc", source="file", path=str(desc1)))
-        proto_manager.register_descriptor(ProtoDescriptor(name="order_svc", source="file", path=str(desc2)))
+        proto_manager.register_descriptor(
+            ProtoDescriptor(name="payment_svc", source="file", path=str(desc3))
+        )
+        proto_manager.register_descriptor(
+            ProtoDescriptor(name="user_svc", source="file", path=str(desc1))
+        )
+        proto_manager.register_descriptor(
+            ProtoDescriptor(name="order_svc", source="file", path=str(desc2))
+        )
 
         # Should return sorted
         result = proto_manager.list_descriptors()
@@ -359,13 +344,15 @@ class TestProtoManagerEdgeCases:
         with pytest.raises(ValueError, match="already registered"):
             proto_manager.register_descriptor(descriptor2)
 
-    def test_compile_proto_missing_protoc(self, proto_manager, temp_proto_dir, sample_proto_content):
+    def test_compile_proto_missing_protoc(
+        self, proto_manager, temp_proto_dir, sample_proto_content
+    ):
         """Test compilation fails gracefully when protoc not installed."""
         proto_file = Path(temp_proto_dir) / "user.proto"
         proto_file.write_text(sample_proto_content, encoding="utf-8")
 
         # Mock subprocess.run to raise FileNotFoundError
-        with patch('subprocess.run', side_effect=FileNotFoundError("protoc not found")):
+        with patch("subprocess.run", side_effect=FileNotFoundError("protoc not found")):
             with pytest.raises(RuntimeError, match="protoc not found"):
                 proto_manager._compile_proto(str(proto_file))
 
@@ -380,7 +367,7 @@ class TestProtoManagerEdgeCases:
         mock_result.returncode = 1
         mock_result.stderr = "syntax error at line 1"
 
-        with patch('subprocess.run', return_value=mock_result):
+        with patch("subprocess.run", return_value=mock_result):
             with pytest.raises(RuntimeError, match="protoc compilation failed"):
                 proto_manager._compile_proto(str(proto_file))
 
@@ -390,11 +377,13 @@ class TestProtoManagerEdgeCases:
         proto_file.write_text(sample_proto_content, encoding="utf-8")
 
         # Mock subprocess.run to raise TimeoutExpired
-        with patch('subprocess.run', side_effect=subprocess.TimeoutExpired("protoc", 30)):
+        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("protoc", 30)):
             with pytest.raises(RuntimeError, match="timeout"):
                 proto_manager._compile_proto(str(proto_file))
 
-    def test_compile_proto_desc_not_created(self, proto_manager, temp_proto_dir, sample_proto_content):
+    def test_compile_proto_desc_not_created(
+        self, proto_manager, temp_proto_dir, sample_proto_content
+    ):
         """Test error when protoc succeeds but .desc file not created."""
         proto_file = Path(temp_proto_dir) / "user.proto"
         proto_file.write_text(sample_proto_content, encoding="utf-8")
@@ -404,6 +393,6 @@ class TestProtoManagerEdgeCases:
         mock_result.returncode = 0
         mock_result.stderr = ""
 
-        with patch('subprocess.run', return_value=mock_result):
+        with patch("subprocess.run", return_value=mock_result):
             with pytest.raises(RuntimeError, match=".desc file not created"):
                 proto_manager._compile_proto(str(proto_file))

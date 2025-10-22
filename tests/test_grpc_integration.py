@@ -30,7 +30,7 @@ from gal.providers.nginx import NginxProvider
 @pytest.fixture
 def sample_proto_content():
     """Valid proto3 content for testing."""
-    return '''
+    return """
 syntax = "proto3";
 package user.v1;
 
@@ -65,7 +65,7 @@ message GetUserRequest {
 message GetUserResponse {
     User user = 1;
 }
-'''
+"""
 
 
 class TestGrpcIntegrationEndToEnd:
@@ -75,9 +75,7 @@ class TestGrpcIntegrationEndToEnd:
         """Test complete flow: Config → ProtoManager → Envoy → Validated output."""
         # Create proto descriptor (inline)
         proto_desc = ProtoDescriptor(
-            name="user_service",
-            source="inline",
-            content=sample_proto_content
+            name="user_service", source="inline", content=sample_proto_content
         )
 
         # Create gRPC transformation
@@ -91,17 +89,14 @@ class TestGrpcIntegrationEndToEnd:
             request_transform=RequestBodyTransformation(
                 add_fields={"trace_id": "{{uuid}}", "timestamp": "{{timestamp}}"},
                 remove_fields=["password"],
-                rename_fields={"user_id": "id"}
+                rename_fields={"user_id": "id"},
             ),
-            response_transform=ResponseBodyTransformation(
-                filter_fields=["secret"]
-            )
+            response_transform=ResponseBodyTransformation(filter_fields=["secret"]),
         )
 
         # Create route with transformation
         route = Route(
-            path_prefix="/user.v1.UserService/CreateUser",
-            grpc_transformation=grpc_transform
+            path_prefix="/user.v1.UserService/CreateUser", grpc_transformation=grpc_transform
         )
 
         # Create gRPC service
@@ -110,7 +105,7 @@ class TestGrpcIntegrationEndToEnd:
             type="grpc",
             protocol="http2",
             upstream=Upstream(host="grpc-backend", port=50051),
-            routes=[route]
+            routes=[route],
         )
 
         # Create complete config
@@ -119,23 +114,23 @@ class TestGrpcIntegrationEndToEnd:
             provider="envoy",
             global_config=GlobalConfig(),
             services=[service],
-            proto_descriptors=[proto_desc]
+            proto_descriptors=[proto_desc],
         )
 
         # Generate output with mocked ProtoManager
         provider = EnvoyProvider()
 
-        with patch('gal.providers.envoy.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.envoy.ProtoManager") as mock_pm_class:
             # Mock descriptor with path
-            mock_desc = ProtoDescriptor(
-                name="user_service",
-                source="file",
-                path="/tmp/user.desc"
-            )
-            mock_manager = type('obj', (object,), {
-                'register_descriptor': lambda self, desc: None,
-                'get_descriptor': lambda self, name: mock_desc
-            })()
+            mock_desc = ProtoDescriptor(name="user_service", source="file", path="/tmp/user.desc")
+            mock_manager = type(
+                "obj",
+                (object,),
+                {
+                    "register_descriptor": lambda self, desc: None,
+                    "get_descriptor": lambda self, name: mock_desc,
+                },
+            )()
             mock_pm_class.return_value = mock_manager
 
             result = provider.generate(config)
@@ -154,12 +149,10 @@ class TestGrpcIntegrationEndToEnd:
         """Test configuration with multiple proto descriptors."""
         # Create two proto descriptors
         user_proto = ProtoDescriptor(
-            name="user_service",
-            source="inline",
-            content=sample_proto_content
+            name="user_service", source="inline", content=sample_proto_content
         )
 
-        order_proto_content = '''
+        order_proto_content = """
 syntax = "proto3";
 package order.v1;
 
@@ -179,12 +172,10 @@ message CreateOrderRequest {
 message CreateOrderResponse {
     Order order = 1;
 }
-'''
+"""
 
         order_proto = ProtoDescriptor(
-            name="order_service",
-            source="inline",
-            content=order_proto_content
+            name="order_service", source="inline", content=order_proto_content
         )
 
         # Create two services with different transformations
@@ -196,8 +187,8 @@ message CreateOrderResponse {
                 package="user.v1",
                 service="UserService",
                 request_type="CreateUserRequest",
-                response_type="CreateUserResponse"
-            )
+                response_type="CreateUserResponse",
+            ),
         )
 
         order_route = Route(
@@ -208,8 +199,8 @@ message CreateOrderResponse {
                 package="order.v1",
                 service="OrderService",
                 request_type="CreateOrderRequest",
-                response_type="CreateOrderResponse"
-            )
+                response_type="CreateOrderResponse",
+            ),
         )
 
         user_service = Service(
@@ -217,7 +208,7 @@ message CreateOrderResponse {
             type="grpc",
             protocol="http2",
             upstream=Upstream(host="user-backend", port=50051),
-            routes=[user_route]
+            routes=[user_route],
         )
 
         order_service = Service(
@@ -225,7 +216,7 @@ message CreateOrderResponse {
             type="grpc",
             protocol="http2",
             upstream=Upstream(host="order-backend", port=50052),
-            routes=[order_route]
+            routes=[order_route],
         )
 
         config = Config(
@@ -233,23 +224,32 @@ message CreateOrderResponse {
             provider="envoy",
             global_config=GlobalConfig(),
             services=[user_service, order_service],
-            proto_descriptors=[user_proto, order_proto]
+            proto_descriptors=[user_proto, order_proto],
         )
 
         provider = EnvoyProvider()
 
-        with patch('gal.providers.envoy.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.envoy.ProtoManager") as mock_pm_class:
+
             def mock_get_descriptor(self, name):
                 if name == "user_service":
-                    return ProtoDescriptor(name="user_service", source="file", path="/tmp/user.desc")
+                    return ProtoDescriptor(
+                        name="user_service", source="file", path="/tmp/user.desc"
+                    )
                 elif name == "order_service":
-                    return ProtoDescriptor(name="order_service", source="file", path="/tmp/order.desc")
+                    return ProtoDescriptor(
+                        name="order_service", source="file", path="/tmp/order.desc"
+                    )
                 return None
 
-            mock_manager = type('obj', (object,), {
-                'register_descriptor': lambda self, desc: None,
-                'get_descriptor': mock_get_descriptor
-            })()
+            mock_manager = type(
+                "obj",
+                (object,),
+                {
+                    "register_descriptor": lambda self, desc: None,
+                    "get_descriptor": mock_get_descriptor,
+                },
+            )()
             mock_pm_class.return_value = mock_manager
 
             result = provider.generate(config)
@@ -263,9 +263,7 @@ message CreateOrderResponse {
     def test_nginx_integration_with_transformation(self, sample_proto_content):
         """Test Nginx provider integration with gRPC transformation."""
         proto_desc = ProtoDescriptor(
-            name="user_service",
-            source="inline",
-            content=sample_proto_content
+            name="user_service", source="inline", content=sample_proto_content
         )
 
         grpc_transform = GrpcTransformation(
@@ -275,14 +273,11 @@ message CreateOrderResponse {
             service="UserService",
             request_type="CreateUserRequest",
             response_type="CreateUserResponse",
-            request_transform=RequestBodyTransformation(
-                add_fields={"trace_id": "{{uuid}}"}
-            )
+            request_transform=RequestBodyTransformation(add_fields={"trace_id": "{{uuid}}"}),
         )
 
         route = Route(
-            path_prefix="/user.v1.UserService/CreateUser",
-            grpc_transformation=grpc_transform
+            path_prefix="/user.v1.UserService/CreateUser", grpc_transformation=grpc_transform
         )
 
         service = Service(
@@ -290,7 +285,7 @@ message CreateOrderResponse {
             type="grpc",
             protocol="http2",
             upstream=Upstream(host="grpc-backend", port=50051),
-            routes=[route]
+            routes=[route],
         )
 
         config = Config(
@@ -298,17 +293,21 @@ message CreateOrderResponse {
             provider="nginx",
             global_config=GlobalConfig(),
             services=[service],
-            proto_descriptors=[proto_desc]
+            proto_descriptors=[proto_desc],
         )
 
         provider = NginxProvider()
 
-        with patch('gal.providers.nginx.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.nginx.ProtoManager") as mock_pm_class:
             mock_desc = ProtoDescriptor(name="user_service", source="file", path="/tmp/user.desc")
-            mock_manager = type('obj', (object,), {
-                'register_descriptor': lambda self, desc: None,
-                'get_descriptor': lambda self, name: mock_desc
-            })()
+            mock_manager = type(
+                "obj",
+                (object,),
+                {
+                    "register_descriptor": lambda self, desc: None,
+                    "get_descriptor": lambda self, name: mock_desc,
+                },
+            )()
             mock_pm_class.return_value = mock_manager
 
             result = provider.generate(config)
@@ -323,9 +322,7 @@ message CreateOrderResponse {
     def test_apisix_integration_with_transformation(self, sample_proto_content):
         """Test APISIX provider integration with gRPC transformation."""
         proto_desc = ProtoDescriptor(
-            name="user_service",
-            source="inline",
-            content=sample_proto_content
+            name="user_service", source="inline", content=sample_proto_content
         )
 
         grpc_transform = GrpcTransformation(
@@ -335,14 +332,11 @@ message CreateOrderResponse {
             service="UserService",
             request_type="CreateUserRequest",
             response_type="CreateUserResponse",
-            request_transform=RequestBodyTransformation(
-                add_fields={"trace_id": "{{uuid}}"}
-            )
+            request_transform=RequestBodyTransformation(add_fields={"trace_id": "{{uuid}}"}),
         )
 
         route = Route(
-            path_prefix="/user.v1.UserService/CreateUser",
-            grpc_transformation=grpc_transform
+            path_prefix="/user.v1.UserService/CreateUser", grpc_transformation=grpc_transform
         )
 
         service = Service(
@@ -350,7 +344,7 @@ message CreateOrderResponse {
             type="grpc",
             protocol="http2",
             upstream=Upstream(host="grpc-backend", port=50051),
-            routes=[route]
+            routes=[route],
         )
 
         config = Config(
@@ -358,33 +352,35 @@ message CreateOrderResponse {
             provider="apisix",
             global_config=GlobalConfig(),
             services=[service],
-            proto_descriptors=[proto_desc]
+            proto_descriptors=[proto_desc],
         )
 
         provider = APISIXProvider()
 
-        with patch('gal.providers.apisix.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.apisix.ProtoManager") as mock_pm_class:
             mock_desc = ProtoDescriptor(name="user_service", source="file", path="/tmp/user.desc")
-            mock_manager = type('obj', (object,), {
-                'register_descriptor': lambda self, desc: None,
-                'get_descriptor': lambda self, name: mock_desc
-            })()
+            mock_manager = type(
+                "obj",
+                (object,),
+                {
+                    "register_descriptor": lambda self, desc: None,
+                    "get_descriptor": lambda self, name: mock_desc,
+                },
+            )()
             mock_pm_class.return_value = mock_manager
 
             result = provider.generate(config)
 
         # Validate APISIX-specific output (JSON format)
-        assert '"serverless-pre-function"' in result or 'serverless-pre-function' in result
-        assert 'apisix.core' in result
-        assert 'user.v1.CreateUserRequest' in result
-        assert 'trace_id' in result
+        assert '"serverless-pre-function"' in result or "serverless-pre-function" in result
+        assert "apisix.core" in result
+        assert "user.v1.CreateUserRequest" in result
+        assert "trace_id" in result
 
     def test_complex_transformation_scenario(self, sample_proto_content):
         """Test complex transformation with multiple operations."""
         proto_desc = ProtoDescriptor(
-            name="user_service",
-            source="inline",
-            content=sample_proto_content
+            name="user_service", source="inline", content=sample_proto_content
         )
 
         # Complex transformation with all operation types
@@ -399,23 +395,18 @@ message CreateOrderResponse {
                 add_fields={
                     "trace_id": "{{uuid}}",
                     "timestamp": "{{timestamp}}",
-                    "server": "gateway"
+                    "server": "gateway",
                 },
                 remove_fields=["password", "email"],
-                rename_fields={
-                    "user_id": "id",
-                    "name": "username"
-                }
+                rename_fields={"user_id": "id", "name": "username"},
             ),
             response_transform=ResponseBodyTransformation(
-                filter_fields=["secret", "password"],
-                add_fields={"processed_by": "gateway"}
-            )
+                filter_fields=["secret", "password"], add_fields={"processed_by": "gateway"}
+            ),
         )
 
         route = Route(
-            path_prefix="/user.v1.UserService/CreateUser",
-            grpc_transformation=grpc_transform
+            path_prefix="/user.v1.UserService/CreateUser", grpc_transformation=grpc_transform
         )
 
         service = Service(
@@ -423,7 +414,7 @@ message CreateOrderResponse {
             type="grpc",
             protocol="http2",
             upstream=Upstream(host="grpc-backend", port=50051),
-            routes=[route]
+            routes=[route],
         )
 
         config = Config(
@@ -431,17 +422,21 @@ message CreateOrderResponse {
             provider="envoy",
             global_config=GlobalConfig(),
             services=[service],
-            proto_descriptors=[proto_desc]
+            proto_descriptors=[proto_desc],
         )
 
         provider = EnvoyProvider()
 
-        with patch('gal.providers.envoy.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.envoy.ProtoManager") as mock_pm_class:
             mock_desc = ProtoDescriptor(name="user_service", source="file", path="/tmp/user.desc")
-            mock_manager = type('obj', (object,), {
-                'register_descriptor': lambda self, desc: None,
-                'get_descriptor': lambda self, name: mock_desc
-            })()
+            mock_manager = type(
+                "obj",
+                (object,),
+                {
+                    "register_descriptor": lambda self, desc: None,
+                    "get_descriptor": lambda self, name: mock_desc,
+                },
+            )()
             mock_pm_class.return_value = mock_manager
 
             result = provider.generate(config)

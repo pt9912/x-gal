@@ -137,9 +137,7 @@ class AzureAPIMProvider(Provider):
                     authentication = AuthenticationConfig(
                         type="api_key",
                         api_key=ApiKeyConfig(
-                            key_name=auth_config.get(
-                                "key_name", "Ocp-Apim-Subscription-Key"
-                            ),
+                            key_name=auth_config.get("key_name", "Ocp-Apim-Subscription-Key"),
                             in_location=auth_config.get("in_location", "header"),
                         ),
                     )
@@ -186,9 +184,7 @@ class AzureAPIMProvider(Provider):
             ),
         )
 
-        logger.info(
-            f"Generated GAL config with {len(routes)} routes for service '{api.api_id}'"
-        )
+        logger.info(f"Generated GAL config with {len(routes)} routes for service '{api.api_id}'")
         logger.warning(
             "Azure APIM policies (rate limiting, caching) are not included in OpenAPI exports. "
             "Configure these features manually in GAL if needed."
@@ -217,13 +213,11 @@ class AzureAPIMProvider(Provider):
                 "apimServiceName": {
                     "type": "string",
                     "defaultValue": self._get_apim_service_name(config),
-                    "metadata": {
-                        "description": "The name of the API Management service instance"
-                    }
+                    "metadata": {"description": "The name of the API Management service instance"},
                 }
             },
             "variables": {},
-            "resources": []
+            "resources": [],
         }
 
         # APIM Service Resource
@@ -256,8 +250,7 @@ class AzureAPIMProvider(Provider):
             # Backend (Traffic Splitting or Single Backend)
             # Check if any route uses traffic splitting
             has_traffic_split = any(
-                route.traffic_split and route.traffic_split.enabled
-                for route in service.routes
+                route.traffic_split and route.traffic_split.enabled for route in service.routes
             )
 
             if has_traffic_split:
@@ -343,14 +336,8 @@ class AzureAPIMProvider(Provider):
             "apiVersion": "2021-08-01",
             "name": "[parameters('apimServiceName')]",
             "location": global_config.location,
-            "sku": {
-                "name": global_config.sku,
-                "capacity": 1
-            },
-            "properties": {
-                "publisherEmail": "admin@example.com",
-                "publisherName": "GAL Admin"
-            }
+            "sku": {"name": global_config.sku, "capacity": 1},
+            "properties": {"publisherEmail": "admin@example.com", "publisherName": "GAL Admin"},
         }
 
     def _generate_api_resource(self, service: Service) -> Dict[str, Any]:
@@ -378,8 +365,8 @@ class AzureAPIMProvider(Provider):
                 "subscriptionRequired": apim_config.subscription_keys_required,
                 "path": service.name,
                 "protocols": ["https"],
-                "isCurrent": True
-            }
+                "isCurrent": True,
+            },
         }
 
     def _generate_operation(self, service: Service, route: Route, method: str) -> Dict[str, Any]:
@@ -408,11 +395,13 @@ class AzureAPIMProvider(Provider):
                 "method": method,
                 "urlTemplate": route.path_prefix,
                 "templateParameters": [],
-                "responses": []
-            }
+                "responses": [],
+            },
         }
 
-    def _generate_operation_policy(self, service: Service, route: Route, method: str) -> Dict[str, Any]:
+    def _generate_operation_policy(
+        self, service: Service, route: Route, method: str
+    ) -> Dict[str, Any]:
         """Generate Operation Policy (XML).
 
         Args:
@@ -433,10 +422,7 @@ class AzureAPIMProvider(Provider):
             "dependsOn": [
                 f"[resourceId('Microsoft.ApiManagement/service/apis/operations', parameters('apimServiceName'), '{service.name}', '{operation_name}')]"
             ],
-            "properties": {
-                "value": policy_xml,
-                "format": "xml"
-            }
+            "properties": {"value": policy_xml, "format": "xml"},
         }
 
     def _build_policy_xml(self, service: Service, route: Route) -> str:
@@ -452,11 +438,11 @@ class AzureAPIMProvider(Provider):
         Returns:
             Policy XML string
         """
-        policies = ['<policies>']
+        policies = ["<policies>"]
 
         # Inbound Policies
-        policies.append('    <inbound>')
-        policies.append('        <base />')
+        policies.append("    <inbound>")
+        policies.append("        <base />")
 
         # Rate Limiting
         if route.rate_limit and route.rate_limit.enabled:
@@ -466,38 +452,46 @@ class AzureAPIMProvider(Provider):
         # JWT Validation (Azure AD)
         if route.authentication and route.authentication.type == "jwt":
             jwt_config = route.authentication.jwt_config
-            policies.append('        <validate-jwt header-name="Authorization" failed-validation-httpcode="401" failed-validation-error-message="Unauthorized">')
-            policies.append(f'            <openid-config url="{jwt_config.issuer}/.well-known/openid-configuration" />')
-            policies.append('            <audiences>')
-            policies.append(f'                <audience>{jwt_config.audience}</audience>')
-            policies.append('            </audiences>')
+            policies.append(
+                '        <validate-jwt header-name="Authorization" failed-validation-httpcode="401" failed-validation-error-message="Unauthorized">'
+            )
+            policies.append(
+                f'            <openid-config url="{jwt_config.issuer}/.well-known/openid-configuration" />'
+            )
+            policies.append("            <audiences>")
+            policies.append(f"                <audience>{jwt_config.audience}</audience>")
+            policies.append("            </audiences>")
 
             # Required Claims
             if jwt_config.required_claims:
-                policies.append('            <required-claims>')
+                policies.append("            <required-claims>")
                 for claim in jwt_config.required_claims:
                     policies.append(f'                <claim name="{claim.name}" match="any">')
-                    policies.append(f'                    <value>{claim.value}</value>')
-                    policies.append('                </claim>')
-                policies.append('            </required-claims>')
+                    policies.append(f"                    <value>{claim.value}</value>")
+                    policies.append("                </claim>")
+                policies.append("            </required-claims>")
 
-            policies.append('        </validate-jwt>')
+            policies.append("        </validate-jwt>")
 
         # API Key Authentication (Subscription Keys)
         elif route.authentication and route.authentication.type == "api_key":
-            policies.append('        <check-header name="Ocp-Apim-Subscription-Key" failed-check-httpcode="401" failed-check-error-message="Missing or invalid subscription key" />')
+            policies.append(
+                '        <check-header name="Ocp-Apim-Subscription-Key" failed-check-httpcode="401" failed-check-error-message="Missing or invalid subscription key" />'
+            )
 
         # Header Manipulation (Request)
         if route.headers and route.headers.request_add:
             for key, value in route.headers.request_add.items():
                 policies.append(f'        <set-header name="{key}" exists-action="override">')
-                policies.append(f'            <value>{value}</value>')
-                policies.append('        </set-header>')
+                policies.append(f"            <value>{value}</value>")
+                policies.append("        </set-header>")
 
         # Backend URL or Backend Pool
         if route.traffic_split and route.traffic_split.enabled:
             # Use load-balanced backend pool
-            policies.append(f'        <set-backend-service backend-id="{service.name}-backend-pool" />')
+            policies.append(
+                f'        <set-backend-service backend-id="{service.name}-backend-pool" />'
+            )
         elif service.upstream and service.upstream.targets:
             # Use single backend URL
             target = service.upstream.targets[0]
@@ -505,34 +499,34 @@ class AzureAPIMProvider(Provider):
             backend_url = f"{protocol}://{target.host}:{target.port}"
             policies.append(f'        <set-backend-service base-url="{backend_url}" />')
 
-        policies.append('    </inbound>')
+        policies.append("    </inbound>")
 
         # Backend Policies
-        policies.append('    <backend>')
-        policies.append('        <base />')
-        policies.append('    </backend>')
+        policies.append("    <backend>")
+        policies.append("        <base />")
+        policies.append("    </backend>")
 
         # Outbound Policies
-        policies.append('    <outbound>')
-        policies.append('        <base />')
+        policies.append("    <outbound>")
+        policies.append("        <base />")
 
         # Header Manipulation (Response)
         if route.headers and route.headers.response_add:
             for key, value in route.headers.response_add.items():
                 policies.append(f'        <set-header name="{key}" exists-action="override">')
-                policies.append(f'            <value>{value}</value>')
-                policies.append('        </set-header>')
+                policies.append(f"            <value>{value}</value>")
+                policies.append("        </set-header>")
 
-        policies.append('    </outbound>')
+        policies.append("    </outbound>")
 
         # On-Error Policies
-        policies.append('    <on-error>')
-        policies.append('        <base />')
-        policies.append('    </on-error>')
+        policies.append("    <on-error>")
+        policies.append("        <base />")
+        policies.append("    </on-error>")
 
-        policies.append('</policies>')
+        policies.append("</policies>")
 
-        return '\n'.join(policies)
+        return "\n".join(policies)
 
     def _generate_product(self, service: Service) -> Dict[str, Any]:
         """Generate Product Resource.
@@ -557,8 +551,8 @@ class AzureAPIMProvider(Provider):
                 "description": apim_config.product_description,
                 "subscriptionRequired": apim_config.product_subscription_required,
                 "approvalRequired": False,
-                "state": "published" if apim_config.product_published else "notPublished"
-            }
+                "state": "published" if apim_config.product_published else "notPublished",
+            },
         }
 
     def _generate_individual_backend(
@@ -588,8 +582,8 @@ class AzureAPIMProvider(Provider):
                 "description": f"Backend for {service.name} - {target_name}",
                 "url": url,
                 "protocol": "http",
-                "resourceId": ""
-            }
+                "resourceId": "",
+            },
         }
 
     def _generate_backend(self, service: Service) -> Dict[str, Any]:
@@ -619,8 +613,8 @@ class AzureAPIMProvider(Provider):
                 "description": f"Backend for {service.name}",
                 "url": url,
                 "protocol": "http",
-                "resourceId": ""
-            }
+                "resourceId": "",
+            },
         }
 
     def _generate_traffic_split_backend(self, service: Service) -> Dict[str, Any]:
@@ -676,11 +670,13 @@ class AzureAPIMProvider(Provider):
             protocol = "https" if target.upstream.port in [443, 8443] else "http"
             backend_url = f"{protocol}://{target.upstream.host}:{target.upstream.port}"
 
-            pool_services.append({
-                "id": f"/subscriptions/{{subscriptionId}}/resourceGroups/{{resourceGroup}}/providers/Microsoft.ApiManagement/service/[parameters('apimServiceName')]/backends/{service.name}-{target.name}-backend",
-                "priority": 1,  # All targets have same priority
-                "weight": target.weight
-            })
+            pool_services.append(
+                {
+                    "id": f"/subscriptions/{{subscriptionId}}/resourceGroups/{{resourceGroup}}/providers/Microsoft.ApiManagement/service/[parameters('apimServiceName')]/backends/{service.name}-{target.name}-backend",
+                    "priority": 1,  # All targets have same priority
+                    "weight": target.weight,
+                }
+            )
 
         backend_pool = {
             "type": "Microsoft.ApiManagement/service/backends",
@@ -692,10 +688,8 @@ class AzureAPIMProvider(Provider):
             "properties": {
                 "description": f"Load-balanced backend pool for {service.name}",
                 "type": "pool",
-                "pool": {
-                    "services": pool_services
-                }
-            }
+                "pool": {"services": pool_services},
+            },
         }
 
         return backend_pool
@@ -718,13 +712,11 @@ class AzureAPIMProvider(Provider):
             "info": {
                 "title": "GAL API",
                 "version": "1.0.0",
-                "description": "Generated by GAL - Gateway Abstraction Layer"
+                "description": "Generated by GAL - Gateway Abstraction Layer",
             },
             "servers": [],
             "paths": {},
-            "components": {
-                "securitySchemes": {}
-            }
+            "components": {"securitySchemes": {}},
         }
 
         # Add security schemes
@@ -751,13 +743,9 @@ class AzureAPIMProvider(Provider):
                         "summary": f"{method} {path}",
                         "operationId": f"{method.lower()}_{path.replace('/', '_').strip('_')}",
                         "responses": {
-                            "200": {
-                                "description": "Successful response"
-                            },
-                            "401": {
-                                "description": "Unauthorized"
-                            }
-                        }
+                            "200": {"description": "Successful response"},
+                            "401": {"description": "Unauthorized"},
+                        },
                     }
 
                     # Add security
@@ -770,9 +758,9 @@ class AzureAPIMProvider(Provider):
                                     "flows": {
                                         "implicit": {
                                             "authorizationUrl": jwt_config.issuer,
-                                            "scopes": {}
+                                            "scopes": {},
                                         }
-                                    }
+                                    },
                                 }
                                 has_oauth2 = True
                             operation["security"] = [{"oauth2": []}]
@@ -782,7 +770,7 @@ class AzureAPIMProvider(Provider):
                                 openapi["components"]["securitySchemes"]["apiKey"] = {
                                     "type": "apiKey",
                                     "name": "Ocp-Apim-Subscription-Key",
-                                    "in": "header"
+                                    "in": "header",
                                 }
                             operation["security"] = [{"apiKey": []}]
 

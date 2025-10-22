@@ -999,12 +999,8 @@ class EnvoyProvider(Provider):
         traffic_split = route.traffic_split
 
         # Check if we have routing rules (header/cookie based)
-        has_routing_rules = (
-            traffic_split.routing_rules
-            and (
-                traffic_split.routing_rules.header_rules
-                or traffic_split.routing_rules.cookie_rules
-            )
+        has_routing_rules = traffic_split.routing_rules and (
+            traffic_split.routing_rules.header_rules or traffic_split.routing_rules.cookie_rules
         )
 
         if has_routing_rules:
@@ -1247,7 +1243,9 @@ class EnvoyProvider(Provider):
         output.append("")
         output.append("                -- Generate UUID (Envoy request ID)")
         output.append("                function generate_uuid(request_handle)")
-        output.append("                  return request_handle:headers():get('x-request-id') or 'unknown'")
+        output.append(
+            "                  return request_handle:headers():get('x-request-id') or 'unknown'"
+        )
         output.append("                end")
         output.append("")
         output.append("                -- Get timestamp")
@@ -1279,7 +1277,9 @@ class EnvoyProvider(Provider):
                     output.append(
                         f"                  -- gRPC transformation for {service.name} {route.path_prefix}"
                     )
-                    output.append(f"                  if string.find(path, '{route.path_prefix}') then")
+                    output.append(
+                        f"                  if string.find(path, '{route.path_prefix}') then"
+                    )
 
                     # Load proto descriptor
                     output.append(
@@ -1293,7 +1293,9 @@ class EnvoyProvider(Provider):
                         "                      -- Skip gRPC 5-byte header (compression flag + message length)"
                     )
                     output.append("                      local grpc_header = body:getBytes(0, 5)")
-                    output.append("                      local pb_bytes = body:getBytes(5, body:length() - 5)")
+                    output.append(
+                        "                      local pb_bytes = body:getBytes(5, body:length() - 5)"
+                    )
                     output.append("")
 
                     # Decode message
@@ -1318,10 +1320,10 @@ class EnvoyProvider(Provider):
                     output.append(
                         f"                        local new_pb = pb.encode('{full_request_type}', msg)"
                     )
+                    output.append("                        local new_body = grpc_header .. new_pb")
                     output.append(
-                        "                        local new_body = grpc_header .. new_pb"
+                        "                        request_handle:body():setBytes(new_body)"
                     )
-                    output.append("                        request_handle:body():setBytes(new_body)")
                     output.append("                      else")
                     output.append(
                         "                        request_handle:logErr('Failed to decode gRPC message')"
@@ -1366,7 +1368,9 @@ class EnvoyProvider(Provider):
                         # Get body
                         output.append("                    local body = response_handle:body()")
                         output.append("                    if body and body:length() > 5 then")
-                        output.append("                      local grpc_header = body:getBytes(0, 5)")
+                        output.append(
+                            "                      local grpc_header = body:getBytes(0, 5)"
+                        )
                         output.append(
                             "                      local pb_bytes = body:getBytes(5, body:length() - 5)"
                         )
@@ -1393,7 +1397,9 @@ class EnvoyProvider(Provider):
                         output.append(
                             "                        local new_body = grpc_header .. new_pb"
                         )
-                        output.append("                        response_handle:body():setBytes(new_body)")
+                        output.append(
+                            "                        response_handle:body():setBytes(new_body)"
+                        )
                         output.append("                      end")
                         output.append("                    end")
                         output.append("                  end")

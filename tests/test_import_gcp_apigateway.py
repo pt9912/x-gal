@@ -4,7 +4,8 @@ Tests for GCP API Gateway Import (Parser)
 
 import pytest
 import yaml
-from gal.parsers.gcp_apigateway_parser import GCPAPIGatewayParser, GCPAPIGatewayAPI
+
+from gal.parsers.gcp_apigateway_parser import GCPAPIGatewayAPI, GCPAPIGatewayParser
 from gal.providers.gcp_apigateway import GCPAPIGatewayProvider
 
 

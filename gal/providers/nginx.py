@@ -704,12 +704,8 @@ class NginxProvider(Provider):
         traffic_split = route.traffic_split
 
         # Check if we have routing rules (header/cookie based)
-        has_routing_rules = (
-            traffic_split.routing_rules
-            and (
-                traffic_split.routing_rules.header_rules
-                or traffic_split.routing_rules.cookie_rules
-            )
+        has_routing_rules = traffic_split.routing_rules and (
+            traffic_split.routing_rules.header_rules or traffic_split.routing_rules.cookie_rules
         )
 
         if has_routing_rules:
@@ -749,14 +745,22 @@ class NginxProvider(Provider):
 
             # Fallback to split_clients for weighted routing
             output.append("            if ($backend_target = 'weighted') {")
-            self._generate_split_clients_block(service, traffic_split, output, indent="                ")
+            self._generate_split_clients_block(
+                service, traffic_split, output, indent="                "
+            )
             output.append("            }")
         else:
             # Simple weight-based routing only
-            self._generate_split_clients_block(service, traffic_split, output, indent="            ")
+            self._generate_split_clients_block(
+                service, traffic_split, output, indent="            "
+            )
 
     def _generate_split_clients_block(
-        self, service: Service, traffic_split: TrafficSplitConfig, output: List[str], indent: str = "            "
+        self,
+        service: Service,
+        traffic_split: TrafficSplitConfig,
+        output: List[str],
+        indent: str = "            ",
     ) -> None:
         """Generate split_clients block for weight-based routing.
 
@@ -779,12 +783,16 @@ class NginxProvider(Provider):
             else:
                 # Use split_clients with request_id for consistent routing
                 percentage = f"{cumulative_weight}%"
-                output.append(f"{indent}# {target.name}: {target.weight}% (cumulative: {percentage})")
+                output.append(
+                    f"{indent}# {target.name}: {target.weight}% (cumulative: {percentage})"
+                )
                 output.append(f"{indent}set_random $rand_split 0 100;")
                 output.append(f"{indent}if ($rand_split < {cumulative_weight}) {{")
 
             output.append(f"{indent}    set $split_backend '{target.name}';")
-            output.append(f"{indent}    proxy_pass http://{target.upstream.host}:{target.upstream.port};")
+            output.append(
+                f"{indent}    proxy_pass http://{target.upstream.host}:{target.upstream.port};"
+            )
             output.append(f"{indent}}}")
 
     def _generate_proxy_pass(self, service: Service, route: Route, output: List[str]) -> None:
@@ -956,7 +964,9 @@ class NginxProvider(Provider):
         # Request transformation
         if grpc_t.request_transform:
             output.append("")
-            output.append("            # gRPC Request transformation (requires OpenResty + lua-protobuf)")
+            output.append(
+                "            # gRPC Request transformation (requires OpenResty + lua-protobuf)"
+            )
             output.append("            access_by_lua_block {")
             output.append("                local pb = require('pb')")
             output.append("")
@@ -978,7 +988,9 @@ class NginxProvider(Provider):
             output.append("                    local pb_data = body_data:sub(6)")
             output.append("")
             output.append("                    -- Decode protobuf message")
-            output.append(f"                    local msg = pb.decode('{full_request_type}', pb_data)")
+            output.append(
+                f"                    local msg = pb.decode('{full_request_type}', pb_data)"
+            )
             output.append("")
             output.append("                    if msg then")
 
@@ -1015,7 +1027,9 @@ class NginxProvider(Provider):
 
             output.append("")
             output.append("                        -- Re-encode protobuf message")
-            output.append(f"                        local new_pb = pb.encode('{full_request_type}', msg)")
+            output.append(
+                f"                        local new_pb = pb.encode('{full_request_type}', msg)"
+            )
             output.append("                        local new_body = grpc_header .. new_pb")
             output.append("                        ngx.req.set_body_data(new_body)")
             output.append("                    end")
@@ -1025,7 +1039,9 @@ class NginxProvider(Provider):
         # Response transformation
         if grpc_t.response_transform:
             output.append("")
-            output.append("            # gRPC Response transformation (requires OpenResty + lua-protobuf)")
+            output.append(
+                "            # gRPC Response transformation (requires OpenResty + lua-protobuf)"
+            )
             output.append("            body_filter_by_lua_block {")
             output.append("                local pb = require('pb')")
             output.append("")
@@ -1046,7 +1062,9 @@ class NginxProvider(Provider):
             output.append("                    local pb_data = chunk:sub(6)")
             output.append("")
             output.append("                    -- Decode protobuf message")
-            output.append(f"                    local msg = pb.decode('{full_response_type}', pb_data)")
+            output.append(
+                f"                    local msg = pb.decode('{full_response_type}', pb_data)"
+            )
             output.append("")
             output.append("                    if msg then")
 
@@ -1074,7 +1092,9 @@ class NginxProvider(Provider):
 
             output.append("")
             output.append("                        -- Re-encode protobuf message")
-            output.append(f"                        local new_pb = pb.encode('{full_response_type}', msg)")
+            output.append(
+                f"                        local new_pb = pb.encode('{full_response_type}', msg)"
+            )
             output.append("                        ngx.arg[1] = grpc_header .. new_pb")
             output.append("                    end")
             output.append("                end")

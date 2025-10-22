@@ -1124,7 +1124,9 @@ class GCPAPIGatewayConfig:
     # Backend Configuration (x-google-backend)
     backend_address: str = ""
     backend_protocol: str = "https"  # http, https
-    backend_path_translation: str = "APPEND_PATH_TO_ADDRESS"  # APPEND_PATH_TO_ADDRESS, CONSTANT_ADDRESS
+    backend_path_translation: str = (
+        "APPEND_PATH_TO_ADDRESS"  # APPEND_PATH_TO_ADDRESS, CONSTANT_ADDRESS
+    )
     backend_deadline: float = 30.0  # seconds
     backend_disable_auth: bool = False
     backend_jwt_audience: str = ""
@@ -1143,9 +1145,7 @@ class GCPAPIGatewayConfig:
     cors_allow_methods: List[str] = field(
         default_factory=lambda: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     )
-    cors_allow_headers: List[str] = field(
-        default_factory=lambda: ["Content-Type", "Authorization"]
-    )
+    cors_allow_headers: List[str] = field(default_factory=lambda: ["Content-Type", "Authorization"])
     cors_expose_headers: List[str] = field(default_factory=list)
     cors_max_age: int = 3600  # seconds
 
@@ -1272,9 +1272,7 @@ class ProtoDescriptor:
             raise ValueError("ProtoDescriptor.name is required")
 
         if self.source not in ["file", "inline", "url"]:
-            raise ValueError(
-                f"Invalid source: {self.source}. Must be 'file', 'inline', or 'url'"
-            )
+            raise ValueError(f"Invalid source: {self.source}. Must be 'file', 'inline', or 'url'")
 
         if self.source == "file" and not self.path:
             raise ValueError("ProtoDescriptor.path is required when source='file'")
@@ -1528,9 +1526,7 @@ class TrafficSplitConfig:
 
             # Validate fallback target exists
             if self.fallback_target and self.fallback_target not in names:
-                raise ValueError(
-                    f"Fallback target '{self.fallback_target}' not found in targets"
-                )
+                raise ValueError(f"Fallback target '{self.fallback_target}' not found in targets")
 
 
 @dataclass
@@ -1715,12 +1711,10 @@ class Config:
                     if "routing_rules" in ts_data:
                         rules_data = ts_data["routing_rules"]
                         header_rules = [
-                            HeaderMatchRule(**hr)
-                            for hr in rules_data.get("header_rules", [])
+                            HeaderMatchRule(**hr) for hr in rules_data.get("header_rules", [])
                         ]
                         cookie_rules = [
-                            CookieMatchRule(**cr)
-                            for cr in rules_data.get("cookie_rules", [])
+                            CookieMatchRule(**cr) for cr in rules_data.get("cookie_rules", [])
                         ]
                         routing_rules = RoutingRules(
                             header_rules=header_rules,

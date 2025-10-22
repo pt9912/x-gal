@@ -31,8 +31,9 @@ References:
 
 import json
 import logging
-from typing import Dict, List, Any
-from gal.config import Config, Service, Route, GCPAPIGatewayConfig
+from typing import Any, Dict, List
+
+from gal.config import Config, GCPAPIGatewayConfig, Route, Service
 from gal.provider import Provider
 
 logger = logging.getLogger(__name__)
@@ -87,8 +88,7 @@ class GCPAPIGatewayProvider(Provider):
         if not gcp_config.backend_address and config.services:
             # Check if at least one service has upstream configured
             has_upstream = any(
-                service.upstream and service.upstream.targets
-                for service in config.services
+                service.upstream and service.upstream.targets for service in config.services
             )
             if not has_upstream:
                 raise ValueError("Either backend_address or service upstream must be configured")
@@ -125,6 +125,7 @@ class GCPAPIGatewayProvider(Provider):
 
         # Convert to YAML (more readable than JSON for gcloud deployment)
         import yaml
+
         return yaml.dump(openapi_spec, default_flow_style=False, sort_keys=False)
 
     def parse(self, provider_config: str) -> Config:
@@ -142,19 +143,20 @@ class GCPAPIGatewayProvider(Provider):
         Raises:
             ValueError: If OpenAPI spec is invalid
         """
-        from gal.parsers.gcp_apigateway_parser import GCPAPIGatewayParser
+        from urllib.parse import urlparse
+
         from gal.config import (
+            AuthenticationConfig,
             Config,
-            GlobalConfig,
             GCPAPIGatewayConfig,
+            GlobalConfig,
+            JwtConfig,
+            Route,
             Service,
             Upstream,
             UpstreamTarget,
-            Route,
-            AuthenticationConfig,
-            JwtConfig,
         )
-        from urllib.parse import urlparse
+        from gal.parsers.gcp_apigateway_parser import GCPAPIGatewayParser
 
         logger.info("Parsing GCP API Gateway OpenAPI 2.0 specification")
 
@@ -338,9 +340,7 @@ class GCPAPIGatewayProvider(Provider):
 
         return backend
 
-    def _build_security_definitions(
-        self, gcp_config: GCPAPIGatewayConfig
-    ) -> Dict[str, Any]:
+    def _build_security_definitions(self, gcp_config: GCPAPIGatewayConfig) -> Dict[str, Any]:
         """Build OpenAPI 2.0 securityDefinitions with x-google extensions.
 
         Args:
@@ -369,9 +369,7 @@ class GCPAPIGatewayProvider(Provider):
 
         return security_defs
 
-    def _build_paths(
-        self, config: Config, gcp_config: GCPAPIGatewayConfig
-    ) -> Dict[str, Any]:
+    def _build_paths(self, config: Config, gcp_config: GCPAPIGatewayConfig) -> Dict[str, Any]:
         """Build OpenAPI 2.0 paths from GAL routes.
 
         Args:
@@ -445,9 +443,7 @@ class GCPAPIGatewayProvider(Provider):
             if target.port and target.port not in [80, 443]:
                 backend_address += f":{target.port}"
 
-            operation["x-google-backend"] = self._build_google_backend(
-                gcp_config, backend_address
-            )
+            operation["x-google-backend"] = self._build_google_backend(gcp_config, backend_address)
 
         return operation
 
@@ -467,9 +463,7 @@ class GCPAPIGatewayProvider(Provider):
         }
 
         if gcp_config.cors_expose_headers:
-            cors_headers["Access-Control-Expose-Headers"] = ",".join(
-                gcp_config.cors_expose_headers
-            )
+            cors_headers["Access-Control-Expose-Headers"] = ",".join(gcp_config.cors_expose_headers)
 
         if gcp_config.cors_max_age:
             cors_headers["Access-Control-Max-Age"] = str(gcp_config.cors_max_age)
@@ -481,8 +475,7 @@ class GCPAPIGatewayProvider(Provider):
                 "200": {
                     "description": "CORS preflight response",
                     "headers": {
-                        key: {"type": "string", "description": key}
-                        for key in cors_headers.keys()
+                        key: {"type": "string", "description": key} for key in cors_headers.keys()
                     },
                 }
             },

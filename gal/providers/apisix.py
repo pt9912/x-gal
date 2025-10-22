@@ -224,8 +224,8 @@ class APISIXProvider(Provider):
                 if route.grpc_transformation and route.grpc_transformation.enabled:
                     if "plugins" not in route_config:
                         route_config["plugins"] = {}
-                    route_config["plugins"]["serverless-pre-function"] = self._generate_grpc_transformation_apisix(
-                        route, config
+                    route_config["plugins"]["serverless-pre-function"] = (
+                        self._generate_grpc_transformation_apisix(route, config)
                     )
 
                 # Add authentication plugin if configured
@@ -690,12 +690,8 @@ class APISIXProvider(Provider):
         plugin_config = {"rules": []}
 
         # Check if we have routing rules (header/cookie based)
-        has_routing_rules = (
-            traffic_split.routing_rules
-            and (
-                traffic_split.routing_rules.header_rules
-                or traffic_split.routing_rules.cookie_rules
-            )
+        has_routing_rules = traffic_split.routing_rules and (
+            traffic_split.routing_rules.header_rules or traffic_split.routing_rules.cookie_rules
         )
 
         if has_routing_rules:
@@ -712,9 +708,12 @@ class APISIXProvider(Provider):
                                 "match": [
                                     {
                                         "vars": [
-                                            ["http_" + rule.header_name.lower().replace("-", "_"),
-                                             "==",
-                                             rule.header_value]
+                                            [
+                                                "http_"
+                                                + rule.header_name.lower().replace("-", "_"),
+                                                "==",
+                                                rule.header_value,
+                                            ]
                                         ]
                                     }
                                 ],

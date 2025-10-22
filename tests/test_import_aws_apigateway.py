@@ -10,6 +10,7 @@ Tests cover:
 """
 
 import json
+
 import pytest
 
 from gal.parsers.aws_apigateway_parser import AWSAPIGatewayParser
@@ -21,15 +22,13 @@ class TestAWSAPIGatewayParser:
 
     def test_parse_basic_openapi(self):
         """Test parsing basic OpenAPI 3.0 spec"""
-        openapi_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {
-                "title": "Test API",
-                "version": "1.0.0",
-                "description": "A test API"
-            },
-            "paths": {}
-        })
+        openapi_spec = json.dumps(
+            {
+                "openapi": "3.0.1",
+                "info": {"title": "Test API", "version": "1.0.0", "description": "A test API"},
+                "paths": {},
+            }
+        )
 
         parser = AWSAPIGatewayParser()
         api = parser.parse(openapi_spec)
@@ -47,10 +46,7 @@ class TestAWSAPIGatewayParser:
 
     def test_parse_unsupported_openapi_version(self):
         """Test parsing unsupported OpenAPI version raises ValueError"""
-        openapi_spec = json.dumps({
-            "openapi": "2.0",
-            "info": {"title": "Test", "version": "1.0"}
-        })
+        openapi_spec = json.dumps({"openapi": "2.0", "info": {"title": "Test", "version": "1.0"}})
 
         parser = AWSAPIGatewayParser()
 
@@ -59,20 +55,22 @@ class TestAWSAPIGatewayParser:
 
     def test_extract_backend_url_http_proxy(self):
         """Test extracting backend URL from HTTP_PROXY integration"""
-        openapi_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/api": {
-                    "get": {
-                        "x-amazon-apigateway-integration": {
-                            "type": "http_proxy",
-                            "uri": "https://backend.example.com/api"
+        openapi_spec = json.dumps(
+            {
+                "openapi": "3.0.1",
+                "info": {"title": "Test", "version": "1.0"},
+                "paths": {
+                    "/api": {
+                        "get": {
+                            "x-amazon-apigateway-integration": {
+                                "type": "http_proxy",
+                                "uri": "https://backend.example.com/api",
+                            }
                         }
                     }
-                }
+                },
             }
-        })
+        )
 
         parser = AWSAPIGatewayParser()
         api = parser.parse(openapi_spec)
@@ -82,17 +80,13 @@ class TestAWSAPIGatewayParser:
 
     def test_extract_backend_url_no_integration(self):
         """Test extracting backend URL when no integration exists"""
-        openapi_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/api": {
-                    "get": {
-                        "responses": {"200": {"description": "OK"}}
-                    }
-                }
+        openapi_spec = json.dumps(
+            {
+                "openapi": "3.0.1",
+                "info": {"title": "Test", "version": "1.0"},
+                "paths": {"/api": {"get": {"responses": {"200": {"description": "OK"}}}}},
             }
-        })
+        )
 
         parser = AWSAPIGatewayParser()
         api = parser.parse(openapi_spec)
@@ -102,21 +96,23 @@ class TestAWSAPIGatewayParser:
 
     def test_extract_routes(self):
         """Test extracting routes from paths"""
-        openapi_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/users": {
-                    "get": {"responses": {"200": {"description": "OK"}}},
-                    "post": {"responses": {"201": {"description": "Created"}}}
+        openapi_spec = json.dumps(
+            {
+                "openapi": "3.0.1",
+                "info": {"title": "Test", "version": "1.0"},
+                "paths": {
+                    "/users": {
+                        "get": {"responses": {"200": {"description": "OK"}}},
+                        "post": {"responses": {"201": {"description": "Created"}}},
+                    },
+                    "/users/{id}": {
+                        "get": {"responses": {"200": {"description": "OK"}}},
+                        "put": {"responses": {"200": {"description": "OK"}}},
+                        "delete": {"responses": {"204": {"description": "No Content"}}},
+                    },
                 },
-                "/users/{id}": {
-                    "get": {"responses": {"200": {"description": "OK"}}},
-                    "put": {"responses": {"200": {"description": "OK"}}},
-                    "delete": {"responses": {"204": {"description": "No Content"}}}
-                }
             }
-        })
+        )
 
         parser = AWSAPIGatewayParser()
         api = parser.parse(openapi_spec)
@@ -130,19 +126,21 @@ class TestAWSAPIGatewayParser:
 
     def test_extract_routes_skips_options(self):
         """Test that OPTIONS methods are skipped (CORS)"""
-        openapi_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/api": {
-                    "get": {"responses": {"200": {"description": "OK"}}},
-                    "options": {
-                        "responses": {"200": {"description": "CORS"}},
-                        "x-amazon-apigateway-integration": {"type": "mock"}
+        openapi_spec = json.dumps(
+            {
+                "openapi": "3.0.1",
+                "info": {"title": "Test", "version": "1.0"},
+                "paths": {
+                    "/api": {
+                        "get": {"responses": {"200": {"description": "OK"}}},
+                        "options": {
+                            "responses": {"200": {"description": "CORS"}},
+                            "x-amazon-apigateway-integration": {"type": "mock"},
+                        },
                     }
-                }
+                },
             }
-        })
+        )
 
         parser = AWSAPIGatewayParser()
         api = parser.parse(openapi_spec)
@@ -153,19 +151,17 @@ class TestAWSAPIGatewayParser:
 
     def test_extract_authentication_api_key(self):
         """Test extracting API key authentication"""
-        openapi_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {"title": "Test", "version": "1.0"},
-            "components": {
-                "securitySchemes": {
-                    "api_key": {
-                        "type": "apiKey",
-                        "name": "x-api-key",
-                        "in": "header"
+        openapi_spec = json.dumps(
+            {
+                "openapi": "3.0.1",
+                "info": {"title": "Test", "version": "1.0"},
+                "components": {
+                    "securitySchemes": {
+                        "api_key": {"type": "apiKey", "name": "x-api-key", "in": "header"}
                     }
-                }
+                },
             }
-        })
+        )
 
         parser = AWSAPIGatewayParser()
         api = parser.parse(openapi_spec)
@@ -178,24 +174,26 @@ class TestAWSAPIGatewayParser:
         """Test extracting Cognito User Pool authentication"""
         cognito_arn = "arn:aws:cognito-idp:us-east-1:123456789012:userpool/us-east-1_AbCdEfGhI"
 
-        openapi_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {"title": "Test", "version": "1.0"},
-            "components": {
-                "securitySchemes": {
-                    "cognito_authorizer": {
-                        "type": "apiKey",
-                        "name": "Authorization",
-                        "in": "header",
-                        "x-amazon-apigateway-authtype": "cognito_user_pools",
-                        "x-amazon-apigateway-authorizer": {
-                            "type": "cognito_user_pools",
-                            "providerARNs": [cognito_arn]
+        openapi_spec = json.dumps(
+            {
+                "openapi": "3.0.1",
+                "info": {"title": "Test", "version": "1.0"},
+                "components": {
+                    "securitySchemes": {
+                        "cognito_authorizer": {
+                            "type": "apiKey",
+                            "name": "Authorization",
+                            "in": "header",
+                            "x-amazon-apigateway-authtype": "cognito_user_pools",
+                            "x-amazon-apigateway-authorizer": {
+                                "type": "cognito_user_pools",
+                                "providerARNs": [cognito_arn],
+                            },
                         }
                     }
-                }
+                },
             }
-        })
+        )
 
         parser = AWSAPIGatewayParser()
         api = parser.parse(openapi_spec)
@@ -210,25 +208,27 @@ class TestAWSAPIGatewayParser:
         lambda_arn = "arn:aws:lambda:us-east-1:123456789012:function:my-authorizer"
         authorizer_uri = f"arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/{lambda_arn}/invocations"
 
-        openapi_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {"title": "Test", "version": "1.0"},
-            "components": {
-                "securitySchemes": {
-                    "lambda_authorizer": {
-                        "type": "apiKey",
-                        "name": "Authorization",
-                        "in": "header",
-                        "x-amazon-apigateway-authtype": "custom",
-                        "x-amazon-apigateway-authorizer": {
-                            "type": "token",
-                            "authorizerUri": authorizer_uri,
-                            "authorizerResultTtlInSeconds": 300
+        openapi_spec = json.dumps(
+            {
+                "openapi": "3.0.1",
+                "info": {"title": "Test", "version": "1.0"},
+                "components": {
+                    "securitySchemes": {
+                        "lambda_authorizer": {
+                            "type": "apiKey",
+                            "name": "Authorization",
+                            "in": "header",
+                            "x-amazon-apigateway-authtype": "custom",
+                            "x-amazon-apigateway-authorizer": {
+                                "type": "token",
+                                "authorizerUri": authorizer_uri,
+                                "authorizerResultTtlInSeconds": 300,
+                            },
                         }
                     }
-                }
+                },
             }
-        })
+        )
 
         parser = AWSAPIGatewayParser()
         api = parser.parse(openapi_spec)
@@ -241,20 +241,22 @@ class TestAWSAPIGatewayParser:
 
     def test_extract_integration_type_http_proxy(self):
         """Test extracting HTTP_PROXY integration type"""
-        openapi_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/api": {
-                    "get": {
-                        "x-amazon-apigateway-integration": {
-                            "type": "http_proxy",
-                            "uri": "https://backend.example.com/api"
+        openapi_spec = json.dumps(
+            {
+                "openapi": "3.0.1",
+                "info": {"title": "Test", "version": "1.0"},
+                "paths": {
+                    "/api": {
+                        "get": {
+                            "x-amazon-apigateway-integration": {
+                                "type": "http_proxy",
+                                "uri": "https://backend.example.com/api",
+                            }
                         }
                     }
-                }
+                },
             }
-        })
+        )
 
         parser = AWSAPIGatewayParser()
         api = parser.parse(openapi_spec)
@@ -267,21 +269,23 @@ class TestAWSAPIGatewayParser:
         lambda_arn = "arn:aws:lambda:us-east-1:123456789012:function:my-function"
         uri = f"arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/{lambda_arn}/invocations"
 
-        openapi_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/api": {
-                    "post": {
-                        "x-amazon-apigateway-integration": {
-                            "type": "aws_proxy",
-                            "httpMethod": "POST",
-                            "uri": uri
+        openapi_spec = json.dumps(
+            {
+                "openapi": "3.0.1",
+                "info": {"title": "Test", "version": "1.0"},
+                "paths": {
+                    "/api": {
+                        "post": {
+                            "x-amazon-apigateway-integration": {
+                                "type": "aws_proxy",
+                                "httpMethod": "POST",
+                                "uri": uri,
+                            }
                         }
                     }
-                }
+                },
             }
-        })
+        )
 
         parser = AWSAPIGatewayParser()
         api = parser.parse(openapi_spec)
@@ -294,20 +298,19 @@ class TestAWSAPIGatewayParser:
         lambda_arn = "arn:aws:lambda:us-east-1:123456789012:function:my-function"
         uri = f"arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/{lambda_arn}/invocations"
 
-        openapi_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/api": {
-                    "post": {
-                        "x-amazon-apigateway-integration": {
-                            "type": "aws_proxy",
-                            "uri": uri
+        openapi_spec = json.dumps(
+            {
+                "openapi": "3.0.1",
+                "info": {"title": "Test", "version": "1.0"},
+                "paths": {
+                    "/api": {
+                        "post": {
+                            "x-amazon-apigateway-integration": {"type": "aws_proxy", "uri": uri}
                         }
                     }
-                }
+                },
             }
-        })
+        )
 
         parser = AWSAPIGatewayParser()
         api = parser.parse(openapi_spec)
@@ -317,30 +320,32 @@ class TestAWSAPIGatewayParser:
 
     def test_extract_cors_config(self):
         """Test extracting CORS configuration from OPTIONS method"""
-        openapi_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/api": {
-                    "options": {
-                        "responses": {"200": {"description": "CORS"}},
-                        "x-amazon-apigateway-integration": {
-                            "type": "mock",
-                            "responses": {
-                                "default": {
-                                    "statusCode": "200",
-                                    "responseParameters": {
-                                        "method.response.header.Access-Control-Allow-Origin": "'https://app.example.com'",
-                                        "method.response.header.Access-Control-Allow-Methods": "'GET,POST,PUT,DELETE'",
-                                        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization'"
+        openapi_spec = json.dumps(
+            {
+                "openapi": "3.0.1",
+                "info": {"title": "Test", "version": "1.0"},
+                "paths": {
+                    "/api": {
+                        "options": {
+                            "responses": {"200": {"description": "CORS"}},
+                            "x-amazon-apigateway-integration": {
+                                "type": "mock",
+                                "responses": {
+                                    "default": {
+                                        "statusCode": "200",
+                                        "responseParameters": {
+                                            "method.response.header.Access-Control-Allow-Origin": "'https://app.example.com'",
+                                            "method.response.header.Access-Control-Allow-Methods": "'GET,POST,PUT,DELETE'",
+                                            "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization'",
+                                        },
                                     }
-                                }
-                            }
+                                },
+                            },
                         }
                     }
-                }
+                },
             }
-        })
+        )
 
         parser = AWSAPIGatewayParser()
         api = parser.parse(openapi_spec)
@@ -357,34 +362,36 @@ class TestAWSAPIGatewayProviderImport:
 
     def test_import_basic_http_proxy(self):
         """Test importing basic HTTP_PROXY configuration"""
-        openapi_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {
-                "title": "PetStore API",
-                "version": "1.0.0",
-                "description": "A simple Pet Store API"
-            },
-            "paths": {
-                "/pets": {
-                    "get": {
-                        "responses": {"200": {"description": "Success"}},
-                        "x-amazon-apigateway-integration": {
-                            "type": "http_proxy",
-                            "httpMethod": "GET",
-                            "uri": "https://petstore.example.com/pets"
-                        }
-                    },
-                    "post": {
-                        "responses": {"201": {"description": "Created"}},
-                        "x-amazon-apigateway-integration": {
-                            "type": "http_proxy",
-                            "httpMethod": "POST",
-                            "uri": "https://petstore.example.com/pets"
-                        }
+        openapi_spec = json.dumps(
+            {
+                "openapi": "3.0.1",
+                "info": {
+                    "title": "PetStore API",
+                    "version": "1.0.0",
+                    "description": "A simple Pet Store API",
+                },
+                "paths": {
+                    "/pets": {
+                        "get": {
+                            "responses": {"200": {"description": "Success"}},
+                            "x-amazon-apigateway-integration": {
+                                "type": "http_proxy",
+                                "httpMethod": "GET",
+                                "uri": "https://petstore.example.com/pets",
+                            },
+                        },
+                        "post": {
+                            "responses": {"201": {"description": "Created"}},
+                            "x-amazon-apigateway-integration": {
+                                "type": "http_proxy",
+                                "httpMethod": "POST",
+                                "uri": "https://petstore.example.com/pets",
+                            },
+                        },
                     }
-                }
+                },
             }
-        })
+        )
 
         provider = AWSAPIGatewayProvider()
         config = provider.parse(openapi_spec)
@@ -414,22 +421,24 @@ class TestAWSAPIGatewayProviderImport:
         lambda_arn = "arn:aws:lambda:us-east-1:123456789012:function:my-function"
         uri = f"arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/{lambda_arn}/invocations"
 
-        openapi_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {"title": "Lambda API", "version": "1.0.0"},
-            "paths": {
-                "/lambda": {
-                    "post": {
-                        "responses": {"200": {"description": "Success"}},
-                        "x-amazon-apigateway-integration": {
-                            "type": "aws_proxy",
-                            "httpMethod": "POST",
-                            "uri": uri
+        openapi_spec = json.dumps(
+            {
+                "openapi": "3.0.1",
+                "info": {"title": "Lambda API", "version": "1.0.0"},
+                "paths": {
+                    "/lambda": {
+                        "post": {
+                            "responses": {"200": {"description": "Success"}},
+                            "x-amazon-apigateway-integration": {
+                                "type": "aws_proxy",
+                                "httpMethod": "POST",
+                                "uri": uri,
+                            },
                         }
                     }
-                }
+                },
             }
-        })
+        )
 
         provider = AWSAPIGatewayProvider()
         config = provider.parse(openapi_spec)
@@ -440,32 +449,30 @@ class TestAWSAPIGatewayProviderImport:
 
     def test_import_with_api_key(self):
         """Test importing with API key authentication"""
-        openapi_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {"title": "Secured API", "version": "1.0.0"},
-            "x-amazon-apigateway-api-key-source": "HEADER",
-            "components": {
-                "securitySchemes": {
-                    "api_key": {
-                        "type": "apiKey",
-                        "name": "x-api-key",
-                        "in": "header"
+        openapi_spec = json.dumps(
+            {
+                "openapi": "3.0.1",
+                "info": {"title": "Secured API", "version": "1.0.0"},
+                "x-amazon-apigateway-api-key-source": "HEADER",
+                "components": {
+                    "securitySchemes": {
+                        "api_key": {"type": "apiKey", "name": "x-api-key", "in": "header"}
                     }
-                }
-            },
-            "paths": {
-                "/secure": {
-                    "get": {
-                        "security": [{"api_key": []}],
-                        "responses": {"200": {"description": "Success"}},
-                        "x-amazon-apigateway-integration": {
-                            "type": "http_proxy",
-                            "uri": "https://api.example.com/secure"
+                },
+                "paths": {
+                    "/secure": {
+                        "get": {
+                            "security": [{"api_key": []}],
+                            "responses": {"200": {"description": "Success"}},
+                            "x-amazon-apigateway-integration": {
+                                "type": "http_proxy",
+                                "uri": "https://api.example.com/secure",
+                            },
                         }
                     }
-                }
+                },
             }
-        })
+        )
 
         provider = AWSAPIGatewayProvider()
         config = provider.parse(openapi_spec)
@@ -482,35 +489,37 @@ class TestAWSAPIGatewayProviderImport:
         """Test importing with Cognito User Pool authentication"""
         cognito_arn = "arn:aws:cognito-idp:us-east-1:123456789012:userpool/us-east-1_AbCdEfGhI"
 
-        openapi_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {"title": "Cognito API", "version": "1.0.0"},
-            "components": {
-                "securitySchemes": {
-                    "cognito_authorizer": {
-                        "type": "apiKey",
-                        "name": "Authorization",
-                        "in": "header",
-                        "x-amazon-apigateway-authtype": "cognito_user_pools",
-                        "x-amazon-apigateway-authorizer": {
-                            "type": "cognito_user_pools",
-                            "providerARNs": [cognito_arn]
+        openapi_spec = json.dumps(
+            {
+                "openapi": "3.0.1",
+                "info": {"title": "Cognito API", "version": "1.0.0"},
+                "components": {
+                    "securitySchemes": {
+                        "cognito_authorizer": {
+                            "type": "apiKey",
+                            "name": "Authorization",
+                            "in": "header",
+                            "x-amazon-apigateway-authtype": "cognito_user_pools",
+                            "x-amazon-apigateway-authorizer": {
+                                "type": "cognito_user_pools",
+                                "providerARNs": [cognito_arn],
+                            },
                         }
                     }
-                }
-            },
-            "paths": {
-                "/user": {
-                    "get": {
-                        "responses": {"200": {"description": "Success"}},
-                        "x-amazon-apigateway-integration": {
-                            "type": "http_proxy",
-                            "uri": "https://api.example.com/user"
+                },
+                "paths": {
+                    "/user": {
+                        "get": {
+                            "responses": {"200": {"description": "Success"}},
+                            "x-amazon-apigateway-integration": {
+                                "type": "http_proxy",
+                                "uri": "https://api.example.com/user",
+                            },
                         }
                     }
-                }
+                },
             }
-        })
+        )
 
         provider = AWSAPIGatewayProvider()
         config = provider.parse(openapi_spec)
@@ -522,36 +531,38 @@ class TestAWSAPIGatewayProviderImport:
 
     def test_import_with_cors(self):
         """Test importing with CORS configuration"""
-        openapi_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {"title": "CORS API", "version": "1.0.0"},
-            "paths": {
-                "/api": {
-                    "get": {
-                        "responses": {"200": {"description": "Success"}},
-                        "x-amazon-apigateway-integration": {
-                            "type": "http_proxy",
-                            "uri": "https://api.example.com/api"
-                        }
-                    },
-                    "options": {
-                        "responses": {"200": {"description": "CORS"}},
-                        "x-amazon-apigateway-integration": {
-                            "type": "mock",
-                            "responses": {
-                                "default": {
-                                    "responseParameters": {
-                                        "method.response.header.Access-Control-Allow-Origin": "'*'",
-                                        "method.response.header.Access-Control-Allow-Methods": "'GET,POST,PUT,DELETE,OPTIONS'",
-                                        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization'"
+        openapi_spec = json.dumps(
+            {
+                "openapi": "3.0.1",
+                "info": {"title": "CORS API", "version": "1.0.0"},
+                "paths": {
+                    "/api": {
+                        "get": {
+                            "responses": {"200": {"description": "Success"}},
+                            "x-amazon-apigateway-integration": {
+                                "type": "http_proxy",
+                                "uri": "https://api.example.com/api",
+                            },
+                        },
+                        "options": {
+                            "responses": {"200": {"description": "CORS"}},
+                            "x-amazon-apigateway-integration": {
+                                "type": "mock",
+                                "responses": {
+                                    "default": {
+                                        "responseParameters": {
+                                            "method.response.header.Access-Control-Allow-Origin": "'*'",
+                                            "method.response.header.Access-Control-Allow-Methods": "'GET,POST,PUT,DELETE,OPTIONS'",
+                                            "method.response.header.Access-Control-Allow-Headers": "'Content-Type,Authorization'",
+                                        }
                                     }
-                                }
-                            }
-                        }
+                                },
+                            },
+                        },
                     }
-                }
+                },
             }
-        })
+        )
 
         provider = AWSAPIGatewayProvider()
         config = provider.parse(openapi_spec)
@@ -568,25 +579,23 @@ class TestAWSAPIGatewayImportIntegration:
 
     def test_import_export_roundtrip(self):
         """Test importing and then exporting produces similar config"""
-        original_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {
-                "title": "Test API",
-                "version": "1.0.0",
-                "description": "Test roundtrip"
-            },
-            "paths": {
-                "/users": {
-                    "get": {
-                        "responses": {"200": {"description": "Success"}},
-                        "x-amazon-apigateway-integration": {
-                            "type": "http_proxy",
-                            "uri": "https://backend.example.com/users"
+        original_spec = json.dumps(
+            {
+                "openapi": "3.0.1",
+                "info": {"title": "Test API", "version": "1.0.0", "description": "Test roundtrip"},
+                "paths": {
+                    "/users": {
+                        "get": {
+                            "responses": {"200": {"description": "Success"}},
+                            "x-amazon-apigateway-integration": {
+                                "type": "http_proxy",
+                                "uri": "https://backend.example.com/users",
+                            },
                         }
                     }
-                }
+                },
             }
-        })
+        )
 
         provider = AWSAPIGatewayProvider()
 
@@ -606,37 +615,39 @@ class TestAWSAPIGatewayImportIntegration:
 
     def test_import_multiple_routes(self):
         """Test importing configuration with multiple routes"""
-        openapi_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {"title": "Multi-Route API", "version": "1.0.0"},
-            "paths": {
-                "/users": {
-                    "get": {
-                        "responses": {"200": {"description": "Success"}},
-                        "x-amazon-apigateway-integration": {
-                            "type": "http_proxy",
-                            "uri": "https://api.example.com/users"
+        openapi_spec = json.dumps(
+            {
+                "openapi": "3.0.1",
+                "info": {"title": "Multi-Route API", "version": "1.0.0"},
+                "paths": {
+                    "/users": {
+                        "get": {
+                            "responses": {"200": {"description": "Success"}},
+                            "x-amazon-apigateway-integration": {
+                                "type": "http_proxy",
+                                "uri": "https://api.example.com/users",
+                            },
+                        },
+                        "post": {
+                            "responses": {"201": {"description": "Created"}},
+                            "x-amazon-apigateway-integration": {
+                                "type": "http_proxy",
+                                "uri": "https://api.example.com/users",
+                            },
+                        },
+                    },
+                    "/products": {
+                        "get": {
+                            "responses": {"200": {"description": "Success"}},
+                            "x-amazon-apigateway-integration": {
+                                "type": "http_proxy",
+                                "uri": "https://api.example.com/products",
+                            },
                         }
                     },
-                    "post": {
-                        "responses": {"201": {"description": "Created"}},
-                        "x-amazon-apigateway-integration": {
-                            "type": "http_proxy",
-                            "uri": "https://api.example.com/users"
-                        }
-                    }
                 },
-                "/products": {
-                    "get": {
-                        "responses": {"200": {"description": "Success"}},
-                        "x-amazon-apigateway-integration": {
-                            "type": "http_proxy",
-                            "uri": "https://api.example.com/products"
-                        }
-                    }
-                }
             }
-        })
+        )
 
         provider = AWSAPIGatewayProvider()
         config = provider.parse(openapi_spec)

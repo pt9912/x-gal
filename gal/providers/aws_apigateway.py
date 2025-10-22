@@ -22,27 +22,28 @@ References:
 - https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations.html
 """
 
-from typing import Dict, List, Any, Optional
-from dataclasses import asdict
-from urllib.parse import urlparse
 import json
 import logging
+from dataclasses import asdict
+from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
+
 import yaml
 
 from gal.config import (
-    Config,
-    Service,
-    Route,
-    Upstream,
-    GlobalConfig,
-    AWSAPIGatewayConfig,
-    AuthenticationConfig,
-    JwtConfig,
     ApiKeyConfig,
+    AuthenticationConfig,
+    AWSAPIGatewayConfig,
+    Config,
+    GlobalConfig,
+    JwtConfig,
+    Route,
+    Service,
     TrafficSplitConfig,
+    Upstream,
 )
-from gal.provider import Provider
 from gal.parsers.aws_apigateway_parser import AWSAPIGatewayParser
+from gal.provider import Provider
 
 logger = logging.getLogger(__name__)
 
@@ -118,9 +119,7 @@ class AWSAPIGatewayProvider(Provider):
 
         # Validate Lambda ARN if using AWS_PROXY
         if aws_config.integration_type == "AWS_PROXY" and not aws_config.lambda_function_arn:
-            raise ValueError(
-                "lambda_function_arn is required when integration_type is AWS_PROXY"
-            )
+            raise ValueError("lambda_function_arn is required when integration_type is AWS_PROXY")
 
         # Validate authorizer configuration
         if aws_config.authorizer_type:
@@ -132,9 +131,7 @@ class AWSAPIGatewayProvider(Provider):
                 )
 
             if aws_config.authorizer_type == "lambda" and not aws_config.lambda_authorizer_arn:
-                raise ValueError(
-                    "lambda_authorizer_arn is required when authorizer_type is lambda"
-                )
+                raise ValueError("lambda_authorizer_arn is required when authorizer_type is lambda")
 
             if aws_config.authorizer_type == "cognito" and not aws_config.cognito_user_pool_arns:
                 raise ValueError(
@@ -292,9 +289,19 @@ class AWSAPIGatewayProvider(Provider):
             lambda_function_arn=lambda_arn,
             api_key_required=api_key_required,
             cors_enabled=cors_config["enabled"],
-            cors_allow_origins=cors_config["allow_origins"] if cors_config["allow_origins"] else ["*"],
-            cors_allow_methods=cors_config["allow_methods"] if cors_config["allow_methods"] else ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            cors_allow_headers=cors_config["allow_headers"] if cors_config["allow_headers"] else ["Content-Type", "Authorization"],
+            cors_allow_origins=(
+                cors_config["allow_origins"] if cors_config["allow_origins"] else ["*"]
+            ),
+            cors_allow_methods=(
+                cors_config["allow_methods"]
+                if cors_config["allow_methods"]
+                else ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+            ),
+            cors_allow_headers=(
+                cors_config["allow_headers"]
+                if cors_config["allow_headers"]
+                else ["Content-Type", "Authorization"]
+            ),
         )
 
         # Create service
@@ -365,12 +372,7 @@ class AWSAPIGatewayProvider(Provider):
 
         # Process each service
         for service in config.services:
-            self._add_service_paths(
-                openapi_spec,
-                service,
-                aws_config,
-                config.global_config
-            )
+            self._add_service_paths(openapi_spec, service, aws_config, config.global_config)
 
         # Add security schemes
         self._add_security_schemes(openapi_spec, aws_config, config.global_config)
@@ -384,7 +386,11 @@ class AWSAPIGatewayProvider(Provider):
 
     def _get_aws_config(self, global_config: Optional[GlobalConfig]) -> AWSAPIGatewayConfig:
         """Extract or create AWS API Gateway configuration."""
-        if global_config and hasattr(global_config, 'aws_apigateway') and global_config.aws_apigateway:
+        if (
+            global_config
+            and hasattr(global_config, "aws_apigateway")
+            and global_config.aws_apigateway
+        ):
             return global_config.aws_apigateway
         return AWSAPIGatewayConfig()
 
@@ -401,17 +407,11 @@ class AWSAPIGatewayProvider(Provider):
                 "variables": {
                     "api_id": {
                         "default": "example",
-                        "description": "API Gateway API ID (auto-generated)"
+                        "description": "API Gateway API ID (auto-generated)",
                     },
-                    "region": {
-                        "default": "us-east-1",
-                        "description": "AWS Region"
-                    },
-                    "stage": {
-                        "default": aws_config.stage_name,
-                        "description": "API Gateway Stage"
-                    }
-                }
+                    "region": {"default": "us-east-1", "description": "AWS Region"},
+                    "stage": {"default": aws_config.stage_name, "description": "API Gateway Stage"},
+                },
             }
         ]
 
@@ -420,7 +420,7 @@ class AWSAPIGatewayProvider(Provider):
         openapi_spec: Dict[str, Any],
         service: Service,
         aws_config: AWSAPIGatewayConfig,
-        global_config: Optional[GlobalConfig]
+        global_config: Optional[GlobalConfig],
     ) -> None:
         """Add service routes to OpenAPI paths."""
         for route in service.routes:
@@ -440,21 +440,13 @@ class AWSAPIGatewayProvider(Provider):
                 method_lower = method.lower()
 
                 # Build operation
-                operation = self._build_operation(
-                    service,
-                    route,
-                    method,
-                    aws_config,
-                    global_config
-                )
+                operation = self._build_operation(service, route, method, aws_config, global_config)
 
                 openapi_spec["paths"][path][method_lower] = operation
 
             # Add OPTIONS for CORS if enabled
             if aws_config.cors_enabled and "options" not in openapi_spec["paths"][path]:
-                openapi_spec["paths"][path]["options"] = self._build_cors_options(
-                    aws_config
-                )
+                openapi_spec["paths"][path]["options"] = self._build_cors_options(aws_config)
 
     def _build_operation(
         self,
@@ -462,20 +454,14 @@ class AWSAPIGatewayProvider(Provider):
         route: Route,
         method: str,
         aws_config: AWSAPIGatewayConfig,
-        global_config: Optional[GlobalConfig]
+        global_config: Optional[GlobalConfig],
     ) -> Dict[str, Any]:
         """Build OpenAPI operation with AWS integration."""
         operation = {
             "responses": {
                 "200": {
                     "description": "Successful response",
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object"
-                            }
-                        }
-                    }
+                    "content": {"application/json": {"schema": {"type": "object"}}},
                 }
             }
         }
@@ -492,28 +478,18 @@ class AWSAPIGatewayProvider(Provider):
         if route.traffic_split and route.traffic_split.enabled:
             # Traffic splitting integration
             operation["x-amazon-apigateway-integration"] = self._build_traffic_split_integration(
-                service,
-                route,
-                method,
-                aws_config
+                service, route, method, aws_config
             )
         else:
             # Standard integration
             operation["x-amazon-apigateway-integration"] = self._build_integration(
-                service,
-                route,
-                method,
-                aws_config
+                service, route, method, aws_config
             )
 
         return operation
 
     def _build_integration(
-        self,
-        service: Service,
-        route: Route,
-        method: str,
-        aws_config: AWSAPIGatewayConfig
+        self, service: Service, route: Route, method: str, aws_config: AWSAPIGatewayConfig
     ) -> Dict[str, Any]:
         """
         Build x-amazon-apigateway-integration object.
@@ -538,11 +514,7 @@ class AWSAPIGatewayProvider(Provider):
             return self._build_http_proxy_integration(service, route, method, aws_config)
 
     def _build_traffic_split_integration(
-        self,
-        service: Service,
-        route: Route,
-        method: str,
-        aws_config: AWSAPIGatewayConfig
+        self, service: Service, route: Route, method: str, aws_config: AWSAPIGatewayConfig
     ) -> Dict[str, Any]:
         """
         Build traffic splitting integration for AWS API Gateway.
@@ -601,12 +573,14 @@ class AWSAPIGatewayProvider(Provider):
                 vtl_lines.append(f"#elseif($random < {cumulative_weight})")
 
             # Set stage variable for this target
-            vtl_lines.append(f'  #set($backend_url = $stageVariables.{service.name}_{target.name}_url)')
+            vtl_lines.append(
+                f"  #set($backend_url = $stageVariables.{service.name}_{target.name}_url)"
+            )
 
         vtl_lines.append("#end")
         vtl_lines.append("")
         vtl_lines.append("## Set backend URL in context")
-        vtl_lines.append('#set($context.requestOverride.path.backend_url = $backend_url)')
+        vtl_lines.append("#set($context.requestOverride.path.backend_url = $backend_url)")
 
         vtl_template = "\\n".join(vtl_lines)
 
@@ -619,30 +593,22 @@ class AWSAPIGatewayProvider(Provider):
             "connectionType": "INTERNET",
             "timeoutInMillis": aws_config.integration_timeout_ms,
             "passthroughBehavior": "when_no_templates",
-            "requestTemplates": {
-                "application/json": vtl_template
-            },
-            "responses": {
-                "default": {
-                    "statusCode": "200"
-                }
-            }
+            "requestTemplates": {"application/json": vtl_template},
+            "responses": {"default": {"statusCode": "200"}},
         }
 
         return integration
 
     def _build_http_proxy_integration(
-        self,
-        service: Service,
-        route: Route,
-        method: str,
-        aws_config: AWSAPIGatewayConfig
+        self, service: Service, route: Route, method: str, aws_config: AWSAPIGatewayConfig
     ) -> Dict[str, Any]:
         """Build HTTP_PROXY integration for backend services."""
         # Construct backend URL
         protocol = service.protocol if service.protocol else "http"
         host = service.upstream.host
-        port = service.upstream.port if service.upstream.port else (443 if protocol == "https" else 80)
+        port = (
+            service.upstream.port if service.upstream.port else (443 if protocol == "https" else 80)
+        )
         path = route.path_prefix or "/"
 
         # Build full URI
@@ -659,19 +625,12 @@ class AWSAPIGatewayProvider(Provider):
             "timeoutInMillis": aws_config.integration_timeout_ms,
             "passthroughBehavior": "when_no_match",
             "requestParameters": {},
-            "responses": {
-                "default": {
-                    "statusCode": "200"
-                }
-            }
+            "responses": {"default": {"statusCode": "200"}},
         }
 
         return integration
 
-    def _build_lambda_integration(
-        self,
-        aws_config: AWSAPIGatewayConfig
-    ) -> Dict[str, Any]:
+    def _build_lambda_integration(self, aws_config: AWSAPIGatewayConfig) -> Dict[str, Any]:
         """Build AWS_PROXY integration for Lambda functions."""
         integration = {
             "type": "aws_proxy",
@@ -690,17 +649,13 @@ class AWSAPIGatewayProvider(Provider):
         """Build MOCK integration for testing."""
         return {
             "type": "mock",
-            "requestTemplates": {
-                "application/json": '{"statusCode": 200}'
-            },
+            "requestTemplates": {"application/json": '{"statusCode": 200}'},
             "responses": {
                 "default": {
                     "statusCode": "200",
-                    "responseTemplates": {
-                        "application/json": '{"message": "Mock response"}'
-                    }
+                    "responseTemplates": {"application/json": '{"message": "Mock response"}'},
                 }
-            }
+            },
         }
 
     def _build_cors_options(self, aws_config: AWSAPIGatewayConfig) -> Dict[str, Any]:
@@ -710,49 +665,31 @@ class AWSAPIGatewayProvider(Provider):
                 "200": {
                     "description": "CORS preflight response",
                     "headers": {
-                        "Access-Control-Allow-Origin": {
-                            "schema": {
-                                "type": "string"
-                            }
-                        },
-                        "Access-Control-Allow-Methods": {
-                            "schema": {
-                                "type": "string"
-                            }
-                        },
-                        "Access-Control-Allow-Headers": {
-                            "schema": {
-                                "type": "string"
-                            }
-                        }
-                    }
+                        "Access-Control-Allow-Origin": {"schema": {"type": "string"}},
+                        "Access-Control-Allow-Methods": {"schema": {"type": "string"}},
+                        "Access-Control-Allow-Headers": {"schema": {"type": "string"}},
+                    },
                 }
             },
             "x-amazon-apigateway-integration": {
                 "type": "mock",
-                "requestTemplates": {
-                    "application/json": '{"statusCode": 200}'
-                },
+                "requestTemplates": {"application/json": '{"statusCode": 200}'},
                 "responses": {
                     "default": {
                         "statusCode": "200",
                         "responseParameters": {
                             "method.response.header.Access-Control-Allow-Origin": f"'{','.join(aws_config.cors_allow_origins)}'",
                             "method.response.header.Access-Control-Allow-Methods": f"'{','.join(aws_config.cors_allow_methods)}'",
-                            "method.response.header.Access-Control-Allow-Headers": f"'{','.join(aws_config.cors_allow_headers)}'"
+                            "method.response.header.Access-Control-Allow-Headers": f"'{','.join(aws_config.cors_allow_headers)}'",
                         },
-                        "responseTemplates": {
-                            "application/json": "{}"
-                        }
+                        "responseTemplates": {"application/json": "{}"},
                     }
-                }
-            }
+                },
+            },
         }
 
     def _add_cors_configuration(
-        self,
-        openapi_spec: Dict[str, Any],
-        aws_config: AWSAPIGatewayConfig
+        self, openapi_spec: Dict[str, Any], aws_config: AWSAPIGatewayConfig
     ) -> None:
         """
         Add CORS configuration to OpenAPI spec.
@@ -768,7 +705,7 @@ class AWSAPIGatewayProvider(Provider):
         self,
         openapi_spec: Dict[str, Any],
         aws_config: AWSAPIGatewayConfig,
-        global_config: Optional[GlobalConfig]
+        global_config: Optional[GlobalConfig],
     ) -> None:
         """Add security schemes to OpenAPI components."""
         # API Key
@@ -776,7 +713,7 @@ class AWSAPIGatewayProvider(Provider):
             openapi_spec["components"]["securitySchemes"]["api_key"] = {
                 "type": "apiKey",
                 "name": "x-api-key",
-                "in": "header"
+                "in": "header",
             }
 
         # Lambda Authorizer
@@ -790,7 +727,7 @@ class AWSAPIGatewayProvider(Provider):
                     "type": "token",
                     "authorizerUri": f"arn:aws:apigateway:{{region}}:lambda:path/2015-03-31/functions/{aws_config.lambda_authorizer_arn}/invocations",
                     "authorizerResultTtlInSeconds": aws_config.lambda_authorizer_ttl,
-                }
+                },
             }
 
         # Cognito User Pool
@@ -802,12 +739,16 @@ class AWSAPIGatewayProvider(Provider):
                 "x-amazon-apigateway-authtype": "cognito_user_pools",
                 "x-amazon-apigateway-authorizer": {
                     "type": "cognito_user_pools",
-                    "providerARNs": aws_config.cognito_user_pool_arns
-                }
+                    "providerARNs": aws_config.cognito_user_pool_arns,
+                },
             }
 
         # Check global authentication config
-        if global_config and hasattr(global_config, 'authentication') and global_config.authentication:
+        if (
+            global_config
+            and hasattr(global_config, "authentication")
+            and global_config.authentication
+        ):
             auth = global_config.authentication
 
             # JWT → Cognito or Lambda
@@ -822,7 +763,7 @@ class AWSAPIGatewayProvider(Provider):
                         "type": "http",
                         "scheme": "bearer",
                         "bearerFormat": "JWT",
-                        "description": "JWT Bearer token authentication"
+                        "description": "JWT Bearer token authentication",
                     }
 
             # API Key
@@ -831,7 +772,7 @@ class AWSAPIGatewayProvider(Provider):
                     openapi_spec["components"]["securitySchemes"]["api_key"] = {
                         "type": "apiKey",
                         "name": auth.api_key.header_name or "x-api-key",
-                        "in": "header"
+                        "in": "header",
                     }
 
     def _get_security_scheme_name(self, auth_type: str) -> Optional[str]:

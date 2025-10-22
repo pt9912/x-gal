@@ -4,14 +4,15 @@ Tests for GCP API Gateway Provider
 
 import pytest
 import yaml
+
 from gal.config import (
     Config,
-    GlobalConfig,
     GCPAPIGatewayConfig,
+    GlobalConfig,
+    Route,
     Service,
     Upstream,
     UpstreamTarget,
-    Route,
 )
 from gal.providers.gcp_apigateway import GCPAPIGatewayProvider
 
@@ -44,9 +45,7 @@ class TestGCPAPIGatewayProvider:
                     upstream=Upstream(
                         targets=[UpstreamTarget(host="backend.example.com", port=443)]
                     ),
-                    routes=[
-                        Route(path_prefix="/api/test", methods=["GET", "POST"])
-                    ],
+                    routes=[Route(path_prefix="/api/test", methods=["GET", "POST"])],
                 )
             ],
         )

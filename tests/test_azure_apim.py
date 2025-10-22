@@ -9,6 +9,7 @@ Test coverage:
 """
 
 import json
+
 import pytest
 
 from gal.config import (
@@ -51,10 +52,7 @@ class TestAzureAPIMARMTemplateGeneration:
         """Test ARM template generation with minimal config."""
         provider = AzureAPIMProvider()
         config = Config(
-            version="1.0",
-            provider="azure_apim",
-            global_config=GlobalConfig(),
-            services=[]
+            version="1.0", provider="azure_apim", global_config=GlobalConfig(), services=[]
         )
 
         output = provider.generate(config)
@@ -62,7 +60,10 @@ class TestAzureAPIMARMTemplateGeneration:
 
         # Parse JSON
         arm_template = json.loads(output)
-        assert arm_template["$schema"] == "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#"
+        assert (
+            arm_template["$schema"]
+            == "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#"
+        )
         assert arm_template["contentVersion"] == "1.0.0.0"
         assert "resources" in arm_template
 
@@ -77,7 +78,7 @@ class TestAzureAPIMARMTemplateGeneration:
                     resource_group="test-rg",
                     apim_service_name="test-apim",
                     location="westeurope",
-                    sku="Developer"
+                    sku="Developer",
                 )
             ),
             services=[
@@ -86,20 +87,14 @@ class TestAzureAPIMARMTemplateGeneration:
                     type="rest",
                     protocol="http",
                     upstream=Upstream(
-                        targets=[
-                            UpstreamTarget(host="backend.example.com", port=443)
-                        ]
+                        targets=[UpstreamTarget(host="backend.example.com", port=443)]
                     ),
-                    routes=[
-                        Route(path_prefix="/api/users")
-                    ],
+                    routes=[Route(path_prefix="/api/users")],
                     azure_apim=AzureAPIMConfig(
-                        product_name="TestProduct",
-                        api_revision="1",
-                        api_version="v1"
-                    )
+                        product_name="TestProduct", api_revision="1", api_version="v1"
+                    ),
                 )
-            ]
+            ],
         )
 
         output = provider.generate(config)
@@ -110,8 +105,12 @@ class TestAzureAPIMARMTemplateGeneration:
 
         # Find APIM Service resource
         apim_service = next(
-            (r for r in arm_template["resources"] if r["type"] == "Microsoft.ApiManagement/service"),
-            None
+            (
+                r
+                for r in arm_template["resources"]
+                if r["type"] == "Microsoft.ApiManagement/service"
+            ),
+            None,
         )
         assert apim_service is not None
         assert apim_service["location"] == "westeurope"
@@ -129,19 +128,13 @@ class TestAzureAPIMARMTemplateGeneration:
                     name="user_api",
                     type="rest",
                     protocol="http",
-                    upstream=Upstream(
-                        targets=[UpstreamTarget(host="api.example.com", port=443)]
-                    ),
-                    routes=[
-                        Route(path_prefix="/api/users")
-                    ],
+                    upstream=Upstream(targets=[UpstreamTarget(host="api.example.com", port=443)]),
+                    routes=[Route(path_prefix="/api/users")],
                     azure_apim=AzureAPIMConfig(
-                        product_name="UserAPI",
-                        api_revision="2",
-                        api_version="v2"
-                    )
+                        product_name="UserAPI", api_revision="2", api_version="v2"
+                    ),
                 )
-            ]
+            ],
         )
 
         output = provider.generate(config)
@@ -149,8 +142,12 @@ class TestAzureAPIMARMTemplateGeneration:
 
         # Find API resource
         api_resource = next(
-            (r for r in arm_template["resources"] if r["type"] == "Microsoft.ApiManagement/service/apis"),
-            None
+            (
+                r
+                for r in arm_template["resources"]
+                if r["type"] == "Microsoft.ApiManagement/service/apis"
+            ),
+            None,
         )
         assert api_resource is not None
         assert api_resource["properties"]["displayName"] == "user_api"
@@ -168,20 +165,18 @@ class TestAzureAPIMPolicyGeneration:
             name="test_api",
             type="rest",
             protocol="http",
-            upstream=Upstream(
-                targets=[UpstreamTarget(host="backend.example.com", port=443)]
-            ),
-            routes=[]
+            upstream=Upstream(targets=[UpstreamTarget(host="backend.example.com", port=443)]),
+            routes=[],
         )
         route = Route(
             path_prefix="/api/test",
-            rate_limit=RateLimitConfig(enabled=True, requests_per_second=100)
+            rate_limit=RateLimitConfig(enabled=True, requests_per_second=100),
         )
 
         policy_xml = provider._build_policy_xml(service, route)
 
         assert "<policies>" in policy_xml
-        assert "<rate-limit calls=\"6000\" renewal-period=\"60\" />" in policy_xml
+        assert '<rate-limit calls="6000" renewal-period="60" />' in policy_xml
         assert "</policies>" in policy_xml
 
     def test_header_manipulation_policy(self):
@@ -191,17 +186,15 @@ class TestAzureAPIMPolicyGeneration:
             name="test_api",
             type="rest",
             protocol="http",
-            upstream=Upstream(
-                targets=[UpstreamTarget(host="backend.example.com", port=443)]
-            ),
-            routes=[]
+            upstream=Upstream(targets=[UpstreamTarget(host="backend.example.com", port=443)]),
+            routes=[],
         )
         route = Route(
             path_prefix="/api/test",
             headers=HeaderManipulation(
                 request_add={"X-Custom-Header": "value1"},
-                response_add={"X-Response-Header": "value2"}
-            )
+                response_add={"X-Response-Header": "value2"},
+            ),
         )
 
         policy_xml = provider._build_policy_xml(service, route)
@@ -221,10 +214,8 @@ class TestAzureAPIMPolicyGeneration:
             name="test_api",
             type="rest",
             protocol="http",
-            upstream=Upstream(
-                targets=[UpstreamTarget(host="backend.example.com", port=443)]
-            ),
-            routes=[]
+            upstream=Upstream(targets=[UpstreamTarget(host="backend.example.com", port=443)]),
+            routes=[],
         )
         route = Route(path_prefix="/api/test")
 
@@ -243,16 +234,14 @@ class TestAzureAPIMProductGeneration:
             name="test_api",
             type="rest",
             protocol="http",
-            upstream=Upstream(
-                targets=[UpstreamTarget(host="backend.example.com", port=443)]
-            ),
+            upstream=Upstream(targets=[UpstreamTarget(host="backend.example.com", port=443)]),
             routes=[],
             azure_apim=AzureAPIMConfig(
                 product_name="Premium-Product",
                 product_description="Premium tier product",
                 product_published=True,
-                product_subscription_required=True
-            )
+                product_subscription_required=True,
+            ),
         )
 
         product = provider._generate_product(service)
@@ -274,10 +263,8 @@ class TestAzureAPIMBackendGeneration:
             name="test_api",
             type="rest",
             protocol="http",
-            upstream=Upstream(
-                targets=[UpstreamTarget(host="api.backend.com", port=8080)]
-            ),
-            routes=[]
+            upstream=Upstream(targets=[UpstreamTarget(host="api.backend.com", port=8080)]),
+            routes=[],
         )
 
         backend = provider._generate_backend(service)
@@ -293,10 +280,8 @@ class TestAzureAPIMBackendGeneration:
             name="test_api",
             type="rest",
             protocol="http",
-            upstream=Upstream(
-                targets=[UpstreamTarget(host="secure.backend.com", port=443)]
-            ),
-            routes=[]
+            upstream=Upstream(targets=[UpstreamTarget(host="secure.backend.com", port=443)]),
+            routes=[],
         )
 
         backend = provider._generate_backend(service)
@@ -319,17 +304,10 @@ class TestAzureAPIMOpenAPIExport:
                     name="user_api",
                     type="rest",
                     protocol="http",
-                    upstream=Upstream(
-                        targets=[UpstreamTarget(host="api.example.com", port=443)]
-                    ),
-                    routes=[
-                        Route(
-                            path_prefix="/api/users",
-                            methods=["GET", "POST"]
-                        )
-                    ]
+                    upstream=Upstream(targets=[UpstreamTarget(host="api.example.com", port=443)]),
+                    routes=[Route(path_prefix="/api/users", methods=["GET", "POST"])],
                 )
-            ]
+            ],
         )
 
         openapi_json = provider.generate_openapi(config)
@@ -351,9 +329,7 @@ class TestAzureAPIMValidation:
         config = Config(
             version="1.0",
             provider="azure_apim",
-            global_config=GlobalConfig(
-                azure_apim=AzureAPIMGlobalConfig()
-            ),
+            global_config=GlobalConfig(azure_apim=AzureAPIMGlobalConfig()),
             services=[
                 Service(
                     name="test_api",
@@ -363,12 +339,9 @@ class TestAzureAPIMValidation:
                         targets=[UpstreamTarget(host="backend.example.com", port=443)]
                     ),
                     routes=[Route(path_prefix="/api/test")],
-                    azure_apim=AzureAPIMConfig(
-                        product_name="TestProduct",
-                        api_revision="1"
-                    )
+                    azure_apim=AzureAPIMConfig(product_name="TestProduct", api_revision="1"),
                 )
-            ]
+            ],
         )
 
         result = provider.validate(config)
@@ -391,11 +364,10 @@ class TestAzureAPIMValidation:
                     ),
                     routes=[Route(path_prefix="/api/test")],
                     azure_apim=AzureAPIMConfig(
-                        product_name="",  # Empty product name
-                        api_revision="1"
-                    )
+                        product_name="", api_revision="1"  # Empty product name
+                    ),
                 )
-            ]
+            ],
         )
 
         with pytest.raises(ValueError, match="product_name is required"):
@@ -420,10 +392,10 @@ class TestAzureAPIMEdgeCases:
                     upstream=Upstream(
                         targets=[UpstreamTarget(host="backend.example.com", port=443)]
                     ),
-                    routes=[Route(path_prefix="/api/test")]
+                    routes=[Route(path_prefix="/api/test")],
                     # No azure_apim config
                 )
-            ]
+            ],
         )
 
         # Should not fail, use defaults
@@ -440,7 +412,7 @@ class TestAzureAPIMEdgeCases:
             type="rest",
             protocol="http",
             upstream=Upstream(targets=[]),  # No targets
-            routes=[]
+            routes=[],
         )
 
         backend = provider._generate_backend(service)
@@ -461,11 +433,9 @@ class TestAzureAPIMEdgeCases:
                     upstream=Upstream(
                         targets=[UpstreamTarget(host="backend.example.com", port=443)]
                     ),
-                    routes=[
-                        Route(path_prefix="/api/test")  # No http_methods
-                    ]
+                    routes=[Route(path_prefix="/api/test")],  # No http_methods
                 )
-            ]
+            ],
         )
 
         output = provider.generate(config)
@@ -473,8 +443,12 @@ class TestAzureAPIMEdgeCases:
 
         # Should default to GET
         operation = next(
-            (r for r in arm_template["resources"] if r["type"] == "Microsoft.ApiManagement/service/apis/operations"),
-            None
+            (
+                r
+                for r in arm_template["resources"]
+                if r["type"] == "Microsoft.ApiManagement/service/apis/operations"
+            ),
+            None,
         )
         assert operation is not None
         assert operation["properties"]["method"] == "GET"

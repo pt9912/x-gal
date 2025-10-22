@@ -797,6 +797,209 @@ if route.body_transformation and route.body_transformation.enabled:
     )
 ```
 
+### 11. Traffic Splitting & Canary Deployments
+
+**Feature:** Gewichtsbasierte Traffic-Verteilung für A/B Testing, Canary Deployments und Blue/Green Deployments.
+
+**Status:** ✅ **Vollständig unterstützt** (seit v1.4.0)
+
+Traefik unterstützt Traffic Splitting nativ über **Weighted Services**.
+
+#### Canary Deployment (90/10 Split)
+
+**Use Case:** Neue Version vorsichtig ausrollen (10% Canary, 90% Stable).
+
+```yaml
+routes:
+  - path_prefix: /api/v1
+    traffic_split:
+      enabled: true
+      targets:
+        - name: stable
+          weight: 90
+          upstream:
+            host: backend-stable
+            port: 8080
+        - name: canary
+          weight: 10
+          upstream:
+            host: backend-canary
+            port: 8080
+```
+
+**Traefik Config (traefik.yml):**
+```yaml
+http:
+  routers:
+    canary_deployment_api_route0:
+      rule: "PathPrefix(`/api/v1`)"
+      service: canary_deployment_api_route0_service
+      entryPoints:
+        - web
+
+  services:
+    # Weighted Service: 90% stable, 10% canary
+    canary_deployment_api_route0_service:
+      weighted:
+        services:
+          - name: canary_deployment_api_stable_service
+            weight: 90
+          - name: canary_deployment_api_canary_service
+            weight: 10
+
+    # Stable Backend
+    canary_deployment_api_stable_service:
+      loadBalancer:
+        servers:
+          - url: "http://backend-stable:8080"
+
+    # Canary Backend
+    canary_deployment_api_canary_service:
+      loadBalancer:
+        servers:
+          - url: "http://backend-canary:8080"
+```
+
+**Erklärung:**
+- `weighted.services`: Weighted Service mit mehreren Targets
+- `weight: 90`: Stable Backend erhält 90% des Traffics
+- `weight: 10`: Canary Backend erhält 10% des Traffics
+- `loadBalancer.servers`: Backend URLs
+
+#### A/B Testing (50/50 Split)
+
+**Use Case:** Zwei Versionen gleichwertig testen.
+
+```yaml
+traffic_split:
+  enabled: true
+  targets:
+    - name: version_a
+      weight: 50
+      upstream:
+        host: api-v2-a
+        port: 8080
+    - name: version_b
+      weight: 50
+      upstream:
+        host: api-v2-b
+        port: 8080
+```
+
+**Traefik Config:**
+```yaml
+http:
+  services:
+    ab_testing_service:
+      weighted:
+        services:
+          - name: version_a_service
+            weight: 50
+          - name: version_b_service
+            weight: 50
+
+    version_a_service:
+      loadBalancer:
+        servers:
+          - url: "http://api-v2-a:8080"
+
+    version_b_service:
+      loadBalancer:
+        servers:
+          - url: "http://api-v2-b:8080"
+```
+
+#### Blue/Green Deployment
+
+**Use Case:** Instant Switch zwischen zwei Environments (100% → 0%).
+
+```yaml
+traffic_split:
+  enabled: true
+  targets:
+    - name: blue
+      weight: 0    # Aktuell inaktiv
+      upstream:
+        host: api-blue
+        port: 8080
+    - name: green
+      weight: 100  # Aktuell aktiv
+      upstream:
+        host: api-green
+        port: 8080
+```
+
+**Deployment-Strategie:**
+1. **Initial:** Blue = 100%, Green = 0%
+2. **Deploy neue Version** auf Green Environment
+3. **Test Green** ausgiebig
+4. **Switch:** Blue = 0%, Green = 100% (Re-Generate traefik.yml, hot-reload)
+5. **Rollback** bei Problemen: Green = 0%, Blue = 100%
+
+#### Gradual Rollout (5% → 25% → 50% → 100%)
+
+**Use Case:** Schrittweise Migration mit Monitoring.
+
+**Phase 1: 5% Canary**
+```yaml
+targets:
+  - {name: stable, weight: 95, upstream: {host: api-stable, port: 8080}}
+  - {name: canary, weight: 5, upstream: {host: api-canary, port: 8080}}
+```
+
+**Phase 2: 25% Canary** (nach Monitoring)
+```yaml
+targets:
+  - {name: stable, weight: 75, upstream: {host: api-stable, port: 8080}}
+  - {name: canary, weight: 25, upstream: {host: api-canary, port: 8080}}
+```
+
+**Phase 3: 50% Canary** (Confidence-Build)
+```yaml
+targets:
+  - {name: stable, weight: 50, upstream: {host: api-stable, port: 8080}}
+  - {name: canary, weight: 50, upstream: {host: api-canary, port: 8080}}
+```
+
+**Phase 4: 100% Canary** (Full Migration)
+```yaml
+targets:
+  - {name: canary, weight: 100, upstream: {host: api-canary, port: 8080}}
+```
+
+#### Traefik Traffic Splitting Features
+
+| Feature | Traefik Support | Implementation |
+|---------|----------------|----------------|
+| **Weight-based Splitting** | ✅ Native | `weighted.services[].weight` |
+| **Health Checks** | ✅ Native | `loadBalancer.healthCheck` |
+| **Sticky Sessions** | ✅ Native | `loadBalancer.sticky.cookie` |
+| **Dynamic Reconfiguration** | ✅ Native | File Provider Hot-Reload |
+| **Header-based Routing** | ⚠️ Headers Middleware | Via `headers.customRequestHeaders` + routing rules |
+| **Cookie-based Routing** | ⚠️ Router Rules | Via `HeadersRegexp` rule matching |
+| **Mirroring** | ✅ Native | `mirroring.service` for Traffic Shadowing |
+
+**Best Practices:**
+- **Start Small:** Begin mit 5-10% Canary Traffic
+- **Monitor Metrics:** Error Rate, Latency, Throughput via Traefik Dashboard/Prometheus
+- **Health Checks:** Immer aktivieren für automatisches Failover
+- **Gradual Increase:** 5% → 25% → 50% → 100% über mehrere Tage
+- **Hot-Reload:** Traefik lädt traefik.yml automatisch neu (keine Downtime)
+- **Rollback Plan:** Schnelles Zurücksetzen via Config Update (< 1 Sekunde)
+
+**Docker E2E Test Results:**
+```bash
+# Test: 1000 Requests mit 90/10 Split (Pending)
+Stable Backend:  TBD
+Canary Backend:  TBD
+Failed Requests: TBD
+```
+
+**Siehe auch:**
+- [Traffic Splitting Guide](TRAFFIC_SPLITTING.md) - Vollständige Dokumentation
+- [examples/traffic-split-example.yaml](../../examples/traffic-split-example.yaml) - 6 Beispiel-Szenarien
+- [tests/docker/traefik/](../../tests/docker/traefik/) - Docker Compose E2E Tests
+
 ---
 
 ## Provider-Vergleich

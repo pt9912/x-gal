@@ -10,18 +10,19 @@ Tests cover:
 """
 
 import json
+
 import pytest
 
 from gal.config import (
+    ApiKeyConfig,
+    AuthenticationConfig,
+    AWSAPIGatewayConfig,
     Config,
     GlobalConfig,
-    Service,
-    Route,
-    Upstream,
-    AuthenticationConfig,
     JwtConfig,
-    ApiKeyConfig,
-    AWSAPIGatewayConfig,
+    Route,
+    Service,
+    Upstream,
 )
 from gal.providers.aws_apigateway import AWSAPIGatewayProvider
 
@@ -38,11 +39,9 @@ class TestAWSAPIGatewayProvider:
         """Test parse method is now implemented"""
         provider = AWSAPIGatewayProvider()
         # Parse method is now implemented, should accept valid OpenAPI
-        openapi_spec = json.dumps({
-            "openapi": "3.0.1",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {}
-        })
+        openapi_spec = json.dumps(
+            {"openapi": "3.0.1", "info": {"title": "Test", "version": "1.0"}, "paths": {}}
+        )
         config = provider.parse(openapi_spec)
         assert config is not None
         assert config.version == "1.0"
@@ -285,9 +284,7 @@ class TestAWSAPIGatewayValidation:
         config = Config(
             version="1.0",
             provider="aws_apigateway",
-            global_config=GlobalConfig(
-                aws_apigateway=AWSAPIGatewayConfig(endpoint_type="INVALID")
-            ),
+            global_config=GlobalConfig(aws_apigateway=AWSAPIGatewayConfig(endpoint_type="INVALID")),
             services=[
                 Service(
                     name="test",
@@ -348,10 +345,7 @@ class TestAWSAPIGatewayGeneration:
 
         # Check servers
         assert len(openapi["servers"]) == 1
-        assert (
-            "{api_id}.execute-api.{region}.amazonaws.com"
-            in openapi["servers"][0]["url"]
-        )
+        assert "{api_id}.execute-api.{region}.amazonaws.com" in openapi["servers"][0]["url"]
 
         # Check paths
         assert "/api/users" in openapi["paths"]
@@ -359,9 +353,7 @@ class TestAWSAPIGatewayGeneration:
         assert "post" in openapi["paths"]["/api/users"]
 
         # Check HTTP_PROXY integration
-        get_integration = openapi["paths"]["/api/users"]["get"][
-            "x-amazon-apigateway-integration"
-        ]
+        get_integration = openapi["paths"]["/api/users"]["get"]["x-amazon-apigateway-integration"]
         assert get_integration["type"] == "http_proxy"
         assert get_integration["httpMethod"] == "GET"
         assert "https://backend.example.com/api/users" in get_integration["uri"]
@@ -399,9 +391,7 @@ class TestAWSAPIGatewayGeneration:
         openapi = json.loads(result)
 
         # Check Lambda integration
-        integration = openapi["paths"]["/lambda"]["post"][
-            "x-amazon-apigateway-integration"
-        ]
+        integration = openapi["paths"]["/lambda"]["post"]["x-amazon-apigateway-integration"]
         assert integration["type"] == "aws_proxy"
         assert integration["httpMethod"] == "POST"
         assert lambda_arn in integration["uri"]
@@ -414,9 +404,7 @@ class TestAWSAPIGatewayGeneration:
             version="1.0",
             provider="aws_apigateway",
             global_config=GlobalConfig(
-                aws_apigateway=AWSAPIGatewayConfig(
-                    api_name="Mock-API", integration_type="MOCK"
-                )
+                aws_apigateway=AWSAPIGatewayConfig(api_name="Mock-API", integration_type="MOCK")
             ),
             services=[
                 Service(
@@ -435,9 +423,7 @@ class TestAWSAPIGatewayGeneration:
         openapi = json.loads(result)
 
         # Check MOCK integration
-        integration = openapi["paths"]["/mock"]["get"][
-            "x-amazon-apigateway-integration"
-        ]
+        integration = openapi["paths"]["/mock"]["get"]["x-amazon-apigateway-integration"]
         assert integration["type"] == "mock"
         assert "requestTemplates" in integration
 
@@ -490,9 +476,7 @@ class TestAWSAPIGatewayGeneration:
         """Test Lambda Authorizer security scheme generation"""
         provider = AWSAPIGatewayProvider()
 
-        authorizer_arn = (
-            "arn:aws:lambda:us-east-1:123456789012:function:my-authorizer"
-        )
+        authorizer_arn = "arn:aws:lambda:us-east-1:123456789012:function:my-authorizer"
 
         config = Config(
             version="1.0",
@@ -533,9 +517,7 @@ class TestAWSAPIGatewayGeneration:
 
         # Check Lambda authorizer security scheme
         assert "lambda_authorizer" in openapi["components"]["securitySchemes"]
-        authorizer_scheme = openapi["components"]["securitySchemes"][
-            "lambda_authorizer"
-        ]
+        authorizer_scheme = openapi["components"]["securitySchemes"]["lambda_authorizer"]
         assert authorizer_scheme["type"] == "apiKey"
         assert authorizer_scheme["name"] == "Authorization"
         assert authorizer_scheme["x-amazon-apigateway-authtype"] == "custom"
@@ -550,9 +532,7 @@ class TestAWSAPIGatewayGeneration:
         """Test Cognito User Pool authorizer generation"""
         provider = AWSAPIGatewayProvider()
 
-        user_pool_arn = (
-            "arn:aws:cognito-idp:us-east-1:123456789012:userpool/us-east-1_AbCdEfGhI"
-        )
+        user_pool_arn = "arn:aws:cognito-idp:us-east-1:123456789012:userpool/us-east-1_AbCdEfGhI"
 
         config = Config(
             version="1.0",
@@ -639,9 +619,7 @@ class TestAWSAPIGatewayGeneration:
 
         # Verify CORS headers values
         response_params = cors_integration["responses"]["default"]["responseParameters"]
-        assert (
-            "method.response.header.Access-Control-Allow-Origin" in response_params
-        )
+        assert "method.response.header.Access-Control-Allow-Origin" in response_params
         assert (
             "https://app.example.com"
             in response_params["method.response.header.Access-Control-Allow-Origin"]
@@ -688,14 +666,8 @@ class TestAWSAPIGatewayGeneration:
         assert "delete" in openapi["paths"]["/users/{id}"]
 
         # Check integrations exist
-        assert (
-            "x-amazon-apigateway-integration"
-            in openapi["paths"]["/users"]["get"]
-        )
-        assert (
-            "x-amazon-apigateway-integration"
-            in openapi["paths"]["/users/{id}"]["delete"]
-        )
+        assert "x-amazon-apigateway-integration" in openapi["paths"]["/users"]["get"]
+        assert "x-amazon-apigateway-integration" in openapi["paths"]["/users/{id}"]["delete"]
 
     def test_generate_with_custom_timeout(self):
         """Test custom integration timeout configuration"""
@@ -726,9 +698,7 @@ class TestAWSAPIGatewayGeneration:
         openapi = json.loads(result)
 
         # Check timeout is set correctly
-        integration = openapi["paths"]["/slow"]["get"][
-            "x-amazon-apigateway-integration"
-        ]
+        integration = openapi["paths"]["/slow"]["get"]["x-amazon-apigateway-integration"]
         assert integration["timeoutInMillis"] == 15000
 
 

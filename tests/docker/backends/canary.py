@@ -4,21 +4,22 @@ Simple HTTP server that identifies itself as 'canary' backend.
 Used for testing traffic splitting.
 """
 
-from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
 import os
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
 
 class CanaryHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('X-Backend-Name', 'canary')
+        self.send_header("Content-Type", "application/json")
+        self.send_header("X-Backend-Name", "canary")
         self.end_headers()
 
         response = {
             "backend": "canary",
             "message": "Response from canary backend",
-            "path": self.path
+            "path": self.path,
         }
         self.wfile.write(json.dumps(response).encode())
 
@@ -35,8 +36,9 @@ class CanaryHandler(BaseHTTPRequestHandler):
         # Suppress default logging
         pass
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    server = HTTPServer(('0.0.0.0', port), CanaryHandler)
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), CanaryHandler)
     print(f"Canary backend listening on port {port}")
     server.serve_forever()

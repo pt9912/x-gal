@@ -625,6 +625,170 @@ global:
     # VNet config via Azure Portal oder Terraform
 ```
 
+### 5. Traffic Splitting & Canary Deployments
+
+**Feature:** Gewichtsbasierte Traffic-Verteilung für A/B Testing, Canary Deployments und Blue/Green Deployments.
+
+**Status:** ⚠️ **Eingeschränkt unterstützt** (Azure APIM native Limitierungen)
+
+Azure API Management unterstützt Traffic Splitting **nicht nativ**, aber es gibt Workarounds:
+
+#### Workaround 1: Multiple Backend Services mit Weighted Round Robin
+
+Azure APIM kann über **Policy XML** mehrere Backends mit Gewichtung ansteuern.
+
+**GAL Config (simuliert Traffic Split):**
+```yaml
+services:
+  - name: canary_api
+    type: rest
+    routes:
+      - path_prefix: /api/v1
+        # Traffic Split via custom policy (siehe unten)
+        upstream:
+          targets:
+            - host: backend-stable.azurewebsites.net
+              port: 443
+              weight: 90
+            - host: backend-canary.azurewebsites.net
+              port: 443
+              weight: 10
+```
+
+**Azure APIM Policy (Inbound):**
+```xml
+<policies>
+  <inbound>
+    <base />
+    <!-- Weighted Random Selection -->
+    <set-variable name="random" value="@(new Random().Next(1, 101))" />
+    <choose>
+      <!-- 90% to Stable -->
+      <when condition="@(context.Variables.GetValueOrDefault<int>("random") <= 90)">
+        <set-backend-service base-url="https://backend-stable.azurewebsites.net" />
+      </when>
+      <!-- 10% to Canary -->
+      <otherwise>
+        <set-backend-service base-url="https://backend-canary.azurewebsites.net" />
+      </otherwise>
+    </choose>
+  </inbound>
+</policies>
+```
+
+**Erklärung:**
+- `set-variable`: Generiert Zufallszahl 1-100
+- `choose/when`: 1-90 → Stable Backend (90%)
+- `otherwise`: 91-100 → Canary Backend (10%)
+- `set-backend-service`: Dynamisches Backend-Routing
+
+#### Workaround 2: Azure API Management Revisions
+
+Azure APIM unterstützt **API Revisions** für Canary Deployments:
+
+**Strategie:**
+1. **Revision 1** (Current): Stable Backend
+2. **Revision 2** (Non-Current): Canary Backend
+3. **Traffic Split**: Via Revision Routing (10% → Revision 2)
+
+**Azure CLI:**
+```bash
+# 1. Neue Revision erstellen
+az apim api revision create \
+  --resource-group gal-rg \
+  --service-name gal-apim \
+  --api-id my-api \
+  --api-revision 2
+
+# 2. Traffic Split konfigurieren (über Azure Portal)
+# Portal → API → Revisions → Set 10% traffic to Revision 2
+```
+
+**Limitation:**
+- ⚠️ Revision-basiertes Traffic Splitting ist **manuell** (Azure Portal)
+- ⚠️ GAL kann Revisions **nicht automatisch** über ARM Templates steuern
+
+#### Workaround 3: Azure Traffic Manager (External)
+
+Für echtes Traffic Splitting nutze **Azure Traffic Manager** vor APIM:
+
+**Architektur:**
+```
+Client
+  ↓
+Azure Traffic Manager (Weighted Routing)
+  ├─ 90% → APIM Instance 1 (Stable Backend)
+  └─ 10% → APIM Instance 2 (Canary Backend)
+```
+
+**Azure Traffic Manager Config:**
+```bash
+az network traffic-manager endpoint create \
+  --resource-group gal-rg \
+  --profile-name gal-tm-profile \
+  --name stable-endpoint \
+  --type azureEndpoints \
+  --target-resource-id /subscriptions/.../apim-stable \
+  --weight 90
+
+az network traffic-manager endpoint create \
+  --resource-group gal-rg \
+  --profile-name gal-tm-profile \
+  --name canary-endpoint \
+  --type azureEndpoints \
+  --target-resource-id /subscriptions/.../apim-canary \
+  --weight 10
+```
+
+**Pros:**
+- ✅ Echte gewichtsbasierte Verteilung
+- ✅ DNS-basiertes Routing
+- ✅ Automatisches Failover
+
+**Cons:**
+- ❌ Zusätzliche Kosten (Traffic Manager)
+- ❌ Komplexere Architektur (2 APIM Instanzen)
+
+#### Azure APIM Traffic Splitting Features
+
+| Feature | Azure APIM Support | Workaround |
+|---------|-------------------|------------|
+| **Weight-based Splitting** | ❌ Native | ✅ Policy XML Random Selection |
+| **Header-based Routing** | ✅ Native | Policy XML `choose/when` |
+| **Revision-based Canary** | ⚠️ Manual | Azure Portal (10-90% Split) |
+| **Traffic Manager** | ✅ External | Azure Traffic Manager Weighted Routing |
+| **A/B Testing** | ⚠️ Limited | Policy XML + Named Values |
+| **Blue/Green** | ✅ Native | Backend URL Switch in Policy |
+
+#### Best Practices für Azure APIM:
+
+**Empfohlene Strategie:**
+1. **Klein starten:** Policy XML mit 5-10% Canary (Random Selection)
+2. **Named Values:** Backend URLs als Named Values speichern
+3. **Monitoring:** Application Insights für beide Backends aktivieren
+4. **Gradual Rollout:** Policy XML manuell anpassen (5% → 25% → 50% → 100%)
+5. **Production:** Azure Traffic Manager für echte Enterprise-Deployments
+
+**GAL Limitation:**
+⚠️ GAL kann Azure APIM Traffic Splitting **nicht automatisch generieren**, da:
+- Azure APIM hat kein natives Traffic Splitting Feature
+- Policy XML Random Selection muss **manuell** geschrieben werden
+- Revisions sind nur über Azure Portal steuerbar
+
+**Alternative:**
+Für native Traffic Splitting Support nutze:
+- ✅ **Envoy** (weighted_clusters)
+- ✅ **Nginx** (split_clients)
+- ✅ **Kong** (upstream targets with weights)
+- ✅ **HAProxy** (server weights)
+- ✅ **Traefik** (weighted services)
+- ✅ **APISIX** (traffic-split plugin)
+
+**Siehe auch:**
+- [Traffic Splitting Guide](TRAFFIC_SPLITTING.md) - Vollständige Dokumentation
+- [Azure Traffic Manager](https://learn.microsoft.com/en-us/azure/traffic-manager/traffic-manager-routing-methods)
+- [Azure APIM Revisions](https://learn.microsoft.com/en-us/azure/api-management/api-management-revisions)
+
 ---
 
 ## Deployment-Strategien

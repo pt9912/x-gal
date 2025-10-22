@@ -210,17 +210,14 @@ class KongProvider(Provider):
             for service in upstreams_needed:
                 # Check if this service has traffic splitting
                 has_traffic_split = any(
-                    route.traffic_split and route.traffic_split.enabled
-                    for route in service.routes
+                    route.traffic_split and route.traffic_split.enabled for route in service.routes
                 )
 
                 if has_traffic_split:
                     # Generate separate upstreams for each route with traffic splitting
                     for route_idx, route in enumerate(service.routes):
                         if route.traffic_split and route.traffic_split.enabled:
-                            self._generate_traffic_split_upstream(
-                                service, route, route_idx, output
-                            )
+                            self._generate_traffic_split_upstream(service, route, route_idx, output)
                 else:
                     # Generate standard upstream
                     self._generate_kong_upstream(service, output)

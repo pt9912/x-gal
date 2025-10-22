@@ -34,11 +34,7 @@ from gal.providers.traefik import TraefikProvider
 @pytest.fixture
 def sample_proto_descriptor():
     """Sample proto descriptor for testing."""
-    return ProtoDescriptor(
-        name="user_service",
-        source="file",
-        path="/tmp/user.desc"
-    )
+    return ProtoDescriptor(name="user_service", source="file", path="/tmp/user.desc")
 
 
 @pytest.fixture
@@ -54,12 +50,11 @@ def sample_grpc_transformation():
         request_transform=RequestBodyTransformation(
             add_fields={"trace_id": "{{uuid}}", "timestamp": "{{timestamp}}"},
             remove_fields=["password"],
-            rename_fields={"user_id": "id"}
+            rename_fields={"user_id": "id"},
         ),
         response_transform=ResponseBodyTransformation(
-            filter_fields=["secret"],
-            add_fields={"server": "gateway"}
-        )
+            filter_fields=["secret"], add_fields={"server": "gateway"}
+        ),
     )
 
 
@@ -68,7 +63,7 @@ def grpc_service(sample_grpc_transformation):
     """Sample gRPC service with transformation."""
     route = Route(
         path_prefix="/user.v1.UserService/CreateUser",
-        grpc_transformation=sample_grpc_transformation
+        grpc_transformation=sample_grpc_transformation,
     )
 
     return Service(
@@ -76,7 +71,7 @@ def grpc_service(sample_grpc_transformation):
         type="grpc",
         protocol="http2",
         upstream=Upstream(host="grpc-backend.local", port=50051),
-        routes=[route]
+        routes=[route],
     )
 
 
@@ -88,7 +83,7 @@ def grpc_config(sample_proto_descriptor, grpc_service):
         provider="envoy",
         global_config=GlobalConfig(),
         services=[grpc_service],
-        proto_descriptors=[sample_proto_descriptor]
+        proto_descriptors=[sample_proto_descriptor],
     )
 
 
@@ -100,7 +95,7 @@ class TestEnvoyGrpcTransformation:
         provider = EnvoyProvider()
 
         # Mock ProtoManager
-        with patch('gal.providers.envoy.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.envoy.ProtoManager") as mock_pm_class:
             mock_manager = MagicMock()
             mock_manager.get_descriptor.return_value = grpc_config.proto_descriptors[0]
             mock_pm_class.return_value = mock_manager
@@ -115,7 +110,7 @@ class TestEnvoyGrpcTransformation:
         """Test Envoy Lua code contains protobuf library require."""
         provider = EnvoyProvider()
 
-        with patch('gal.providers.envoy.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.envoy.ProtoManager") as mock_pm_class:
             mock_manager = MagicMock()
             mock_manager.get_descriptor.return_value = grpc_config.proto_descriptors[0]
             mock_pm_class.return_value = mock_manager
@@ -129,7 +124,7 @@ class TestEnvoyGrpcTransformation:
         """Test Envoy Lua code references proto descriptor path."""
         provider = EnvoyProvider()
 
-        with patch('gal.providers.envoy.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.envoy.ProtoManager") as mock_pm_class:
             mock_manager = MagicMock()
             mock_manager.get_descriptor.return_value = grpc_config.proto_descriptors[0]
             mock_pm_class.return_value = mock_manager
@@ -143,7 +138,7 @@ class TestEnvoyGrpcTransformation:
         """Test Envoy request transformation adds trace_id and timestamp."""
         provider = EnvoyProvider()
 
-        with patch('gal.providers.envoy.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.envoy.ProtoManager") as mock_pm_class:
             mock_manager = MagicMock()
             mock_manager.get_descriptor.return_value = grpc_config.proto_descriptors[0]
             mock_pm_class.return_value = mock_manager
@@ -158,7 +153,7 @@ class TestEnvoyGrpcTransformation:
         """Test Envoy request transformation removes password field."""
         provider = EnvoyProvider()
 
-        with patch('gal.providers.envoy.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.envoy.ProtoManager") as mock_pm_class:
             mock_manager = MagicMock()
             mock_manager.get_descriptor.return_value = grpc_config.proto_descriptors[0]
             mock_pm_class.return_value = mock_manager
@@ -167,13 +162,17 @@ class TestEnvoyGrpcTransformation:
 
         # Check password is removed
         assert "password" in result
-        assert "= nil" in result or "msg['password'] = nil" in result or 'msg["password"] = nil' in result
+        assert (
+            "= nil" in result
+            or "msg['password'] = nil" in result
+            or 'msg["password"] = nil' in result
+        )
 
     def test_envoy_request_transform_renames_fields(self, grpc_config):
         """Test Envoy request transformation renames user_id to id."""
         provider = EnvoyProvider()
 
-        with patch('gal.providers.envoy.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.envoy.ProtoManager") as mock_pm_class:
             mock_manager = MagicMock()
             mock_manager.get_descriptor.return_value = grpc_config.proto_descriptors[0]
             mock_pm_class.return_value = mock_manager
@@ -188,7 +187,7 @@ class TestEnvoyGrpcTransformation:
         """Test Envoy response transformation filters secret field."""
         provider = EnvoyProvider()
 
-        with patch('gal.providers.envoy.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.envoy.ProtoManager") as mock_pm_class:
             mock_manager = MagicMock()
             mock_manager.get_descriptor.return_value = grpc_config.proto_descriptors[0]
             mock_pm_class.return_value = mock_manager
@@ -205,14 +204,11 @@ class TestEnvoyGrpcTransformation:
             type="http",
             protocol="http",
             upstream=Upstream(host="backend", port=8080),
-            routes=[Route(path_prefix="/api")]
+            routes=[Route(path_prefix="/api")],
         )
 
         config = Config(
-            version="1.0",
-            provider="envoy",
-            global_config=GlobalConfig(),
-            services=[service]
+            version="1.0", provider="envoy", global_config=GlobalConfig(), services=[service]
         )
 
         provider = EnvoyProvider()
@@ -230,7 +226,7 @@ class TestNginxGrpcTransformation:
         grpc_config.provider = "nginx"
         provider = NginxProvider()
 
-        with patch('gal.providers.nginx.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.nginx.ProtoManager") as mock_pm_class:
             mock_manager = MagicMock()
             mock_manager.get_descriptor.return_value = grpc_config.proto_descriptors[0]
             mock_pm_class.return_value = mock_manager
@@ -245,7 +241,7 @@ class TestNginxGrpcTransformation:
         grpc_config.provider = "nginx"
         provider = NginxProvider()
 
-        with patch('gal.providers.nginx.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.nginx.ProtoManager") as mock_pm_class:
             mock_manager = MagicMock()
             mock_manager.get_descriptor.return_value = grpc_config.proto_descriptors[0]
             mock_pm_class.return_value = mock_manager
@@ -260,7 +256,7 @@ class TestNginxGrpcTransformation:
         grpc_config.provider = "nginx"
         provider = NginxProvider()
 
-        with patch('gal.providers.nginx.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.nginx.ProtoManager") as mock_pm_class:
             mock_manager = MagicMock()
             mock_manager.get_descriptor.return_value = grpc_config.proto_descriptors[0]
             mock_pm_class.return_value = mock_manager
@@ -275,7 +271,7 @@ class TestNginxGrpcTransformation:
         grpc_config.provider = "nginx"
         provider = NginxProvider()
 
-        with patch('gal.providers.nginx.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.nginx.ProtoManager") as mock_pm_class:
             mock_manager = MagicMock()
             mock_manager.get_descriptor.return_value = grpc_config.proto_descriptors[0]
             mock_pm_class.return_value = mock_manager
@@ -292,14 +288,11 @@ class TestNginxGrpcTransformation:
             type="http",
             protocol="http",
             upstream=Upstream(host="backend", port=8080),
-            routes=[Route(path_prefix="/api")]
+            routes=[Route(path_prefix="/api")],
         )
 
         config = Config(
-            version="1.0",
-            provider="nginx",
-            global_config=GlobalConfig(),
-            services=[service]
+            version="1.0", provider="nginx", global_config=GlobalConfig(), services=[service]
         )
 
         provider = NginxProvider()
@@ -317,7 +310,7 @@ class TestAPISIXGrpcTransformation:
         grpc_config.provider = "apisix"
         provider = APISIXProvider()
 
-        with patch('gal.providers.apisix.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.apisix.ProtoManager") as mock_pm_class:
             mock_manager = MagicMock()
             mock_manager.get_descriptor.return_value = grpc_config.proto_descriptors[0]
             mock_pm_class.return_value = mock_manager
@@ -332,7 +325,7 @@ class TestAPISIXGrpcTransformation:
         grpc_config.provider = "apisix"
         provider = APISIXProvider()
 
-        with patch('gal.providers.apisix.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.apisix.ProtoManager") as mock_pm_class:
             mock_manager = MagicMock()
             mock_manager.get_descriptor.return_value = grpc_config.proto_descriptors[0]
             mock_pm_class.return_value = mock_manager
@@ -347,7 +340,7 @@ class TestAPISIXGrpcTransformation:
         grpc_config.provider = "apisix"
         provider = APISIXProvider()
 
-        with patch('gal.providers.apisix.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.apisix.ProtoManager") as mock_pm_class:
             mock_manager = MagicMock()
             mock_manager.get_descriptor.return_value = grpc_config.proto_descriptors[0]
             mock_pm_class.return_value = mock_manager
@@ -364,14 +357,11 @@ class TestAPISIXGrpcTransformation:
             type="http",
             protocol="http",
             upstream=Upstream(host="backend", port=8080),
-            routes=[Route(path_prefix="/api")]
+            routes=[Route(path_prefix="/api")],
         )
 
         config = Config(
-            version="1.0",
-            provider="apisix",
-            global_config=GlobalConfig(),
-            services=[service]
+            version="1.0", provider="apisix", global_config=GlobalConfig(), services=[service]
         )
 
         provider = APISIXProvider()
@@ -420,7 +410,7 @@ class TestGrpcTransformationIntegration:
         """Test complete Envoy config with gRPC service and transformation."""
         provider = EnvoyProvider()
 
-        with patch('gal.providers.envoy.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.envoy.ProtoManager") as mock_pm_class:
             mock_manager = MagicMock()
             mock_manager.get_descriptor.return_value = grpc_config.proto_descriptors[0]
             mock_pm_class.return_value = mock_manager
@@ -440,7 +430,7 @@ class TestGrpcTransformationIntegration:
         grpc_config.provider = "nginx"
         provider = NginxProvider()
 
-        with patch('gal.providers.nginx.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.nginx.ProtoManager") as mock_pm_class:
             mock_manager = MagicMock()
             mock_manager.get_descriptor.return_value = grpc_config.proto_descriptors[0]
             mock_pm_class.return_value = mock_manager
@@ -460,7 +450,7 @@ class TestGrpcTransformationIntegration:
         grpc_config.provider = "apisix"
         provider = APISIXProvider()
 
-        with patch('gal.providers.apisix.ProtoManager') as mock_pm_class:
+        with patch("gal.providers.apisix.ProtoManager") as mock_pm_class:
             mock_manager = MagicMock()
             mock_manager.get_descriptor.return_value = grpc_config.proto_descriptors[0]
             mock_pm_class.return_value = mock_manager
@@ -468,7 +458,12 @@ class TestGrpcTransformationIntegration:
             result = provider.generate(grpc_config)
 
         # Should contain APISIX config structure (JSON format)
-        assert '"routes"' in result or 'routes:' in result
-        assert '"upstreams"' in result or 'upstreams:' in result or '"upstream"' in result or 'upstream:' in result
+        assert '"routes"' in result or "routes:" in result
+        assert (
+            '"upstreams"' in result
+            or "upstreams:" in result
+            or '"upstream"' in result
+            or "upstream:" in result
+        )
         # Should contain serverless plugin
-        assert '"plugins"' in result or 'plugins:' in result
+        assert '"plugins"' in result or "plugins:" in result

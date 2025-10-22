@@ -1,12 +1,12 @@
 """Tests for Azure APIM Import (OpenAPI 3.0 parsing)."""
 
 import json
+
 import pytest
 
 # No need to import AuthenticationType, it's just a string
 from gal.parsers.azure_apim_parser import AzureAPIMParser
 from gal.providers.azure_apim import AzureAPIMProvider
-
 
 # Sample OpenAPI 3.0 spec (minimal)
 MINIMAL_OPENAPI = """

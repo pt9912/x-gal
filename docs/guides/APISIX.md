@@ -1144,6 +1144,277 @@ services:
 - 📚 [APISIX Standalone Mode](https://apisix.apache.org/docs/apisix/deployment-modes/#standalone)
 - 📚 [APISIX Load Balancing](https://apisix.apache.org/docs/apisix/terminology/upstream/#load-balancing)
 
+### 10. Traffic Splitting & Canary Deployments
+
+**Feature:** Gewichtsbasierte Traffic-Verteilung für A/B Testing, Canary Deployments und Blue/Green Deployments.
+
+**Status:** ✅ **Vollständig unterstützt** (seit v1.4.0)
+
+APISIX unterstützt Traffic Splitting nativ über das **`traffic-split`** Plugin.
+
+#### Canary Deployment (90/10 Split)
+
+**Use Case:** Neue Version vorsichtig ausrollen (10% Canary, 90% Stable).
+
+```yaml
+routes:
+  - path_prefix: /api/v1
+    traffic_split:
+      enabled: true
+      targets:
+        - name: stable
+          weight: 90
+          upstream:
+            host: backend-stable
+            port: 8080
+        - name: canary
+          weight: 10
+          upstream:
+            host: backend-canary
+            port: 8080
+```
+
+**APISIX Config (JSON):**
+```json
+{
+  "uri": "/api/v1*",
+  "plugins": {
+    "traffic-split": {
+      "rules": [
+        {
+          "weighted_upstreams": [
+            {
+              "upstream": {
+                "name": "canary_deployment_api_stable_upstream",
+                "type": "roundrobin",
+                "nodes": {
+                  "backend-stable:8080": 1
+                }
+              },
+              "weight": 90
+            },
+            {
+              "upstream": {
+                "name": "canary_deployment_api_canary_upstream",
+                "type": "roundrobin",
+                "nodes": {
+                  "backend-canary:8080": 1
+                }
+              },
+              "weight": 10
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+```
+
+**Erklärung:**
+- `traffic-split.rules[].weighted_upstreams`: Liste von gewichteten Upstreams
+- `weight: 90`: Stable Backend erhält 90% des Traffics
+- `weight: 10`: Canary Backend erhält 10% des Traffics
+- `upstream.nodes`: Backend Server
+
+#### A/B Testing (50/50 Split)
+
+**Use Case:** Zwei Versionen gleichwertig testen.
+
+```yaml
+traffic_split:
+  enabled: true
+  targets:
+    - name: version_a
+      weight: 50
+      upstream:
+        host: api-v2-a
+        port: 8080
+    - name: version_b
+      weight: 50
+      upstream:
+        host: api-v2-b
+        port: 8080
+```
+
+**APISIX Config:**
+```json
+{
+  "plugins": {
+    "traffic-split": {
+      "rules": [
+        {
+          "weighted_upstreams": [
+            {
+              "upstream": {
+                "name": "version_a_upstream",
+                "nodes": {"api-v2-a:8080": 1}
+              },
+              "weight": 50
+            },
+            {
+              "upstream": {
+                "name": "version_b_upstream",
+                "nodes": {"api-v2-b:8080": 1}
+              },
+              "weight": 50
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+```
+
+#### Blue/Green Deployment
+
+**Use Case:** Instant Switch zwischen zwei Environments (100% → 0%).
+
+```yaml
+traffic_split:
+  enabled: true
+  targets:
+    - name: blue
+      weight: 0    # Aktuell inaktiv
+      upstream:
+        host: api-blue
+        port: 8080
+    - name: green
+      weight: 100  # Aktuell aktiv
+      upstream:
+        host: api-green
+        port: 8080
+```
+
+**Deployment-Strategie:**
+1. **Initial:** Blue = 100%, Green = 0%
+2. **Deploy neue Version** auf Green Environment
+3. **Test Green** ausgiebig
+4. **Switch:** Blue = 0%, Green = 100% (APISIX Admin API PATCH)
+5. **Rollback** bei Problemen: Green = 0%, Blue = 100%
+
+**Admin API Update:**
+```bash
+curl -X PATCH http://localhost:9180/apisix/admin/routes/1 \
+  -H "X-API-KEY: $ADMIN_KEY" \
+  -d '{
+    "plugins": {
+      "traffic-split": {
+        "rules": [{
+          "weighted_upstreams": [
+            {"upstream": {"name": "blue_upstream", "nodes": {"api-blue:8080": 1}}, "weight": 0},
+            {"upstream": {"name": "green_upstream", "nodes": {"api-green:8080": 1}}, "weight": 100}
+          ]
+        }]
+      }
+    }
+  }'
+```
+
+#### Gradual Rollout (5% → 25% → 50% → 100%)
+
+**Use Case:** Schrittweise Migration mit Monitoring.
+
+**Phase 1: 5% Canary**
+```yaml
+targets:
+  - {name: stable, weight: 95, upstream: {host: api-stable, port: 8080}}
+  - {name: canary, weight: 5, upstream: {host: api-canary, port: 8080}}
+```
+
+**Phase 2: 25% Canary** (nach Monitoring)
+```yaml
+targets:
+  - {name: stable, weight: 75, upstream: {host: api-stable, port: 8080}}
+  - {name: canary, weight: 25, upstream: {host: api-canary, port: 8080}}
+```
+
+**Phase 3: 50% Canary** (Confidence-Build)
+```yaml
+targets:
+  - {name: stable, weight: 50, upstream: {host: api-stable, port: 8080}}
+  - {name: canary, weight: 50, upstream: {host: api-canary, port: 8080}}
+```
+
+**Phase 4: 100% Canary** (Full Migration)
+```yaml
+targets:
+  - {name: canary, weight: 100, upstream: {host: api-canary, port: 8080}}
+```
+
+#### APISIX Traffic Splitting Features
+
+| Feature | APISIX Support | Implementation |
+|---------|----------------|----------------|
+| **Weight-based Splitting** | ✅ Native | `traffic-split` plugin |
+| **Health Checks** | ✅ Native | `upstream.checks` (active/passive) |
+| **Header-based Routing** | ✅ Native | `traffic-split.rules[].match` |
+| **Weighted Round Robin** | ✅ Native | `upstream.type: roundrobin` + weights |
+| **Dynamic Updates** | ✅ Native | Admin API PATCH (hot-reload) |
+| **Sticky Sessions** | ⚠️ Limited | Via `upstream.hash_on: cookie` |
+| **Mirroring** | ✅ Native | `proxy-mirror` plugin for Traffic Shadowing |
+
+**Advanced: Header-based Traffic Splitting**
+
+APISIX unterstützt auch **conditional routing** basierend auf Headers:
+
+```json
+{
+  "plugins": {
+    "traffic-split": {
+      "rules": [
+        {
+          "match": [
+            {
+              "vars": [["http_x_version", "==", "beta"]]
+            }
+          ],
+          "weighted_upstreams": [
+            {
+              "upstream": {"name": "beta_upstream", "nodes": {"api-beta:8080": 1}},
+              "weight": 100
+            }
+          ]
+        },
+        {
+          "weighted_upstreams": [
+            {"upstream": {"name": "stable_upstream", "nodes": {"api-stable:8080": 1}}, "weight": 90},
+            {"upstream": {"name": "canary_upstream", "nodes": {"api-canary:8080": 1}}, "weight": 10}
+          ]
+        }
+      ]
+    }
+  }
+}
+```
+
+**Erklärung:**
+- **Regel 1:** Wenn `X-Version: beta` Header vorhanden → 100% zu Beta Backend
+- **Regel 2:** Alle anderen Requests → 90/10 Split (Stable/Canary)
+
+**Best Practices:**
+- **Start Small:** Begin mit 5-10% Canary Traffic
+- **Monitor Metrics:** Error Rate, Latency, Throughput via APISIX Prometheus Plugin
+- **Health Checks:** Immer aktivieren für automatisches Failover
+- **Gradual Increase:** 5% → 25% → 50% → 100% über mehrere Tage
+- **Admin API:** Nutze PATCH für dynamische Weight-Updates (keine Reload nötig)
+- **Rollback Plan:** Schnelles Zurücksetzen via Admin API (< 100ms)
+
+**Docker E2E Test Results:**
+```bash
+# Test: 1000 Requests mit 90/10 Split (Pending)
+Stable Backend:  TBD
+Canary Backend:  TBD
+Failed Requests: TBD
+```
+
+**Siehe auch:**
+- [Traffic Splitting Guide](TRAFFIC_SPLITTING.md) - Vollständige Dokumentation
+- [APISIX traffic-split Plugin](https://apisix.apache.org/docs/apisix/plugins/traffic-split/)
+- [examples/traffic-split-example.yaml](../../examples/traffic-split-example.yaml) - 6 Beispiel-Szenarien
+- [tests/docker/apisix/](../../tests/docker/apisix/) - Docker Compose E2E Tests
+
 ---
 
 ## APISIX-spezifische Details

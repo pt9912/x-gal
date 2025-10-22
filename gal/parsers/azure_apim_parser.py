@@ -96,8 +96,7 @@ class AzureAPIMParser:
         openapi_version = self.openapi_spec.get("openapi", "")
         if not openapi_version.startswith("3."):
             raise ValueError(
-                f"Unsupported OpenAPI version: {openapi_version}. "
-                "Only OpenAPI 3.x is supported."
+                f"Unsupported OpenAPI version: {openapi_version}. " "Only OpenAPI 3.x is supported."
             )
 
         self.api_id = api_id
@@ -218,9 +217,7 @@ class AzureAPIMParser:
         logger.info(f"Extracted {len(routes)} routes from API")
         return routes
 
-    def extract_authentication(
-        self, api: AzureAPIMAPI
-    ) -> Optional[Dict[str, Any]]:
+    def extract_authentication(self, api: AzureAPIMAPI) -> Optional[Dict[str, Any]]:
         """Extract authentication configuration from security schemes.
 
         Args:
@@ -264,9 +261,7 @@ class AzureAPIMParser:
                 if implicit:
                     return {
                         "type": "jwt",
-                        "issuer": implicit.get("authorizationUrl", "").split("/oauth2")[
-                            0
-                        ],
+                        "issuer": implicit.get("authorizationUrl", "").split("/oauth2")[0],
                         "audience": None,  # Cannot infer from OpenAPI
                         "description": scheme.get("description"),
                     }
@@ -275,18 +270,14 @@ class AzureAPIMParser:
             elif scheme_type == "openIdConnect":
                 return {
                     "type": "jwt",
-                    "issuer": scheme.get("openIdConnectUrl", "").split(
-                        "/.well-known"
-                    )[0],
+                    "issuer": scheme.get("openIdConnectUrl", "").split("/.well-known")[0],
                     "audience": None,  # Cannot infer from OpenAPI
                     "description": scheme.get("description"),
                 }
 
         return None
 
-    def extract_rate_limiting(
-        self, api: AzureAPIMAPI
-    ) -> Optional[Dict[str, Any]]:
+    def extract_rate_limiting(self, api: AzureAPIMAPI) -> Optional[Dict[str, Any]]:
         """Extract rate limiting from x-azure-api-management extensions.
 
         Azure APIM rate limiting is configured via policies (not in OpenAPI),

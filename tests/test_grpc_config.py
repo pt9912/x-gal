@@ -25,11 +25,7 @@ class TestProtoDescriptor:
 
     def test_proto_descriptor_file_source(self):
         """Test ProtoDescriptor with source='file'."""
-        desc = ProtoDescriptor(
-            name="user_service",
-            source="file",
-            path="/protos/user.proto"
-        )
+        desc = ProtoDescriptor(name="user_service", source="file", path="/protos/user.proto")
 
         assert desc.name == "user_service"
         assert desc.source == "file"
@@ -39,17 +35,13 @@ class TestProtoDescriptor:
 
     def test_proto_descriptor_inline_source(self):
         """Test ProtoDescriptor with source='inline'."""
-        proto_content = '''
+        proto_content = """
         syntax = "proto3";
         package user.v1;
         message User { string id = 1; }
-        '''
+        """
 
-        desc = ProtoDescriptor(
-            name="user_service",
-            source="inline",
-            content=proto_content
-        )
+        desc = ProtoDescriptor(name="user_service", source="inline", content=proto_content)
 
         assert desc.name == "user_service"
         assert desc.source == "inline"
@@ -60,9 +52,7 @@ class TestProtoDescriptor:
     def test_proto_descriptor_url_source(self):
         """Test ProtoDescriptor with source='url'."""
         desc = ProtoDescriptor(
-            name="user_service",
-            source="url",
-            url="https://api.example.com/protos/user.proto"
+            name="user_service", source="url", url="https://api.example.com/protos/user.proto"
         )
 
         assert desc.name == "user_service"
@@ -88,7 +78,9 @@ class TestProtoDescriptor:
 
     def test_proto_descriptor_inline_without_content(self):
         """Test ProtoDescriptor with source='inline' but no content raises ValueError."""
-        with pytest.raises(ValueError, match="ProtoDescriptor.content is required when source='inline'"):
+        with pytest.raises(
+            ValueError, match="ProtoDescriptor.content is required when source='inline'"
+        ):
             ProtoDescriptor(name="user_service", source="inline")
 
     def test_proto_descriptor_url_without_url(self):
@@ -108,7 +100,7 @@ class TestGrpcTransformation:
             package="user.v1",
             service="UserService",
             request_type="CreateUserRequest",
-            response_type="CreateUserResponse"
+            response_type="CreateUserResponse",
         )
 
         assert transform.enabled is True
@@ -137,7 +129,7 @@ class TestGrpcTransformation:
                 package="user.v1",
                 service="UserService",
                 request_type="CreateUserRequest",
-                response_type="CreateUserResponse"
+                response_type="CreateUserResponse",
             )
 
     def test_grpc_transformation_missing_package(self):
@@ -148,7 +140,7 @@ class TestGrpcTransformation:
                 proto_descriptor="user_service",
                 service="UserService",
                 request_type="CreateUserRequest",
-                response_type="CreateUserResponse"
+                response_type="CreateUserResponse",
             )
 
     def test_grpc_transformation_missing_service(self):
@@ -159,7 +151,7 @@ class TestGrpcTransformation:
                 proto_descriptor="user_service",
                 package="user.v1",
                 request_type="CreateUserRequest",
-                response_type="CreateUserResponse"
+                response_type="CreateUserResponse",
             )
 
     def test_grpc_transformation_missing_request_type(self):
@@ -170,7 +162,7 @@ class TestGrpcTransformation:
                 proto_descriptor="user_service",
                 package="user.v1",
                 service="UserService",
-                response_type="CreateUserResponse"
+                response_type="CreateUserResponse",
             )
 
     def test_grpc_transformation_missing_response_type(self):
@@ -181,7 +173,7 @@ class TestGrpcTransformation:
                 proto_descriptor="user_service",
                 package="user.v1",
                 service="UserService",
-                request_type="CreateUserRequest"
+                request_type="CreateUserRequest",
             )
 
     def test_grpc_transformation_with_request_transform(self):
@@ -189,7 +181,7 @@ class TestGrpcTransformation:
         request_transform = RequestBodyTransformation(
             add_fields={"trace_id": "{{uuid}}"},
             remove_fields=["password"],
-            rename_fields={"user_id": "id"}
+            rename_fields={"user_id": "id"},
         )
 
         transform = GrpcTransformation(
@@ -199,7 +191,7 @@ class TestGrpcTransformation:
             service="UserService",
             request_type="CreateUserRequest",
             response_type="CreateUserResponse",
-            request_transform=request_transform
+            request_transform=request_transform,
         )
 
         assert transform.request_transform is not None
@@ -210,8 +202,7 @@ class TestGrpcTransformation:
     def test_grpc_transformation_with_response_transform(self):
         """Test GrpcTransformation with response transformation."""
         response_transform = ResponseBodyTransformation(
-            filter_fields=["password", "secret"],
-            add_fields={"server_timestamp": "{{timestamp}}"}
+            filter_fields=["password", "secret"], add_fields={"server_timestamp": "{{timestamp}}"}
         )
 
         transform = GrpcTransformation(
@@ -221,7 +212,7 @@ class TestGrpcTransformation:
             service="UserService",
             request_type="CreateUserRequest",
             response_type="CreateUserResponse",
-            response_transform=response_transform
+            response_transform=response_transform,
         )
 
         assert transform.response_transform is not None
@@ -240,13 +231,10 @@ class TestRouteGrpcTransformation:
             package="user.v1",
             service="UserService",
             request_type="CreateUserRequest",
-            response_type="CreateUserResponse"
+            response_type="CreateUserResponse",
         )
 
-        route = Route(
-            path_prefix="/user.v1.UserService/CreateUser",
-            grpc_transformation=grpc_t
-        )
+        route = Route(path_prefix="/user.v1.UserService/CreateUser", grpc_transformation=grpc_t)
 
         assert route.grpc_transformation is not None
         assert route.grpc_transformation.enabled is True
@@ -272,7 +260,7 @@ class TestConfigProtoDescriptors:
             provider="envoy",
             global_config=GlobalConfig(),
             services=[],
-            proto_descriptors=[desc1, desc2]
+            proto_descriptors=[desc1, desc2],
         )
 
         assert len(config.proto_descriptors) == 2
@@ -281,12 +269,7 @@ class TestConfigProtoDescriptors:
 
     def test_config_without_proto_descriptors(self):
         """Test Config without proto_descriptors (default empty list)."""
-        config = Config(
-            version="1.0",
-            provider="envoy",
-            global_config=GlobalConfig(),
-            services=[]
-        )
+        config = Config(version="1.0", provider="envoy", global_config=GlobalConfig(), services=[])
 
         assert config.proto_descriptors == []
 
@@ -301,22 +284,17 @@ class TestConfigProtoDescriptors:
             service="UserService",
             request_type="CreateUserRequest",
             response_type="CreateUserResponse",
-            request_transform=RequestBodyTransformation(
-                add_fields={"trace_id": "{{uuid}}"}
-            )
+            request_transform=RequestBodyTransformation(add_fields={"trace_id": "{{uuid}}"}),
         )
 
-        route = Route(
-            path_prefix="/user.v1.UserService/CreateUser",
-            grpc_transformation=grpc_t
-        )
+        route = Route(path_prefix="/user.v1.UserService/CreateUser", grpc_transformation=grpc_t)
 
         service = Service(
             name="user_api",
             type="grpc",
             protocol="http2",
             upstream=Upstream(host="grpc-backend", port=50051),
-            routes=[route]
+            routes=[route],
         )
 
         config = Config(
@@ -324,7 +302,7 @@ class TestConfigProtoDescriptors:
             provider="envoy",
             global_config=GlobalConfig(),
             services=[service],
-            proto_descriptors=[desc]
+            proto_descriptors=[desc],
         )
 
         assert len(config.services) == 1

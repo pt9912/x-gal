@@ -18,8 +18,9 @@ References:
 
 import json
 import logging
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
+
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -188,12 +189,14 @@ class AWSAPIGatewayParser:
                         integration_uri = integration.get("uri", "")
 
             if valid_methods:
-                routes.append({
-                    "path": path,
-                    "methods": valid_methods,
-                    "integration_type": integration_type,
-                    "integration_uri": integration_uri,
-                })
+                routes.append(
+                    {
+                        "path": path,
+                        "methods": valid_methods,
+                        "integration_type": integration_type,
+                        "integration_uri": integration_uri,
+                    }
+                )
 
         return routes
 
@@ -372,9 +375,7 @@ class AWSAPIGatewayParser:
                     )
                     if methods_param:
                         methods_str = methods_param.strip("'\"")
-                        cors_config["allow_methods"] = [
-                            m.strip() for m in methods_str.split(",")
-                        ]
+                        cors_config["allow_methods"] = [m.strip() for m in methods_str.split(",")]
 
                     # Extract Allow-Headers
                     headers_param = response_params.get(
@@ -382,9 +383,7 @@ class AWSAPIGatewayParser:
                     )
                     if headers_param:
                         headers_str = headers_param.strip("'\"")
-                        cors_config["allow_headers"] = [
-                            h.strip() for h in headers_str.split(",")
-                        ]
+                        cors_config["allow_headers"] = [h.strip() for h in headers_str.split(",")]
 
                     # Found CORS, no need to check other paths
                     break

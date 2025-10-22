@@ -72,7 +72,10 @@ services:
             print(f"Output:\n{result.output}")
             if result.exception:
                 import traceback
-                traceback.print_exception(type(result.exception), result.exception, result.exception.__traceback__)
+
+                traceback.print_exception(
+                    type(result.exception), result.exception, result.exception.__traceback__
+                )
 
         assert result.exit_code == 0
         assert "Generating configuration for: envoy" in result.output

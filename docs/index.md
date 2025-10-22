@@ -80,6 +80,18 @@ gal generate -c config.yaml -p aws_apigateway
 
     Importieren Sie bestehende Provider-Configs und exportieren Sie zu GAL.
 
+- :material-ab-testing: **A/B Testing & Traffic Splitting**
+
+    ---
+
+    Canary Deployments, Blue/Green, Header/Cookie-Routing - alle Provider.
+
+- :material-test-tube: **E2E Docker Tests**
+
+    ---
+
+    Runtime-Tests mit echten Gateway-Containern. 1000 Requests, ±5% Toleranz.
+
 </div>
 
 ---

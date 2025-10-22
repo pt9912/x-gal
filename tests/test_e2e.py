@@ -731,6 +731,7 @@ services:
         elif provider_name == "apisix":
             # APISIX: traffic-split plugin
             import json
+
             config = json.loads(output)
             # Find route with traffic-split plugin
             routes = config.get("routes", [])
@@ -752,17 +753,19 @@ services:
         elif provider_name == "haproxy":
             # HAProxy: weighted servers
             assert "weight 230" in output  # 90 * 2.56 ≈ 230
-            assert "weight 25" in output   # 10 * 2.56 ≈ 25
+            assert "weight 25" in output  # 10 * 2.56 ≈ 25
             assert "server server_stable api-v1-stable:8080" in output
             assert "server server_canary api-v1-canary:8080" in output
 
         elif provider_name == "azure_apim":
             # Azure APIM: backend pool
             import json
+
             arm_template = json.loads(output)
             # Find backend pool
             backends = [
-                r for r in arm_template["resources"]
+                r
+                for r in arm_template["resources"]
                 if r["type"] == "Microsoft.ApiManagement/service/backends"
                 and "pool" in r.get("properties", {})
             ]
@@ -774,6 +777,7 @@ services:
         elif provider_name == "aws_apigateway":
             # AWS API Gateway: VTL template
             import json
+
             spec = json.loads(output)
             # Find integration with VTL
             operation = spec["paths"]["/api/v1"]["get"]

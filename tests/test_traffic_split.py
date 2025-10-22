@@ -98,9 +98,7 @@ class TestTrafficSplitConfig:
         )
 
         with pytest.raises(ValueError, match="not found in targets"):
-            TrafficSplitConfig(
-                enabled=True, targets=[target1], fallback_target="nonexistent"
-            )
+            TrafficSplitConfig(enabled=True, targets=[target1], fallback_target="nonexistent")
 
     def test_header_based_routing(self):
         """Test header-based routing configuration"""
@@ -619,7 +617,7 @@ class TestHAProxyTrafficSplit:
 
         # Check weight conversion (GAL 90 → HAProxy 230 = 90 × 2.56)
         assert "weight 230" in output  # 90 × 2.56 ≈ 230
-        assert "weight 25" in output   # 10 × 2.56 ≈ 25
+        assert "weight 25" in output  # 10 × 2.56 ≈ 25
 
         # Check backend configuration
         assert "backend backend_canary_deployment_api" in output
@@ -678,11 +676,13 @@ class TestAzureAPIMTrafficSplit:
         output = provider.generate(config)
 
         import json
+
         arm_template = json.loads(output)
 
         # Find backend pool resource
         backend_pools = [
-            r for r in arm_template["resources"]
+            r
+            for r in arm_template["resources"]
             if r["type"] == "Microsoft.ApiManagement/service/backends"
             and "pool" in r.get("properties", {})
         ]
@@ -705,11 +705,13 @@ class TestAzureAPIMTrafficSplit:
         output = provider.generate(config)
 
         import json
+
         arm_template = json.loads(output)
 
         # Find individual backend resources
         individual_backends = [
-            r for r in arm_template["resources"]
+            r
+            for r in arm_template["resources"]
             if r["type"] == "Microsoft.ApiManagement/service/backends"
             and "pool" not in r.get("properties", {})
         ]
@@ -729,11 +731,13 @@ class TestAzureAPIMTrafficSplit:
         output = provider.generate(config)
 
         import json
+
         arm_template = json.loads(output)
 
         # Find policy resources
         policies = [
-            r for r in arm_template["resources"]
+            r
+            for r in arm_template["resources"]
             if r["type"] == "Microsoft.ApiManagement/service/apis/operations/policies"
         ]
 
@@ -778,7 +782,10 @@ class TestAWSAPIGatewayTrafficSplit:
             routes=[route],
         )
         return Config(
-            version="1.0", provider="aws_apigateway", global_config=global_config, services=[service]
+            version="1.0",
+            provider="aws_apigateway",
+            global_config=global_config,
+            services=[service],
         )
 
     def test_aws_vtl_template(self):
@@ -788,6 +795,7 @@ class TestAWSAPIGatewayTrafficSplit:
         output = provider.generate(config)
 
         import json
+
         spec = json.loads(output)
 
         # Find integration with VTL template
@@ -812,6 +820,7 @@ class TestAWSAPIGatewayTrafficSplit:
         output = provider.generate(config)
 
         import json
+
         spec = json.loads(output)
 
         # Find integration
@@ -861,13 +870,17 @@ class TestAWSAPIGatewayTrafficSplit:
             routes=[route],
         )
         config = Config(
-            version="1.0", provider="aws_apigateway", global_config=global_config, services=[service]
+            version="1.0",
+            provider="aws_apigateway",
+            global_config=global_config,
+            services=[service],
         )
 
         provider = AWSAPIGatewayProvider()
         output = provider.generate(config)
 
         import json
+
         spec = json.loads(output)
 
         operation = spec["paths"]["/api/multi"]["get"]

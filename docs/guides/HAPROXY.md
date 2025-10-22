@@ -776,6 +776,172 @@ backend backend_api
 
 **Use Case:** Wenn Cookies nicht möglich (z.B. native Apps).
 
+### 7. Traffic Splitting & Canary Deployments
+
+**Feature:** Gewichtsbasierte Traffic-Verteilung für A/B Testing, Canary Deployments und Blue/Green Deployments.
+
+**Status:** ✅ **Vollständig unterstützt** (seit v1.4.0)
+
+HAProxy unterstützt Traffic Splitting nativ über **Server Weights** mit `balance roundrobin`.
+
+#### Canary Deployment (90/10 Split)
+
+**Use Case:** Neue Version vorsichtig ausrollen (10% Canary, 90% Stable).
+
+```yaml
+routes:
+  - path_prefix: /api/v1
+    traffic_split:
+      enabled: true
+      targets:
+        - name: stable
+          weight: 90
+          upstream:
+            host: backend-stable
+            port: 8080
+        - name: canary
+          weight: 10
+          upstream:
+            host: backend-canary
+            port: 8080
+```
+
+**HAProxy Config:**
+```haproxy
+backend backend_api_v1
+    balance roundrobin
+    option httpclose
+    option forwardfor
+
+    # 90% Stable, 10% Canary
+    server server_stable backend-stable:8080 check inter 10s fall 3 rise 2 weight 90
+    server server_canary backend-canary:8080 check inter 10s fall 3 rise 2 weight 10
+```
+
+**Erklärung:**
+- `balance roundrobin`: Round-Robin-Verteilung mit Gewichtung
+- `weight 90`: Stable Backend erhält 90% des Traffics
+- `weight 10`: Canary Backend erhält 10% des Traffics
+- `check inter 10s`: Health Check alle 10 Sekunden
+
+#### A/B Testing (50/50 Split)
+
+**Use Case:** Zwei Versionen gleichwertig testen.
+
+```yaml
+traffic_split:
+  enabled: true
+  targets:
+    - name: version_a
+      weight: 50
+      upstream:
+        host: api-v2-a
+        port: 8080
+    - name: version_b
+      weight: 50
+      upstream:
+        host: api-v2-b
+        port: 8080
+```
+
+**HAProxy Config:**
+```haproxy
+backend backend_ab_testing
+    balance roundrobin
+
+    server version_a api-v2-a:8080 check weight 50
+    server version_b api-v2-b:8080 check weight 50
+```
+
+#### Blue/Green Deployment
+
+**Use Case:** Instant Switch zwischen zwei Environments (100% → 0%).
+
+```yaml
+traffic_split:
+  enabled: true
+  targets:
+    - name: blue
+      weight: 0    # Aktuell inaktiv
+      upstream:
+        host: api-blue
+        port: 8080
+    - name: green
+      weight: 100  # Aktuell aktiv
+      upstream:
+        host: api-green
+        port: 8080
+```
+
+**Deployment-Strategie:**
+1. **Initial:** Blue = 100%, Green = 0%
+2. **Deploy neue Version** auf Green Environment
+3. **Test Green** ausgiebig
+4. **Switch:** Blue = 0%, Green = 100% (Re-Generate haproxy.cfg, reload)
+5. **Rollback** bei Problemen: Green = 0%, Blue = 100%
+
+#### Gradual Rollout (5% → 25% → 50% → 100%)
+
+**Use Case:** Schrittweise Migration mit Monitoring.
+
+**Phase 1: 5% Canary**
+```yaml
+targets:
+  - {name: stable, weight: 95, upstream: {host: api-stable, port: 8080}}
+  - {name: canary, weight: 5, upstream: {host: api-canary, port: 8080}}
+```
+
+**Phase 2: 25% Canary** (nach Monitoring)
+```yaml
+targets:
+  - {name: stable, weight: 75, upstream: {host: api-stable, port: 8080}}
+  - {name: canary, weight: 25, upstream: {host: api-canary, port: 8080}}
+```
+
+**Phase 3: 50% Canary** (Confidence-Build)
+```yaml
+targets:
+  - {name: stable, weight: 50, upstream: {host: api-stable, port: 8080}}
+  - {name: canary, weight: 50, upstream: {host: api-canary, port: 8080}}
+```
+
+**Phase 4: 100% Canary** (Full Migration)
+```yaml
+targets:
+  - {name: canary, weight: 100, upstream: {host: api-canary, port: 8080}}
+```
+
+#### HAProxy Traffic Splitting Features
+
+| Feature | HAProxy Support | Implementation |
+|---------|----------------|----------------|
+| **Weight-based Splitting** | ✅ Native | `server ... weight N` |
+| **Health Checks** | ✅ Native | `check inter Ns fall N rise N` |
+| **Sticky Sessions** | ✅ Native | `cookie NAME insert` |
+| **Dynamic Weights** | ⚠️ Runtime API | HAProxy Runtime API (socat/socket) |
+| **Header-based Routing** | ⚠️ ACLs | Via `http-request set-header` + ACLs |
+| **Cookie-based Routing** | ⚠️ ACLs | Via `hdr(cookie)` ACLs |
+
+**Best Practices:**
+- **Start Small:** Begin mit 5-10% Canary Traffic
+- **Monitor Metrics:** Error Rate, Latency, Throughput auf beiden Targets
+- **Health Checks:** Immer aktivieren für automatisches Failover
+- **Gradual Increase:** 5% → 25% → 50% → 100% über mehrere Tage
+- **Rollback Plan:** Schnelles Zurücksetzen via Config Reload (`systemctl reload haproxy`)
+
+**Docker E2E Test Results:**
+```bash
+# Test: 1000 Requests mit 90/10 Split
+Stable Backend:  900 requests (90.0%) ✅
+Canary Backend:  100 requests (10.0%) ✅
+Failed Requests: 0 (0.0%)
+```
+
+**Siehe auch:**
+- [Traffic Splitting Guide](TRAFFIC_SPLITTING.md) - Vollständige Dokumentation
+- [examples/traffic-split-example.yaml](../../examples/traffic-split-example.yaml) - 6 Beispiel-Szenarien
+- [tests/docker/haproxy/](../../tests/docker/haproxy/) - Docker Compose E2E Tests
+
 ---
 
 ## HAProxy-spezifische Details

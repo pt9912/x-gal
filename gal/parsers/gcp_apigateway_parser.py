@@ -29,8 +29,9 @@ References:
 
 import json
 import logging
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
+
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -227,17 +228,17 @@ class GCPAPIGatewayParser:
                         backend_address = backend.get("address", "")
 
             if valid_methods:
-                routes.append({
-                    "path": path,
-                    "methods": valid_methods,
-                    "backend_address": backend_address,
-                })
+                routes.append(
+                    {
+                        "path": path,
+                        "methods": valid_methods,
+                        "backend_address": backend_address,
+                    }
+                )
 
         return routes
 
-    def extract_jwt_config(
-        self, api: GCPAPIGatewayAPI
-    ) -> Optional[Dict[str, Any]]:
+    def extract_jwt_config(self, api: GCPAPIGatewayAPI) -> Optional[Dict[str, Any]]:
         """
         Extract JWT configuration from GCP API Gateway securityDefinitions.
 
