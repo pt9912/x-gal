@@ -92,9 +92,10 @@ class HAProxyProvider(Provider):
             for route in service.routes:
                 if route.mirroring and route.mirroring.enabled:
                     logger.info(
-                        f"Request mirroring on route {route.path_prefix} is supported in HAProxy "
-                        f"but not yet implemented in GAL. Configuration will be generated as comments. "
-                        f"Requires HAProxy 2.4+ or Lua scripting for full implementation."
+                        f"Request mirroring on route {route.path_prefix} uses HAProxy's native "
+                        f"'http-request mirror' directive. Requires HAProxy 2.4+ "
+                        f"(for HAProxy 2.3 or older, Lua scripting is required). "
+                        f"See: https://www.haproxy.com/blog/haproxy-2-4-features/"
                     )
 
                 # Check for JWT authentication
