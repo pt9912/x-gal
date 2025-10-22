@@ -69,17 +69,66 @@ flake8 gal/ tests/ gal-cli.py --count --select=E9,F63,F7,F82 --show-source --sta
 - `F822`: Undefined name in __all__
 - `F824`: Unused global/nonlocal
 
-### Schritt 5: Tests (Optional)
-Falls gewünscht, führe alle Tests aus:
+### Schritt 5: Unit Tests (Optional)
+Falls gewünscht, führe alle Unit-Tests aus (ohne Docker):
 ```bash
-pytest -v --tb=short
+pytest -v --tb=short --ignore=tests/test_docker_runtime.py
 ```
 
 **Erwartetes Ergebnis:**
-- `323 passed` → Alle Tests bestehen
+- `759 passed` → Alle Tests bestehen
 - Fehler → **NICHT PUSHEN!** Behebe die Tests zuerst
 
-### Schritt 6: Git Status prüfen
+### Schritt 6: Docker Runtime Tests (Kritisch bei Docker-Änderungen)
+**WICHTIG:** Führe diese Tests aus, wenn Docker Compose Konfigurationen geändert wurden!
+
+Prüfe, ob Docker-bezogene Dateien geändert wurden:
+```bash
+git diff --name-only develop | grep -E "tests/docker/|test_docker_runtime.py"
+```
+
+Falls Docker-Dateien geändert wurden, führe die Tests lokal aus:
+```bash
+pytest tests/test_docker_runtime.py -v -s
+```
+
+**Erwartetes Ergebnis:**
+- `8 passed` → Alle Docker-Tests bestehen
+- Timeout/Container-Fehler → **NICHT PUSHEN!** Behebe die Docker-Konfiguration zuerst
+
+**Typische Docker-Fehler:**
+- **Port-Konflikte**: Prüfe `docker-compose.yml` auf Port-Mappings (intern vs extern)
+- **YAML-Syntax**: Validiere mit `docker compose config` im jeweiligen Verzeichnis
+- **Container-Logs**: Prüfe Logs mit `docker compose logs <service>` bei Fehlern
+- **Health Checks**: Stelle sicher, dass alle Services Health Checks haben
+
+**Debug-Befehle bei Fehlern:**
+```bash
+# Docker Compose Syntax validieren
+cd tests/docker/<provider> && docker compose config
+
+# Container manuell starten und Logs prüfen
+cd tests/docker/<provider> && docker compose up
+
+# Container-Status prüfen
+docker compose ps
+
+# Logs eines spezifischen Services anzeigen
+docker compose logs <service-name>
+
+# Aufräumen nach fehlgeschlagenen Tests
+docker compose down -v
+```
+
+**Provider-spezifische Checks:**
+- **Traefik**: Port-Trennung zwischen Dashboard (:8080) und Entrypoint (:80)
+- **APISIX**: YAML-Format (nicht JSON) in `apisix.yaml` verwenden
+- **Envoy**: Cluster-Namen müssen mit Service-Namen übereinstimmen
+- **Kong**: Admin API muss vor Proxy-Konfiguration verfügbar sein
+- **Nginx**: Upstream-Server müssen im `upstream` Block definiert sein
+- **HAProxy**: Server-Zeilen müssen korrekte Weight-Syntax haben
+
+### Schritt 7: Git Status prüfen
 Falls Dateien geändert wurden:
 ```bash
 git status
@@ -89,13 +138,14 @@ git commit --amend --no-edit
 git commit -m "style: Apply code formatting"
 ```
 
-### Schritt 7: Push erlauben
+### Schritt 8: Push erlauben
 ✅ **Alle Checks bestanden → PUSH ERLAUBT**
 
 ## Ausgabe-Format
 
 Gib dem Nutzer eine klare Zusammenfassung:
 
+### Wenn keine Docker-Änderungen vorhanden sind:
 ```
 🔍 Pre-Push Code Quality Check
 ==============================
@@ -103,7 +153,36 @@ Gib dem Nutzer eine klare Zusammenfassung:
 ✅ Black Formatierung: OK (0 Dateien geändert)
 ✅ Isort Import-Sortierung: OK (0 Dateien geändert)
 ✅ Flake8 Linting: OK (0 Fehler)
-⏭️  Tests: Übersprungen (optional)
+⏭️  Unit Tests: Übersprungen (optional)
+⏭️  Docker Tests: Nicht nötig (keine Docker-Änderungen)
+
+✅ ALLE CHECKS BESTANDEN - PUSH ERLAUBT!
+
+Nächster Schritt:
+  git push origin develop
+```
+
+### Wenn Docker-Änderungen vorhanden sind:
+```
+🔍 Pre-Push Code Quality Check
+==============================
+
+✅ Black Formatierung: OK (0 Dateien geändert)
+✅ Isort Import-Sortierung: OK (0 Dateien geändert)
+✅ Flake8 Linting: OK (0 Fehler)
+⏭️  Unit Tests: Übersprungen (optional)
+⚠️  Docker-Änderungen erkannt:
+    - tests/docker/traefik/docker-compose.yml
+    - tests/docker/apisix/apisix.yaml
+
+🐳 Docker Runtime Tests werden ausgeführt...
+✅ Docker Tests: 8/8 Tests bestanden (2m30s)
+    - Envoy: 897/103 (89.7%/10.3%) ✅
+    - Nginx: 914/86 (91.4%/8.6%) ✅
+    - Kong: 900/100 (90.0%/10.0%) ✅
+    - HAProxy: 900/100 (90.0%/10.0%) ✅
+    - Traefik: 900/100 (90.0%/10.0%) ✅
+    - APISIX: 906/94 (90.6%/9.4%) ✅
 
 ✅ ALLE CHECKS BESTANDEN - PUSH ERLAUBT!
 
@@ -132,6 +211,36 @@ Geänderte Dateien müssen committed werden:
   git commit --amend --no-edit
 ```
 
+Falls Docker-Tests fehlschlagen:
+
+```
+🔍 Pre-Push Code Quality Check
+==============================
+
+✅ Black Formatierung: OK
+✅ Isort Import-Sortierung: OK
+✅ Flake8 Linting: OK
+⏭️  Unit Tests: Übersprungen
+❌ Docker Tests: 2 FEHLER GEFUNDEN!
+
+Docker-Fehler:
+  - TestTraefikTrafficSplitRuntime::test_traffic_distribution_90_10
+    Error: listen tcp :8080: bind: address already in use
+
+  - TestAPISIXTrafficSplitRuntime::test_traffic_distribution_90_10
+    Error: failed to classify line: {
+
+❌ PUSH BLOCKIERT - Behebe die Docker-Konfiguration zuerst!
+
+Debug-Hinweise:
+  1. Traefik Port-Konflikt: Prüfe docker-compose.yml (Port-Mapping)
+  2. APISIX YAML-Fehler: Konvertiere JSON zu YAML in apisix.yaml
+
+Validierung:
+  cd tests/docker/traefik && docker compose config
+  cd tests/docker/apisix && docker compose config
+```
+
 ## Fehlerbehandlung
 
 ### Venv nicht gefunden
@@ -156,7 +265,10 @@ pip install -e .[dev]
 1. **Immer vor dem Push ausführen** - Verhindert CI/CD Fehler
 2. **Bei Fehlern nicht pushen** - Behebe sie lokal zuerst
 3. **Geänderte Dateien committen** - Verwende `--amend` oder neuen Commit
-4. **Tests optional ausführen** - Nur bei größeren Änderungen nötig
+4. **Unit Tests optional ausführen** - Nur bei größeren Code-Änderungen nötig
+5. **Docker Tests IMMER ausführen bei Docker-Änderungen** - Verhindert Container-Fehler in CI/CD
+6. **Docker Compose Syntax validieren** - Nutze `docker compose config` vor dem Push
+7. **Container-Logs bei Fehlern prüfen** - Nicht blind auf GitHub Actions verlassen
 
 ## Integration in Workflow
 
@@ -177,6 +289,7 @@ Claude: "✅ Alle Checks bestanden. Ich pushe jetzt..."
 
 ## Beispiel-Ausführung
 
+### Beispiel 1: Normale Code-Änderungen (ohne Docker)
 ```bash
 # Schritt 1: Venv aktivieren
 source venv/bin/activate
@@ -195,12 +308,67 @@ isort .
 flake8 gal/ tests/ gal-cli.py --count --select=E9,F63,F7,F82 --show-source --statistics
 # → 0
 
-# Schritt 5: Geänderte Dateien committen
+# Schritt 5: Prüfe auf Docker-Änderungen
+git diff --name-only develop | grep -E "tests/docker/|test_docker_runtime.py"
+# → (keine Ausgabe)
+
+# Schritt 6: Geänderte Dateien committen
 git add -A
 git commit -m "style: Apply code formatting"
 
-# Schritt 6: Push
+# Schritt 7: Push
 git push origin develop
+```
+
+### Beispiel 2: Docker-Änderungen (mit Docker Runtime Tests)
+```bash
+# Schritt 1: Venv aktivieren
+source venv/bin/activate
+
+# Schritt 2-4: Black, Isort, Flake8 (wie oben)
+
+# Schritt 5: Prüfe auf Docker-Änderungen
+git diff --name-only develop | grep -E "tests/docker/|test_docker_runtime.py"
+# → tests/docker/traefik/docker-compose.yml
+# → tests/docker/apisix/apisix.yaml
+
+# Schritt 6: Docker Compose Syntax validieren
+cd tests/docker/traefik && docker compose config
+# → (Ausgabe der validierten Config)
+cd tests/docker/apisix && docker compose config
+# → (Ausgabe der validierten Config)
+
+# Schritt 7: Docker Runtime Tests ausführen
+cd /Development/x-gal
+pytest tests/test_docker_runtime.py -v -s
+# → 8 passed in 150.04s (0:02:30)
+
+# Schritt 8: Push
+git push origin develop
+```
+
+### Beispiel 3: Docker-Tests schlagen fehl (Debugging)
+```bash
+# Schritt 7: Docker Runtime Tests ausführen
+pytest tests/test_docker_runtime.py::TestTraefikTrafficSplitRuntime -v -s
+# → FAILED - Error: listen tcp :8080: bind: address already in use
+
+# Debug: Container manuell starten
+cd tests/docker/traefik
+docker compose up
+# → Error: listen tcp :8080: bind: address already in use
+
+# Debug: Logs prüfen
+docker compose logs traefik
+# → traefik    | Error: cannot bind listener: listen tcp :8080: bind: address already in use
+
+# Fix: docker-compose.yml anpassen (Port 80 intern, 8080 extern)
+# Dann erneut testen
+pytest tests/test_docker_runtime.py::TestTraefikTrafficSplitRuntime -v -s
+# → PASSED ✅
+
+# Aufräumen
+docker compose down -v
 ```
 
 ---
@@ -211,7 +379,22 @@ Aktualisiere diesen Skill, wenn:
 - Neue Code Quality Tools hinzugefügt werden
 - GitHub Actions Workflow geändert wird
 - Neue Linting-Regeln eingeführt werden
+- Neue Docker-Provider hinzugefügt werden
+- Docker Compose Konfigurationen geändert werden
+
+## Changelog
+
+**Version 2.0.0** (2025-10-22)
+- ✅ Docker Runtime Tests hinzugefügt (Schritt 6)
+- ✅ Automatische Erkennung von Docker-Änderungen
+- ✅ Provider-spezifische Debug-Hinweise (Traefik, APISIX, etc.)
+- ✅ Docker Compose Syntax-Validierung
+- ✅ Erweiterte Fehlerbehandlung für Container-Probleme
+- ✅ Drei vollständige Beispiele (Normal, Docker, Debugging)
+
+**Version 1.0.0** (2025-10-18)
+- Initial Release mit Black, Isort, Flake8, Unit Tests
 
 **Autor:** Claude Code (generiert)
-**Version:** 1.0.0
-**Letzte Aktualisierung:** 2025-10-18
+**Version:** 2.0.0
+**Letzte Aktualisierung:** 2025-10-22
