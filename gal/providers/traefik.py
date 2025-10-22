@@ -239,9 +239,12 @@ class TraefikProvider(Provider):
 
         output.append("  services:")
         for service in config.services:
-            # Check if service has traffic splitting
+            # Check if service has traffic splitting or mirroring
             has_traffic_split = any(
                 route.traffic_split and route.traffic_split.enabled for route in service.routes
+            )
+            has_mirroring = any(
+                route.mirroring and route.mirroring.enabled for route in service.routes
             )
 
             if has_traffic_split:
@@ -249,6 +252,12 @@ class TraefikProvider(Provider):
                 for i, route in enumerate(service.routes):
                     if route.traffic_split and route.traffic_split.enabled:
                         self._generate_traffic_split_service(service, route, i, output)
+                        output.append("")
+            elif has_mirroring:
+                # Generate mirroring services for request mirroring
+                for i, route in enumerate(service.routes):
+                    if route.mirroring and route.mirroring.enabled:
+                        self._generate_mirroring_service(service, route, i, output)
                         output.append("")
             else:
                 # Generate standard service
@@ -661,6 +670,65 @@ class TraefikProvider(Provider):
             output.append("      loadBalancer:")
             output.append("        servers:")
             output.append(f"        - url: 'http://{target.upstream.host}:{target.upstream.port}'")
+
+    def _generate_mirroring_service(
+        self, service: Service, route: Route, route_idx: int, output: list
+    ) -> None:
+        """Generate Traefik Mirroring service for request mirroring/shadowing.
+
+        Creates a mirroring service configuration that duplicates requests to
+        shadow backends while returning responses from the primary service.
+
+        Args:
+            service: Service with request mirroring
+            route: Route with mirroring configuration
+            route_idx: Index of the route
+            output: Output list to append YAML lines to
+
+        Side Effects:
+            Appends mirroring service configuration to output
+
+        Traefik Docs:
+            https://doc.traefik.io/traefik/routing/services/#mirroring-service
+        """
+        mirroring = route.mirroring
+        service_name = f"{service.name}_route{route_idx}_service"
+
+        output.append(f"    {service_name}:")
+        output.append("      mirroring:")
+        # Main service (primary backend)
+        output.append(f"        service: {service.name}_primary_service")
+
+        # Mirror targets
+        if mirroring.targets:
+            output.append("        mirrors:")
+            for i, target in enumerate(mirroring.targets):
+                output.append(f"        - name: {service.name}_{target.name}_mirror")
+                # Traefik uses percent as integer (10% = 10, not 0.1)
+                if target.sample_percentage < 100.0:
+                    output.append(f"          percent: {int(target.sample_percentage)}")
+
+        # Generate primary service
+        output.append(f"    {service.name}_primary_service:")
+        output.append("      loadBalancer:")
+        output.append("        servers:")
+        output.append(f"        - url: 'http://{service.upstream.host}:{service.upstream.port}'")
+
+        # Generate mirror services
+        for target in mirroring.targets:
+            output.append(f"    {service.name}_{target.name}_mirror:")
+            output.append("      loadBalancer:")
+            output.append("        servers:")
+            output.append(f"        - url: 'http://{target.upstream.host}:{target.upstream.port}'")
+
+            # Note: Traefik doesn't support custom headers per mirror target directly
+            # Headers would need to be added via middleware
+            if target.headers:
+                logger.warning(
+                    f"Custom headers for mirror target '{target.name}' are not directly "
+                    f"supported in Traefik mirroring service. Consider using a middleware "
+                    f"plugin for header manipulation: {list(target.headers.keys())}"
+                )
 
     def deploy(
         self, config: Config, output_file: Optional[str] = None, api_url: Optional[str] = None

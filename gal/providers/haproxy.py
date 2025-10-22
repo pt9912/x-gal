@@ -135,6 +135,14 @@ class HAProxyProvider(Provider):
             output.extend(self._generate_backend(service, config))
             output.append("")
 
+        # Mirror backends for request mirroring
+        for service in config.services:
+            for route in service.routes:
+                if route.mirroring and route.mirroring.enabled:
+                    for target in route.mirroring.targets:
+                        output.extend(self._generate_mirror_backend(service, target))
+                        output.append("")
+
         return "\n".join(output).rstrip() + "\n"
 
     def _generate_global(self, config: Config) -> List[str]:
@@ -292,6 +300,21 @@ class HAProxyProvider(Provider):
                     if route.headers.request_remove:
                         for header in route.headers.request_remove:
                             output.append(f"    http-request del-header {header} if {acl_name}")
+
+                # Request Mirroring (HAProxy 2.4+)
+                if route.mirroring and route.mirroring.enabled:
+                    output.append(f"    # Request Mirroring for {route.path_prefix}")
+                    for target in route.mirroring.targets:
+                        mirror_backend = f"mirror_{service.name}_{target.name}"
+
+                        # HAProxy mirror syntax: http-request mirror <backend> if <condition>
+                        if target.sample_percentage < 100.0:
+                            # Sampling support via random percentage
+                            sample_acl = f"{acl_name}_sample_{target.name}"
+                            output.append(f"    acl {sample_acl} rand({int(target.sample_percentage)})")
+                            output.append(f"    http-request mirror {mirror_backend} if {acl_name} {sample_acl}")
+                        else:
+                            output.append(f"    http-request mirror {mirror_backend} if {acl_name}")
 
                 # CORS headers (add to response)
                 if route.cors and route.cors.enabled:
@@ -637,6 +660,44 @@ class HAProxyProvider(Provider):
             )
             output.append("    # or use stats endpoint: http://<haproxy_host>:8404/stats;csv")
             logger.info(f"Prometheus metrics: Configure external exporter or use stats endpoint")
+
+    def _generate_mirror_backend(self, service: Service, target) -> List[str]:
+        """Generate HAProxy backend for mirror target.
+
+        Creates a backend configuration for a shadow/mirror backend target.
+
+        Args:
+            service: Service with request mirroring
+            target: MirrorTarget with upstream configuration
+
+        Returns:
+            List of HAProxy config lines
+        """
+        backend_name = f"mirror_{service.name}_{target.name}"
+
+        output = [
+            "#---------------------------------------------------------------------",
+            f"# Mirror Backend - {service.name} -> {target.name}",
+            "#---------------------------------------------------------------------",
+            f"backend {backend_name}",
+            "    mode http",
+            "    balance roundrobin",
+        ]
+
+        # Timeout configuration
+        timeout = target.timeout if target.timeout else "5s"
+        output.append(f"    timeout connect {timeout}")
+        output.append(f"    timeout server {timeout}")
+
+        # Custom headers for mirror target
+        if target.headers:
+            for key, value in target.headers.items():
+                output.append(f'    http-request set-header {key} "{value}"')
+
+        # Mirror server
+        output.append(f"    server mirror1 {target.upstream.host}:{target.upstream.port} check")
+
+        return output
 
     def _convert_template_vars(self, value: str) -> str:
         """Convert GAL template variables to HAProxy format."""
