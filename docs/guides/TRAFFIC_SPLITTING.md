@@ -42,31 +42,31 @@ Cookie-based:  canary_user=true → Canary Backend
 
 ### Provider-Unterstützung
 
-| Feature | Envoy | Kong | APISIX | Traefik | Nginx | HAProxy | Implementierung |
-|---------|-------|------|--------|---------|-------|---------|-----------------|
-| **Traffic Splitting** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | Native/Plugin |
-| **Weight-based** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | Gewichts-Verteilung |
-| **Header-based** | ⚠️ | ⚠️ | ✅ | ⚠️ | ✅ | - | Header-Matching |
-| **Cookie-based** | ⚠️ | ⚠️ | ✅ | ⚠️ | ✅ | - | Cookie-Matching |
-| **Dynamic Weights** | ✅ | ✅ | ✅ | ✅ | - | - | Zur Laufzeit änderbar |
+| Feature | Envoy | Kong | APISIX | Traefik | Nginx | HAProxy | Azure APIM | AWS API GW | GCP API GW |
+|---------|-------|------|--------|---------|-------|---------|------------|------------|------------|
+| **Traffic Splitting** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Weight-based** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Header-based** | ⚠️ | ⚠️ | ✅ | ⚠️ | ✅ | ❌ | ⚠️ | ⚠️ | ❌ |
+| **Cookie-based** | ⚠️ | ⚠️ | ✅ | ⚠️ | ✅ | ❌ | ⚠️ | ⚠️ | ❌ |
+| **Dynamic Weights** | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
 
-**Coverage**: 100% (6 von 6 Open-Source-Providern haben Unterstützung)
+**Coverage**: 88.9% (8 von 9 Providern haben Unterstützung)
 
 **Open-Source Providers:**
 - **Envoy**: Weighted Clusters ✅
-- **Kong**: Weighted Upstream Targets ✅
+- **Kong**: Weighted Upstream Targets (0-1000 scale) ✅
 - **APISIX**: Native `traffic-split` Plugin ✅
 - **Traefik**: WeightedRoundRobin Services ✅
 - **Nginx**: `set_random` + conditional routing ✅
-- **HAProxy**: Weighted Servers ✅
+- **HAProxy**: Weighted Servers (0-256 scale) ✅
 
-**Cloud Providers (Limitiert):**
-- **Azure APIM**: ⚠️ Begrenzte Unterstützung (Backend Pool ohne Gewichte)
-- **AWS API Gateway**: ⚠️ Begrenzte Unterstützung (Weighted Targets in VPC Link)
-- **GCP API Gateway**: ⚠️ Keine native Unterstützung (Load Balancer extern)
+**Cloud Providers:**
+- **Azure APIM**: Load-Balanced Backend Pool mit Gewichten ✅
+- **AWS API Gateway**: VTL (Velocity Template Language) mit stageVariables ✅
+- **GCP API Gateway**: ❌ Keine native Unterstützung (externe Cloud Load Balancer erforderlich)
 
-> **Hinweis:** Cloud-Provider haben eingeschränkte Traffic Splitting-Features.
-> Für volle Kontrolle verwende Open-Source Gateways (Envoy, APISIX, Traefik).
+> **Hinweis:** Azure APIM und AWS API Gateway haben vollständige Weight-based Unterstützung.
+> GCP API Gateway benötigt externe **Cloud Load Balancer** für Traffic Splitting.
 
 ---
 
@@ -503,6 +503,204 @@ http:
 - ✅ Dynamische File Provider Rekonfiguration
 - ✅ Kompatibel mit Kubernetes IngressRoute
 - ⚠️ Header/Cookie-Routing benötigt separate Router mit Priority
+
+### HAProxy - Weighted Servers
+
+HAProxy verwendet Server-Gewichte (0-256 scale).
+
+**Generierte Konfiguration:**
+```haproxy
+backend backend_canary_deployment_api
+    balance roundrobin
+    option httpclose
+    option forwardfor
+
+    # Backend servers mit Gewichten
+    server server_stable api-v1-stable:8080 check inter 10s fall 3 rise 2 weight 230
+    server server_canary api-v1-canary:8080 check inter 10s fall 3 rise 2 weight 25
+```
+
+**Eigenschaften:**
+- ✅ Weighted Servers (0-256 scale)
+- ✅ Robustes Load Balancing
+- ✅ Health Checks integriert
+- ✅ Production-grade Performance
+- ⚠️ Weight-Umrechnung: GAL 0-100 → HAProxy 0-256 (×2.56)
+- ❌ Keine Header/Cookie-Routing Unterstützung
+
+**Deployment:**
+```bash
+gal generate -f gateway.yaml -o haproxy.cfg --provider haproxy
+haproxy -f haproxy.cfg -c  # Config validieren
+haproxy -f haproxy.cfg     # Starten
+```
+
+### Azure API Management - Load-Balanced Backend Pool
+
+Azure APIM verwendet Load-Balanced Backend Pools mit Gewichten.
+
+**Generierte ARM Template Konfiguration:**
+```json
+{
+  "type": "Microsoft.ApiManagement/service/backends",
+  "properties": {
+    "description": "Load-balanced backend pool for canary_deployment_api",
+    "type": "pool",
+    "pool": {
+      "services": [
+        {
+          "id": "/backends/canary_deployment_api-stable-backend",
+          "priority": 1,
+          "weight": 90
+        },
+        {
+          "id": "/backends/canary_deployment_api-canary-backend",
+          "priority": 1,
+          "weight": 10
+        }
+      ]
+    }
+  }
+}
+```
+
+**Policy XML:**
+```xml
+<policies>
+  <inbound>
+    <base />
+    <set-backend-service backend-id="canary_deployment_api-backend-pool" />
+  </inbound>
+</policies>
+```
+
+**Eigenschaften:**
+- ✅ Native Backend Pool Support
+- ✅ Weighted Targets (gleiche Scale wie GAL: 0-100)
+- ✅ Azure Portal Verwaltung
+- ✅ Multi-Region Deployment
+- ⚠️ Header/Cookie-Routing benötigt Policy XML
+- ⚠️ ARM Template Deployment erforderlich
+
+**Deployment:**
+```bash
+gal generate -f gateway.yaml -o azure-apim.json --provider azure_apim
+az deployment group create \
+  --resource-group my-rg \
+  --template-file azure-apim.json
+```
+
+### AWS API Gateway - VTL (Velocity Template Language)
+
+AWS API Gateway verwendet VTL Request Templates mit `stageVariables`.
+
+**Generierte OpenAPI 3.0 Konfiguration:**
+```json
+{
+  "paths": {
+    "/api/v1": {
+      "get": {
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "GET",
+          "uri": "${stageVariables.backend_url}/api/v1",
+          "requestTemplates": {
+            "application/json": "## AWS API Gateway Traffic Splitting via VTL\\n#set($random = $context.requestTimeEpoch % 100)\\n#if($random < 90)\\n  #set($backend_url = $stageVariables.canary_deployment_api_stable_url)\\n#elseif($random < 100)\\n  #set($backend_url = $stageVariables.canary_deployment_api_canary_url)\\n#end\\n#set($context.requestOverride.path.backend_url = $backend_url)"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**Stage Variables:**
+```json
+{
+  "canary_deployment_api_stable_url": "https://api-v1-stable.example.com:8080",
+  "canary_deployment_api_canary_url": "https://api-v1-canary.example.com:8080"
+}
+```
+
+**Eigenschaften:**
+- ✅ VTL Template Support
+- ✅ Weighted Routing via Random Selection
+- ✅ Stage Variables für Flexibilität
+- ✅ Deployment History & Rollback
+- ⚠️ Komplexe VTL Syntax
+- ⚠️ Stage Variables müssen manuell konfiguriert werden
+- ⚠️ Header/Cookie-Routing benötigt zusätzliche VTL Logic
+
+**Deployment:**
+```bash
+gal generate -f gateway.yaml -o aws-apigateway.json --provider aws_apigateway
+
+# Import OpenAPI
+aws apigateway import-rest-api \
+  --body file://aws-apigateway.json \
+  --fail-on-warnings
+
+# Deploy Stage mit Variables
+aws apigateway create-deployment \
+  --rest-api-id <api-id> \
+  --stage-name prod \
+  --variables canary_deployment_api_stable_url=https://api-stable:8080,canary_deployment_api_canary_url=https://api-canary:8080
+```
+
+### GCP API Gateway - ❌ Nicht Unterstützt
+
+**GCP API Gateway** unterstützt **KEIN natives Traffic Splitting**.
+
+**Grund:**
+- GCP API Gateway unterstützt nur ein einzelnes Backend pro Route
+- Keine Weighted Targets oder Load Balancing Features
+- OpenAPI 2.0 (Swagger) hat keine Traffic Splitting Extensions
+
+**Workaround:**
+Verwende **Google Cloud Load Balancer** VOR GCP API Gateway:
+
+```
+Client → Cloud Load Balancer (Traffic Split 90/10)
+         ├─ 90% → Backend 1 (Stable)
+         └─ 10% → Backend 2 (Canary)
+```
+
+**Cloud Load Balancer Konfiguration:**
+```yaml
+# Weighted Backend Services
+backends:
+  - name: stable-backend
+    backends:
+      - group: instance-group-stable
+        balancingMode: UTILIZATION
+        capacityScaler: 0.9  # 90%
+  - name: canary-backend
+    backends:
+      - group: instance-group-canary
+        balancingMode: UTILIZATION
+        capacityScaler: 0.1  # 10%
+```
+
+**Alternative: Cloud Run Traffic Splitting**
+
+Wenn du **Cloud Run** als Backend verwendest:
+```bash
+# Cloud Run native Traffic Splitting
+gcloud run services update-traffic my-service \
+  --to-revisions=stable=90,canary=10
+```
+
+**Eigenschaften:**
+- ❌ GCP API Gateway: Kein Traffic Splitting
+- ✅ Cloud Load Balancer: Weighted Backends
+- ✅ Cloud Run: Native Traffic Splitting
+- ⚠️ Workaround benötigt zusätzliche GCP-Komponenten
+
+**Empfehlung:**
+Für Traffic Splitting auf GCP, verwende:
+1. **Cloud Run** (wenn serverless Backend)
+2. **Cloud Load Balancer** + **Compute Engine/GKE** (wenn VM/Container Backend)
+3. Alternative: **Istio** auf GKE (volle Traffic Management Kontrolle)
 
 ---
 
