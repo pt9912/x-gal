@@ -16,6 +16,7 @@ from gal.config import (
     HeaderManipulation,
     HealthCheckConfig,
     LoadBalancerConfig,
+    MirroringConfig,
     RateLimitConfig,
     Route,
     Service,
@@ -86,9 +87,17 @@ class HAProxyProvider(Provider):
         """
         warnings = []
 
-        # Check for JWT authentication
+        # Check for request mirroring
         for service in config.services:
             for route in service.routes:
+                if route.mirroring and route.mirroring.enabled:
+                    logger.info(
+                        f"Request mirroring on route {route.path_prefix} is supported in HAProxy "
+                        f"but not yet implemented in GAL. Configuration will be generated as comments. "
+                        f"Requires HAProxy 2.4+ or Lua scripting for full implementation."
+                    )
+
+                # Check for JWT authentication
                 if route.authentication and route.authentication.enabled:
                     if route.authentication.type == "jwt":
                         warnings.append(
