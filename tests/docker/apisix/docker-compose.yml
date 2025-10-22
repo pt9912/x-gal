@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # Backend - Stable (90% traffic)
+  backend-stable:
+    build:
+      context: ../backends
+      dockerfile: Dockerfile
+    command: ["python", "-u", "/app/stable.py"]
+    environment:
+      - PORT=8080
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080')"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # Backend - Canary (10% traffic)
+  backend-canary:
+    build:
+      context: ../backends
+      dockerfile: Dockerfile
+    command: ["python", "-u", "/app/canary.py"]
+    environment:
+      - PORT=8080
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080')"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # APISIX with Traffic Splitting
+  apisix:
+    image: apache/apisix:3.5.0-debian
+    environment:
+      APISIX_STAND_ALONE: "true"
+    volumes:
+      - ./apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro
+    ports:
+      - "9080:9080"  # HTTP
+      - "9180:9180"  # Admin API
+    networks:
+      - test-network
+    depends_on:
+      backend-stable:
+        condition: service_healthy
+      backend-canary:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9080/"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+networks:
+  test-network:
+    driver: bridge

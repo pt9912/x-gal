@@ -366,6 +366,267 @@ class TestKongTrafficSplitRuntime:
         print("\n✅ Kong traffic distribution test PASSED!")
 
 
+class TestHAProxyTrafficSplitRuntime:
+    """Test HAProxy traffic splitting with real Docker containers"""
+
+    @pytest.fixture(scope="class")
+    def docker_compose_file(self):
+        """Path to Docker Compose file"""
+        return str(Path(__file__).parent / "docker" / "haproxy" / "docker-compose.yml")
+
+    @pytest.fixture(scope="class")
+    def haproxy_setup(self, docker_compose_file):
+        """Setup and teardown Docker Compose environment"""
+        compose_dir = Path(docker_compose_file).parent
+
+        print("\n🐳 Starting HAProxy Docker Compose environment...")
+        subprocess.run(
+            ["docker", "compose", "up", "-d", "--build"],
+            cwd=compose_dir,
+            check=True,
+            capture_output=True
+        )
+
+        print("⏳ Waiting for HAProxy to be healthy...")
+        max_wait = 30
+        for i in range(max_wait):
+            try:
+                response = requests.get("http://localhost:8080/api/v1", timeout=2)
+                if response.status_code == 200:
+                    print("✅ HAProxy is ready!")
+                    break
+            except requests.exceptions.RequestException:
+                pass
+            time.sleep(1)
+        else:
+            subprocess.run(["docker", "compose", "logs"], cwd=compose_dir)
+            pytest.fail("HAProxy did not become ready in time")
+
+        time.sleep(2)
+        yield
+
+        print("\n🧹 Stopping HAProxy Docker Compose environment...")
+        subprocess.run(
+            ["docker", "compose", "down", "-v"],
+            cwd=compose_dir,
+            check=True,
+            capture_output=True
+        )
+
+    def test_traffic_distribution_90_10(self, haproxy_setup):
+        """Test that traffic is distributed 90% stable, 10% canary"""
+        results = Counter()
+        failed = 0
+
+        print("\n📊 Sending 1000 requests to test HAProxy traffic distribution...")
+
+        for i in range(1000):
+            try:
+                response = requests.get("http://localhost:8080/api/v1", timeout=5)
+
+                if response.status_code == 200:
+                    data = response.json()
+                    backend = data.get("backend")
+                    if backend:
+                        results[backend] += 1
+                    else:
+                        failed += 1
+                else:
+                    failed += 1
+            except Exception:
+                failed += 1
+
+            if (i + 1) % 100 == 0:
+                print(f"  Progress: {i + 1}/1000 requests")
+
+        print(f"\n📈 HAProxy Traffic Distribution Results:")
+        print(f"  Stable: {results['stable']} requests ({results['stable']/10:.1f}%)")
+        print(f"  Canary: {results['canary']} requests ({results['canary']/10:.1f}%)")
+        print(f"  Failed: {failed} requests")
+
+        assert results['stable'] >= 850, f"Stable: {results['stable']} < 850"
+        assert results['stable'] <= 950, f"Stable: {results['stable']} > 950"
+        assert results['canary'] >= 50, f"Canary: {results['canary']} < 50"
+        assert results['canary'] <= 150, f"Canary: {results['canary']} > 150"
+        assert failed < 50, f"Too many failed: {failed}"
+
+        print("\n✅ HAProxy traffic distribution test PASSED!")
+
+
+class TestTraefikTrafficSplitRuntime:
+    """Test Traefik traffic splitting with real Docker containers"""
+
+    @pytest.fixture(scope="class")
+    def docker_compose_file(self):
+        """Path to Docker Compose file"""
+        return str(Path(__file__).parent / "docker" / "traefik" / "docker-compose.yml")
+
+    @pytest.fixture(scope="class")
+    def traefik_setup(self, docker_compose_file):
+        """Setup and teardown Docker Compose environment"""
+        compose_dir = Path(docker_compose_file).parent
+
+        print("\n🐳 Starting Traefik Docker Compose environment...")
+        subprocess.run(
+            ["docker", "compose", "up", "-d", "--build"],
+            cwd=compose_dir,
+            check=True,
+            capture_output=True
+        )
+
+        print("⏳ Waiting for Traefik to be healthy...")
+        max_wait = 30
+        for i in range(max_wait):
+            try:
+                response = requests.get("http://localhost:8080/api/v1", timeout=2)
+                if response.status_code == 200:
+                    print("✅ Traefik is ready!")
+                    break
+            except requests.exceptions.RequestException:
+                pass
+            time.sleep(1)
+        else:
+            subprocess.run(["docker", "compose", "logs"], cwd=compose_dir)
+            pytest.fail("Traefik did not become ready in time")
+
+        time.sleep(2)
+        yield
+
+        print("\n🧹 Stopping Traefik Docker Compose environment...")
+        subprocess.run(
+            ["docker", "compose", "down", "-v"],
+            cwd=compose_dir,
+            check=True,
+            capture_output=True
+        )
+
+    def test_traffic_distribution_90_10(self, traefik_setup):
+        """Test that traffic is distributed 90% stable, 10% canary"""
+        results = Counter()
+        failed = 0
+
+        print("\n📊 Sending 1000 requests to test Traefik traffic distribution...")
+
+        for i in range(1000):
+            try:
+                response = requests.get("http://localhost:8080/api/v1", timeout=5)
+
+                if response.status_code == 200:
+                    data = response.json()
+                    backend = data.get("backend")
+                    if backend:
+                        results[backend] += 1
+                    else:
+                        failed += 1
+                else:
+                    failed += 1
+            except Exception:
+                failed += 1
+
+            if (i + 1) % 100 == 0:
+                print(f"  Progress: {i + 1}/1000 requests")
+
+        print(f"\n📈 Traefik Traffic Distribution Results:")
+        print(f"  Stable: {results['stable']} requests ({results['stable']/10:.1f}%)")
+        print(f"  Canary: {results['canary']} requests ({results['canary']/10:.1f}%)")
+        print(f"  Failed: {failed} requests")
+
+        assert results['stable'] >= 850, f"Stable: {results['stable']} < 850"
+        assert results['stable'] <= 950, f"Stable: {results['stable']} > 950"
+        assert results['canary'] >= 50, f"Canary: {results['canary']} < 50"
+        assert results['canary'] <= 150, f"Canary: {results['canary']} > 150"
+        assert failed < 50, f"Too many failed: {failed}"
+
+        print("\n✅ Traefik traffic distribution test PASSED!")
+
+
+class TestAPISIXTrafficSplitRuntime:
+    """Test APISIX traffic splitting with real Docker containers"""
+
+    @pytest.fixture(scope="class")
+    def docker_compose_file(self):
+        """Path to Docker Compose file"""
+        return str(Path(__file__).parent / "docker" / "apisix" / "docker-compose.yml")
+
+    @pytest.fixture(scope="class")
+    def apisix_setup(self, docker_compose_file):
+        """Setup and teardown Docker Compose environment"""
+        compose_dir = Path(docker_compose_file).parent
+
+        print("\n🐳 Starting APISIX Docker Compose environment...")
+        subprocess.run(
+            ["docker", "compose", "up", "-d", "--build"],
+            cwd=compose_dir,
+            check=True,
+            capture_output=True
+        )
+
+        print("⏳ Waiting for APISIX to be healthy...")
+        max_wait = 30
+        for i in range(max_wait):
+            try:
+                response = requests.get("http://localhost:9080/api/v1", timeout=2)
+                if response.status_code == 200:
+                    print("✅ APISIX is ready!")
+                    break
+            except requests.exceptions.RequestException:
+                pass
+            time.sleep(1)
+        else:
+            subprocess.run(["docker", "compose", "logs"], cwd=compose_dir)
+            pytest.fail("APISIX did not become ready in time")
+
+        time.sleep(2)
+        yield
+
+        print("\n🧹 Stopping APISIX Docker Compose environment...")
+        subprocess.run(
+            ["docker", "compose", "down", "-v"],
+            cwd=compose_dir,
+            check=True,
+            capture_output=True
+        )
+
+    def test_traffic_distribution_90_10(self, apisix_setup):
+        """Test that traffic is distributed 90% stable, 10% canary"""
+        results = Counter()
+        failed = 0
+
+        print("\n📊 Sending 1000 requests to test APISIX traffic distribution...")
+
+        for i in range(1000):
+            try:
+                response = requests.get("http://localhost:9080/api/v1", timeout=5)
+
+                if response.status_code == 200:
+                    data = response.json()
+                    backend = data.get("backend")
+                    if backend:
+                        results[backend] += 1
+                    else:
+                        failed += 1
+                else:
+                    failed += 1
+            except Exception:
+                failed += 1
+
+            if (i + 1) % 100 == 0:
+                print(f"  Progress: {i + 1}/1000 requests")
+
+        print(f"\n📈 APISIX Traffic Distribution Results:")
+        print(f"  Stable: {results['stable']} requests ({results['stable']/10:.1f}%)")
+        print(f"  Canary: {results['canary']} requests ({results['canary']/10:.1f}%)")
+        print(f"  Failed: {failed} requests")
+
+        assert results['stable'] >= 850, f"Stable: {results['stable']} < 850"
+        assert results['stable'] <= 950, f"Stable: {results['stable']} > 950"
+        assert results['canary'] >= 50, f"Canary: {results['canary']} < 50"
+        assert results['canary'] <= 150, f"Canary: {results['canary']} > 150"
+        assert failed < 50, f"Too many failed: {failed}"
+
+        print("\n✅ APISIX traffic distribution test PASSED!")
+
+
 @pytest.mark.skip(reason="Docker Compose test - run manually with: pytest tests/test_docker_runtime.py -v -m docker")
 @pytest.mark.docker
 class TestDockerRuntimeSkipped:

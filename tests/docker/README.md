@@ -92,6 +92,53 @@ Failed: 0 requests           ✅
 - Upstream targets with weight: 900 (stable) and 100 (canary)
 - Native load balancing support
 
+### 4. HAProxy Traffic Splitting (tests/docker/haproxy/)
+
+**Config:** 90% Stable, 10% Canary (server weights)
+
+**Tests:**
+- `test_traffic_distribution_90_10`: Sends 1000 requests, verifies 90/10 ± 5% distribution
+
+**Results:**
+```
+Stable: 90 requests (90.0%) ✅
+Canary: 10 requests (10.0%) ✅
+Failed: 0 requests          ✅
+```
+
+**Notes:**
+- Simplified config without chroot (Docker compatibility)
+- Server weights: 90 (stable) and 10 (canary)
+- Balance roundrobin algorithm
+
+### 5. Traefik Traffic Splitting (tests/docker/traefik/)
+
+**Config:** 90% Stable, 10% Canary (weighted services)
+
+**Tests:**
+- `test_traffic_distribution_90_10`: Sends 1000 requests, verifies 90/10 ± 5% distribution
+
+**Status:** Configuration created, ready for testing
+
+**Notes:**
+- Weighted services with weight: 90/10
+- File provider with traefik.yml
+- HTTP entrypoint on port 8080
+
+### 6. APISIX Traffic Splitting (tests/docker/apisix/)
+
+**Config:** 90% Stable, 10% Canary (traffic-split plugin)
+
+**Tests:**
+- `test_traffic_distribution_90_10`: Sends 1000 requests, verifies 90/10 ± 5% distribution
+
+**Status:** Configuration created, ready for testing
+
+**Notes:**
+- Apache APISIX 3.5.0 in standalone mode
+- traffic-split plugin with weighted_upstreams
+- HTTP on port 9080, Admin API on 9180
+
 ## Running Tests
 
 ### Prerequisites
