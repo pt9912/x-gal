@@ -14,7 +14,6 @@ import urllib.error
 import urllib.request
 from typing import Tuple
 
-
 # SPOE Frame Types
 SPOE_FRM_T_HAPROXY_HELLO = 1
 SPOE_FRM_T_HAPROXY_DISCONNECT = 2
@@ -40,7 +39,7 @@ class SPOEAgent:
     """SPOE agent for request mirroring with HAProxy"""
 
     def __init__(self, mirror_url: str, port: int = 12345):
-        self.mirror_url = mirror_url.rstrip('/')
+        self.mirror_url = mirror_url.rstrip("/")
         self.port = port
         self.connections = 0
 
@@ -62,7 +61,10 @@ class SPOEAgent:
                     header = await reader.readexactly(4)
                     print(f"[{client_id}] Received header: {header.hex()}", flush=True)
                 except asyncio.IncompleteReadError as e:
-                    print(f"[{client_id}] Client disconnected (no header) - bytes read: {len(e.partial)}", flush=True)
+                    print(
+                        f"[{client_id}] Client disconnected (no header) - bytes read: {len(e.partial)}",
+                        flush=True,
+                    )
                     break
 
                 # Parse frame length
@@ -77,17 +79,24 @@ class SPOEAgent:
                 try:
                     frame_data = await reader.readexactly(frame_length)
                     if len(frame_data) <= 200:
-                        print(f"[{client_id}] Frame data received ({len(frame_data)} bytes): {frame_data.hex()}", flush=True)
+                        print(
+                            f"[{client_id}] Frame data received ({len(frame_data)} bytes): {frame_data.hex()}",
+                            flush=True,
+                        )
                     else:
-                        print(f"[{client_id}] Frame data received ({len(frame_data)} bytes): {frame_data[:50].hex()}...", flush=True)
+                        print(
+                            f"[{client_id}] Frame data received ({len(frame_data)} bytes): {frame_data[:50].hex()}...",
+                            flush=True,
+                        )
                 except asyncio.IncompleteReadError as e:
-                    print(f"[{client_id}] Incomplete frame data - expected {frame_length}, got {len(e.partial)}", flush=True)
+                    print(
+                        f"[{client_id}] Incomplete frame data - expected {frame_length}, got {len(e.partial)}",
+                        flush=True,
+                    )
                     break
 
                 # Process SPOE frame
-                should_continue = await self.process_spoe_frame(
-                    frame_data, writer, client_id
-                )
+                should_continue = await self.process_spoe_frame(frame_data, writer, client_id)
                 if not should_continue:
                     print(f"[{client_id}] Process returned False, closing connection", flush=True)
                     break
@@ -97,6 +106,7 @@ class SPOEAgent:
         except Exception as e:
             print(f"[{client_id}] Error: {e}", file=sys.stderr, flush=True)
             import traceback
+
             traceback.print_exc()
         finally:
             writer.close()
@@ -115,13 +125,14 @@ class SPOEAgent:
         frame_type = data[0]
         frame_flags = data[1] if len(data) > 1 else 0
 
-        frame_type_name = {
-            1: "HAPROXY_HELLO",
-            2: "HAPROXY_DISCONNECT",
-            3: "HAPROXY_NOTIFY"
-        }.get(frame_type, f"UNKNOWN({frame_type})")
+        frame_type_name = {1: "HAPROXY_HELLO", 2: "HAPROXY_DISCONNECT", 3: "HAPROXY_NOTIFY"}.get(
+            frame_type, f"UNKNOWN({frame_type})"
+        )
 
-        print(f"[{client_id}] >>> Processing frame: type={frame_type_name}, flags={frame_flags}, len={len(data)}", flush=True)
+        print(
+            f"[{client_id}] >>> Processing frame: type={frame_type_name}, flags={frame_flags}, len={len(data)}",
+            flush=True,
+        )
 
         if frame_type == SPOE_FRM_T_HAPROXY_HELLO:
             print(f"[{client_id}] Handling HAPROXY_HELLO...", flush=True)
@@ -137,10 +148,12 @@ class SPOEAgent:
             print(f"[{client_id}] HELLO stream_id={stream_id}, frame_id={frame_id}", flush=True)
 
             # Parse HELLO KV-pairs properly from the beginning
-            hello_kvs = self.parse_hello_kvs(data[7:], client_id)  # Skip type(1) + flags(4) + stream(1) + frame(1) = 7
-            haproxy_caps = hello_kvs.get('capabilities', '')
-            haproxy_engine_id = hello_kvs.get('engine-id', '')
-            haproxy_max_frame_size = hello_kvs.get('max-frame-size', 16384)
+            hello_kvs = self.parse_hello_kvs(
+                data[7:], client_id
+            )  # Skip type(1) + flags(4) + stream(1) + frame(1) = 7
+            haproxy_caps = hello_kvs.get("capabilities", "")
+            haproxy_engine_id = hello_kvs.get("engine-id", "")
+            haproxy_max_frame_size = hello_kvs.get("max-frame-size", 16384)
             print(f"[{client_id}] HAProxy capabilities: '{haproxy_caps}'", flush=True)
             print(f"[{client_id}] HAProxy max-frame-size: {haproxy_max_frame_size}", flush=True)
             if haproxy_engine_id:
@@ -148,7 +161,16 @@ class SPOEAgent:
 
             # Send AGENT_HELLO - use FIN flag (0x01) in response
             response_flags = 0x01  # SPOE_FRM_FL_FIN
-            await self.send_agent_hello(writer, client_id, response_flags, stream_id, frame_id, haproxy_caps, haproxy_engine_id, haproxy_max_frame_size)
+            await self.send_agent_hello(
+                writer,
+                client_id,
+                response_flags,
+                stream_id,
+                frame_id,
+                haproxy_caps,
+                haproxy_engine_id,
+                haproxy_max_frame_size,
+            )
             print(f"[{client_id}] HAPROXY_HELLO handled, waiting for next frame", flush=True)
             return True
 
@@ -164,13 +186,22 @@ class SPOEAgent:
             return True
 
         else:
-            print(f"[{client_id}] WARNING: Unknown frame type: {frame_type} (raw data: {data[:20].hex()})", flush=True)
+            print(
+                f"[{client_id}] WARNING: Unknown frame type: {frame_type} (raw data: {data[:20].hex()})",
+                flush=True,
+            )
             return True
 
     async def send_agent_hello(
-        self, writer: asyncio.StreamWriter, client_id: int, flags: int,
-        stream_id: int = 0, frame_id: int = 0, haproxy_capabilities: str = "",
-        haproxy_engine_id: str = "", haproxy_max_frame_size: int = 16384
+        self,
+        writer: asyncio.StreamWriter,
+        client_id: int,
+        flags: int,
+        stream_id: int = 0,
+        frame_id: int = 0,
+        haproxy_capabilities: str = "",
+        haproxy_engine_id: str = "",
+        haproxy_max_frame_size: int = 16384,
     ):
         """Send AGENT_HELLO response to HAProxy"""
         print(f"[{client_id}] Building AGENT_HELLO response...", flush=True)
@@ -199,19 +230,30 @@ class SPOEAgent:
         # Per spoa-server code: "Keep the lower value", but HAProxy may be rejecting
         # if we return a value that's TOO different from what it expects
         # Try returning HAProxy's value directly
-        print(f"[{client_id}] max-frame-size: HAProxy={haproxy_max_frame_size}, returning same", flush=True)
+        print(
+            f"[{client_id}] max-frame-size: HAProxy={haproxy_max_frame_size}, returning same",
+            flush=True,
+        )
         frame.extend(self.encode_kv_uint32("max-frame-size", haproxy_max_frame_size))
 
         # Capabilities (REQUIRED): Return EXACTLY what HAProxy sends (no additions!)
         agent_caps = haproxy_capabilities if haproxy_capabilities else ""
-        print(f"[{client_id}] Responding with capabilities: '{agent_caps}' (exact match)", flush=True)
+        print(
+            f"[{client_id}] Responding with capabilities: '{agent_caps}' (exact match)", flush=True
+        )
         frame.extend(self.encode_kv_string("capabilities", agent_caps))
 
-        print(f"[{client_id}] AGENT_HELLO frame built: {len(frame)} bytes (hex: {bytes(frame[:50]).hex()}...)", flush=True)
+        print(
+            f"[{client_id}] AGENT_HELLO frame built: {len(frame)} bytes (hex: {bytes(frame[:50]).hex()}...)",
+            flush=True,
+        )
 
         # Send frame with length prefix
         frame_length_bytes = struct.pack(">I", len(frame))
-        print(f"[{client_id}] Sending frame length: {len(frame)} (hex: {frame_length_bytes.hex()})", flush=True)
+        print(
+            f"[{client_id}] Sending frame length: {len(frame)} (hex: {frame_length_bytes.hex()})",
+            flush=True,
+        )
 
         writer.write(frame_length_bytes)
         writer.write(frame)
@@ -219,9 +261,7 @@ class SPOEAgent:
 
         print(f"[{client_id}] ✓ AGENT_HELLO sent successfully", flush=True)
 
-    async def send_agent_disconnect(
-        self, writer: asyncio.StreamWriter, client_id: int, flags: int
-    ):
+    async def send_agent_disconnect(self, writer: asyncio.StreamWriter, client_id: int, flags: int):
         """Send AGENT_DISCONNECT response to HAProxy"""
         frame = bytearray()
         frame.append(SPOE_FRM_T_AGENT_DISCONNECT)  # Frame type
@@ -266,11 +306,10 @@ class SPOEAgent:
         except Exception as e:
             print(f"[{client_id}] Error handling NOTIFY: {e}", file=sys.stderr, flush=True)
             import traceback
+
             traceback.print_exc()
 
-    async def send_agent_ack(
-        self, writer: asyncio.StreamWriter, client_id: int, flags: int
-    ):
+    async def send_agent_ack(self, writer: asyncio.StreamWriter, client_id: int, flags: int):
         """Send AGENT_ACK response to HAProxy"""
         print(f"[{client_id}] Building AGENT_ACK response...", flush=True)
 
@@ -306,7 +345,7 @@ class SPOEAgent:
                 return 0, 0
             # Stream-ID and Frame-ID are single bytes (0) for HELLO frames
             stream_id = data[4]  # byte after 4-byte flags
-            frame_id = data[5]   # next byte
+            frame_id = data[5]  # next byte
             return stream_id, frame_id
         except Exception as e:
             print(f"Error parsing HELLO IDs: {e}", file=sys.stderr, flush=True)
@@ -325,7 +364,7 @@ class SPOEAgent:
                     break
 
                 # Read key
-                key = payload[pos:pos+key_len].decode('utf-8', errors='replace')
+                key = payload[pos : pos + key_len].decode("utf-8", errors="replace")
                 pos += key_len
 
                 # Read type byte
@@ -339,17 +378,20 @@ class SPOEAgent:
                     val_len, pos = self.decode_varint(payload, pos)
                     if pos + val_len > len(payload):
                         break
-                    value = payload[pos:pos+val_len].decode('utf-8', errors='replace')
+                    value = payload[pos : pos + val_len].decode("utf-8", errors="replace")
                     pos += val_len
                     kvs[key] = value
-                    print(f"[{client_id}]   KV: {key} = \"{value}\" (string)", flush=True)
+                    print(f'[{client_id}]   KV: {key} = "{value}" (string)', flush=True)
                 elif type_byte == SPOE_DATA_T_UINT32:  # Uint32 (0x03)
                     value, pos = self.decode_varint(payload, pos)
                     kvs[key] = value
                     print(f"[{client_id}]   KV: {key} = {value} (uint32)", flush=True)
                 else:
                     # Unknown type, try to skip
-                    print(f"[{client_id}]   KV: {key} - unknown type {type_byte}, skipping", flush=True)
+                    print(
+                        f"[{client_id}]   KV: {key} - unknown type {type_byte}, skipping",
+                        flush=True,
+                    )
                     break
 
         except Exception as e:
@@ -361,7 +403,7 @@ class SPOEAgent:
         """Extract capabilities string from HAPROXY_HELLO frame"""
         try:
             # Look for "capabilities" in the frame
-            caps_pos = data.find(b'capabilities')
+            caps_pos = data.find(b"capabilities")
             if caps_pos == -1:
                 return ""
 
@@ -392,7 +434,7 @@ class SPOEAgent:
                 return ""
 
             # Extract capabilities string
-            caps = data[pos:pos+caps_len].decode('utf-8', errors='replace')
+            caps = data[pos : pos + caps_len].decode("utf-8", errors="replace")
             return caps
         except Exception as e:
             print(f"Error extracting capabilities: {e}", file=sys.stderr, flush=True)
@@ -402,7 +444,7 @@ class SPOEAgent:
         """Extract engine-id string from HAPROXY_HELLO frame"""
         try:
             # Look for "engine-id" in the frame
-            engine_id_pos = data.find(b'engine-id')
+            engine_id_pos = data.find(b"engine-id")
             if engine_id_pos == -1:
                 return ""
 
@@ -432,7 +474,7 @@ class SPOEAgent:
                 return ""
 
             # Extract engine-id string
-            engine_id = data[pos:pos+engine_id_len].decode('utf-8', errors='replace')
+            engine_id = data[pos : pos + engine_id_len].decode("utf-8", errors="replace")
             return engine_id
         except Exception as e:
             print(f"Error extracting engine-id: {e}", file=sys.stderr, flush=True)
@@ -451,7 +493,7 @@ class SPOEAgent:
 
             # Read message name (string)
             message_name_len, pos = self.decode_varint(data, pos)
-            message_name = data[pos:pos + message_name_len].decode('utf-8')
+            message_name = data[pos : pos + message_name_len].decode("utf-8")
             pos += message_name_len
 
             print(f"[{client_id}] Message: {message_name}", flush=True)
@@ -463,7 +505,7 @@ class SPOEAgent:
             for _ in range(nb_args):
                 # Argument name
                 arg_name_len, pos = self.decode_varint(data, pos)
-                arg_name = data[pos:pos + arg_name_len].decode('utf-8')
+                arg_name = data[pos : pos + arg_name_len].decode("utf-8")
                 pos += arg_name_len
 
                 # Argument value type
@@ -473,7 +515,7 @@ class SPOEAgent:
                 # Argument value
                 if arg_type == SPOE_DATA_T_STR:
                     arg_value_len, pos = self.decode_varint(data, pos)
-                    arg_value = data[pos:pos + arg_value_len].decode('utf-8', errors='ignore')
+                    arg_value = data[pos : pos + arg_value_len].decode("utf-8", errors="ignore")
                     pos += arg_value_len
 
                     if arg_name == "method":
@@ -490,6 +532,7 @@ class SPOEAgent:
         except Exception as e:
             print(f"[{client_id}] Error parsing NOTIFY: {e}", file=sys.stderr, flush=True)
             import traceback
+
             traceback.print_exc()
 
         return method, uri
@@ -520,13 +563,13 @@ class SPOEAgent:
         """Encode key-value pair with string value (matches spoa-server format)"""
         result = bytearray()
         # Key: [length:varint][bytes]
-        key_bytes = key.encode('utf-8')
+        key_bytes = key.encode("utf-8")
         result.extend(self.encode_varint(len(key_bytes)))
         result.extend(key_bytes)
         # Type byte (not combined with flags!)
         result.append(SPOE_DATA_T_STR)  # 0x08
         # Value: [length:varint][bytes]
-        value_bytes = value.encode('utf-8')
+        value_bytes = value.encode("utf-8")
         result.extend(self.encode_varint(len(value_bytes)))
         result.extend(value_bytes)
         return bytes(result)
@@ -535,7 +578,7 @@ class SPOEAgent:
         """Encode key-value pair with uint32 value (matches spoa-server format)"""
         result = bytearray()
         # Key: [length:varint][bytes]
-        key_bytes = key.encode('utf-8')
+        key_bytes = key.encode("utf-8")
         result.extend(self.encode_varint(len(key_bytes)))
         result.extend(key_bytes)
         # Type byte (not combined with flags!)

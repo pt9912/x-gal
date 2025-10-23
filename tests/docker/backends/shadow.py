@@ -67,6 +67,7 @@ class ShadowHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         # Log to stdout for debugging with timestamp for uniqueness
         import datetime
+
         ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
         print(f"[SHADOW-{ts}] {format % args}")
 

@@ -159,7 +159,9 @@ class TestAPISIXRequestMirroringE2E:
                     timeout=10,
                 )
                 if response.status_code not in (200, 201):
-                    print(f"⚠️  Failed to deploy route {route_id} ({route_uri}): {response.status_code}")
+                    print(
+                        f"⚠️  Failed to deploy route {route_id} ({route_uri}): {response.status_code}"
+                    )
                     print(f"  Response: {response.text}")
                 else:
                     plugins = route.get("plugins", {})
@@ -208,11 +210,15 @@ class TestAPISIXRequestMirroringE2E:
                     if backend == "primary":
                         primary_responses.append(response)
                     else:
-                        print(f"⚠️  Unexpected backend: {backend} (headers: {dict(response.headers)})")
+                        print(
+                            f"⚠️  Unexpected backend: {backend} (headers: {dict(response.headers)})"
+                        )
                 else:
                     failed += 1
                     if i < 5:  # Log first few non-200 responses
-                        print(f"❌ Non-200 response: {response.status_code} - {response.text[:200]}")
+                        print(
+                            f"❌ Non-200 response: {response.status_code} - {response.text[:200]}"
+                        )
             except requests.exceptions.RequestException as e:
                 failed += 1
                 if i < 5:  # Only log first few failures
