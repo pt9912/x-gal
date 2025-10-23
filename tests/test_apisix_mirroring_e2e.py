@@ -66,7 +66,12 @@ class TestAPISIXRequestMirroringE2E:
                 print(f"  Waiting... ({i}s) - Container status check")
 
             try:
-                response = requests.get("http://localhost:10003/health", timeout=2)
+                # Check Admin API instead of /health (which doesn't exist until routes are configured)
+                response = requests.get(
+                    "http://localhost:9182/apisix/admin/routes",
+                    headers={"X-API-KEY": "edd1c9f034335f136f87ad84b625c8f1"},
+                    timeout=2
+                )
                 if response.status_code == 200:
                     print("✅ APISIX is ready!")
                     break

@@ -21,5 +21,6 @@ USER spoa
 EXPOSE 12345
 
 # Default command: Listen on port 12345, mirror to shadow-backend
-ENTRYPOINT ["python3", "/usr/local/bin/spoa-mirror"]
+# -u flag for unbuffered output (important for Docker logs)
+ENTRYPOINT ["python3", "-u", "/usr/local/bin/spoa-mirror"]
 CMD ["-p", "12345", "-u", "http://backend-shadow:8080"]

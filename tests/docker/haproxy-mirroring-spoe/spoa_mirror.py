@@ -69,58 +69,57 @@ class SPOEAgent:
 
     async def process_spoe_message(self, data: bytes, client_id: int):
         """Process SPOE message and mirror request"""
-        # This is a SIMPLIFIED parser - real SPOE is more complex
-        # We just extract basic request info from the message
+        # Simplified SPOE parser - looks for method and path in binary data
+        # Real SPOE uses complex binary format with VarInt encoding
+        # This is a practical approximation that looks for text patterns
 
         try:
-            # Extract request data (simplified - assumes message contains method and URI)
-            message_str = data.decode("utf-8", errors="ignore")
+            # Default values
+            method = "GET"
+            uri = "/"
 
-            # Look for method and URI in message
-            # Real SPOE uses binary format with typed arguments
-            method = "GET"  # Default
-            uri = "/"  # Default
+            # Convert to string for easier searching (ignoring unprintable chars)
+            data_str = data.decode("utf-8", errors="ignore")
 
-            if b"method" in data:
-                # Try to extract method
-                idx = data.find(b"method")
-                if idx != -1:
-                    # Next few bytes might contain the method
-                    snippet = data[idx : idx + 20].decode("utf-8", errors="ignore")
-                    if "GET" in snippet:
-                        method = "GET"
-                    elif "POST" in snippet:
-                        method = "POST"
-                    elif "PUT" in snippet:
-                        method = "PUT"
-                    elif "DELETE" in snippet:
-                        method = "DELETE"
+            # Extract HTTP method - look for common methods in the data
+            if "GET" in data_str:
+                method = "GET"
+            elif "POST" in data_str:
+                method = "POST"
+            elif "PUT" in data_str:
+                method = "PUT"
+            elif "DELETE" in data_str:
+                method = "DELETE"
+            elif "PATCH" in data_str:
+                method = "PATCH"
 
-            if b"uri" in data or b"path" in data:
-                # Try to extract URI
-                idx = max(data.find(b"uri"), data.find(b"path"))
-                if idx != -1:
-                    snippet = data[idx : idx + 100].decode("utf-8", errors="ignore")
-                    # Look for /api/ patterns
-                    if "/api/" in snippet:
-                        start = snippet.find("/api/")
-                        end = snippet.find(" ", start)
-                        if end == -1:
-                            end = snippet.find("\x00", start)
-                        if end != -1:
-                            uri = snippet[start:end]
-                        else:
-                            uri = snippet[start : start + 20]
+            # Extract URI/path - look for /api/ patterns
+            # SPOE sends path as null-terminated string after "path" key
+            if "/api/" in data_str:
+                start = data_str.find("/api/")
+                # Find end of path (null byte, space, or newline)
+                end = len(data_str)
+                for delimiter in ["\x00", " ", "\n", "\r"]:
+                    pos = data_str.find(delimiter, start)
+                    if pos != -1 and pos < end:
+                        end = pos
+                uri = data_str[start:end].strip()
+                # Clean up any non-path characters
+                if " " in uri:
+                    uri = uri.split(" ")[0]
 
-            # Mirror the request to shadow backend
-            mirror_url = f"{self.mirror_url}{uri}"
-            print(f"[{client_id}] Mirroring: {method} {uri} → {mirror_url}")
+            # Only mirror if we found a valid URI
+            if uri and uri != "/":
+                mirror_url = f"{self.mirror_url}{uri}"
+                print(f"[{client_id}] Mirroring: {method} {uri} → {mirror_url}", flush=True)
 
-            # Fire-and-forget mirror (don't wait for response)
-            asyncio.create_task(self.mirror_request(method, mirror_url, client_id))
+                # Fire-and-forget mirror (don't wait for response)
+                asyncio.create_task(self.mirror_request(method, mirror_url, client_id))
+            else:
+                print(f"[{client_id}] No valid URI found in SPOE message", flush=True)
 
         except Exception as e:
-            print(f"[{client_id}] Failed to parse SPOE message: {e}", file=sys.stderr)
+            print(f"[{client_id}] Failed to parse SPOE message: {e}", file=sys.stderr, flush=True)
 
     async def mirror_request(self, method: str, url: str, client_id: int):
         """Mirror request to shadow backend (async, fire-and-forget)"""
