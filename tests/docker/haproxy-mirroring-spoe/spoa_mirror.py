@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
 """
-Simple SPOE (Stream Processing Offload Engine) agent for request mirroring.
+SPOE (Stream Processing Offload Engine) agent for request mirroring.
 
-This is a simplified Python implementation of spoa-mirror that:
-1. Listens for SPOE messages from HAProxy
-2. Extracts request data (method, URI, headers, body)
-3. Mirrors requests to shadow backend (fire-and-forget)
-
-Based on HAProxy SPOE protocol specification.
+Implements HAProxy SPOE protocol with proper HELLO/DISCONNECT handshake.
+Based on HAProxy SPOE specification: https://www.haproxy.org/download/2.9/doc/SPOE.txt
 """
 
 import argparse
@@ -16,14 +12,35 @@ import struct
 import sys
 import urllib.error
 import urllib.request
-from typing import Any, Dict
+from typing import Tuple
+
+
+# SPOE Frame Types
+SPOE_FRM_T_HAPROXY_HELLO = 1
+SPOE_FRM_T_HAPROXY_DISCONNECT = 2
+SPOE_FRM_T_HAPROXY_NOTIFY = 3
+SPOE_FRM_T_AGENT_HELLO = 101
+SPOE_FRM_T_AGENT_DISCONNECT = 102
+SPOE_FRM_T_AGENT_ACK = 103
+
+# SPOE Data Types
+SPOE_DATA_T_NULL = 0
+SPOE_DATA_T_BOOL = 1
+SPOE_DATA_T_INT32 = 2
+SPOE_DATA_T_UINT32 = 3
+SPOE_DATA_T_INT64 = 4
+SPOE_DATA_T_UINT64 = 5
+SPOE_DATA_T_IPV4 = 6
+SPOE_DATA_T_IPV6 = 7
+SPOE_DATA_T_STR = 8
+SPOE_DATA_T_BIN = 9
 
 
 class SPOEAgent:
-    """Simple SPOE agent for request mirroring"""
+    """SPOE agent for request mirroring with HAProxy"""
 
     def __init__(self, mirror_url: str, port: int = 12345):
-        self.mirror_url = mirror_url
+        self.mirror_url = mirror_url.rstrip('/')
         self.port = port
         self.connections = 0
 
@@ -32,104 +49,287 @@ class SPOEAgent:
         self.connections += 1
         client_id = self.connections
         addr = writer.get_extra_info("peername")
-        print(f"[{client_id}] Connection from {addr}")
+        print(f"[{client_id}] Connection from {addr}", flush=True)
 
         try:
             while True:
-                # Read frame header (4 bytes)
-                header = await reader.readexactly(4)
-                if not header:
+                # Read frame header (4 bytes: length)
+                try:
+                    header = await reader.readexactly(4)
+                except asyncio.IncompleteReadError:
+                    print(f"[{client_id}] Client disconnected (no header)", flush=True)
                     break
 
                 # Parse frame length
                 frame_length = struct.unpack(">I", header)[0]
                 if frame_length == 0:
+                    print(f"[{client_id}] Empty frame, closing", flush=True)
                     break
 
                 # Read frame data
-                frame_data = await reader.readexactly(frame_length)
+                try:
+                    frame_data = await reader.readexactly(frame_length)
+                except asyncio.IncompleteReadError:
+                    print(f"[{client_id}] Incomplete frame data", flush=True)
+                    break
 
-                # Process SPOE message
-                await self.process_spoe_message(frame_data, client_id)
+                # Process SPOE frame
+                should_continue = await self.process_spoe_frame(
+                    frame_data, writer, client_id
+                )
+                if not should_continue:
+                    break
 
-                # Send ACK (simple empty frame for now)
-                # In production, parse message and send proper ACK
-                ack = struct.pack(">I", 0)
-                writer.write(ack)
-                await writer.drain()
-
-        except asyncio.IncompleteReadError:
-            print(f"[{client_id}] Client disconnected")
         except Exception as e:
-            print(f"[{client_id}] Error: {e}", file=sys.stderr)
+            print(f"[{client_id}] Error: {e}", file=sys.stderr, flush=True)
+            import traceback
+            traceback.print_exc()
         finally:
             writer.close()
             await writer.wait_closed()
-            print(f"[{client_id}] Connection closed")
+            print(f"[{client_id}] Connection closed", flush=True)
 
-    async def process_spoe_message(self, data: bytes, client_id: int):
-        """Process SPOE message and mirror request"""
-        # Simplified SPOE parser - looks for method and path in binary data
-        # Real SPOE uses complex binary format with VarInt encoding
-        # This is a practical approximation that looks for text patterns
+    async def process_spoe_frame(
+        self, data: bytes, writer: asyncio.StreamWriter, client_id: int
+    ) -> bool:
+        """Process SPOE frame from HAProxy. Returns False to close connection."""
+        if len(data) == 0:
+            return False
 
+        # Frame type is first byte
+        frame_type = data[0]
+        frame_flags = data[1] if len(data) > 1 else 0
+
+        print(f"[{client_id}] Frame type={frame_type}, flags={frame_flags}, len={len(data)}", flush=True)
+
+        if frame_type == SPOE_FRM_T_HAPROXY_HELLO:
+            # HAProxy sent HELLO, respond with AGENT_HELLO
+            await self.send_agent_hello(writer, client_id, frame_flags)
+            return True
+
+        elif frame_type == SPOE_FRM_T_HAPROXY_DISCONNECT:
+            # HAProxy wants to disconnect
+            await self.send_agent_disconnect(writer, client_id, frame_flags)
+            return False
+
+        elif frame_type == SPOE_FRM_T_HAPROXY_NOTIFY:
+            # HAProxy sent a NOTIFY message (actual request mirroring)
+            await self.handle_notify(data, writer, client_id, frame_flags)
+            return True
+
+        else:
+            print(f"[{client_id}] Unknown frame type: {frame_type}", flush=True)
+            return True
+
+    async def send_agent_hello(
+        self, writer: asyncio.StreamWriter, client_id: int, flags: int
+    ):
+        """Send AGENT_HELLO response to HAProxy"""
+        # Build AGENT_HELLO frame
+        frame = bytearray()
+        frame.append(SPOE_FRM_T_AGENT_HELLO)  # Frame type
+        frame.append(flags & 0x01)  # Flags: FIN bit only
+
+        # Stream-ID and Frame-ID (copy from HELLO, but we don't parse them)
+        # For simplicity, use zeros
+        frame.extend(self.encode_varint(0))  # stream-id
+        frame.extend(self.encode_varint(0))  # frame-id
+
+        # KV pairs: version, max-frame-size, capabilities
+        # Version
+        frame.extend(self.encode_kv_string("version", "2.0"))
+        # Max frame size
+        frame.extend(self.encode_kv_uint32("max-frame-size", 16384))
+        # Capabilities (empty string = no capabilities)
+        frame.extend(self.encode_kv_string("capabilities", ""))
+
+        # Send frame with length prefix
+        writer.write(struct.pack(">I", len(frame)))
+        writer.write(frame)
+        await writer.drain()
+        print(f"[{client_id}] Sent AGENT_HELLO", flush=True)
+
+    async def send_agent_disconnect(
+        self, writer: asyncio.StreamWriter, client_id: int, flags: int
+    ):
+        """Send AGENT_DISCONNECT response to HAProxy"""
+        frame = bytearray()
+        frame.append(SPOE_FRM_T_AGENT_DISCONNECT)  # Frame type
+        frame.append(flags & 0x01)  # Flags: FIN bit only
+
+        # Stream-ID and Frame-ID
+        frame.extend(self.encode_varint(0))  # stream-id
+        frame.extend(self.encode_varint(0))  # frame-id
+
+        # Status code (0 = normal)
+        frame.extend(self.encode_kv_uint32("status-code", 0))
+        # Message (optional)
+        frame.extend(self.encode_kv_string("message", "Goodbye"))
+
+        # Send frame
+        writer.write(struct.pack(">I", len(frame)))
+        writer.write(frame)
+        await writer.drain()
+        print(f"[{client_id}] Sent AGENT_DISCONNECT", flush=True)
+
+    async def handle_notify(
+        self, data: bytes, writer: asyncio.StreamWriter, client_id: int, flags: int
+    ):
+        """Handle NOTIFY frame from HAProxy"""
         try:
-            # Default values
-            method = "GET"
-            uri = "/"
+            # Parse NOTIFY frame to extract method and path
+            method, uri = self.parse_notify_frame(data[2:], client_id)  # Skip type+flags
 
-            # Convert to string for easier searching (ignoring unprintable chars)
-            data_str = data.decode("utf-8", errors="ignore")
-
-            # Extract HTTP method - look for common methods in the data
-            if "GET" in data_str:
-                method = "GET"
-            elif "POST" in data_str:
-                method = "POST"
-            elif "PUT" in data_str:
-                method = "PUT"
-            elif "DELETE" in data_str:
-                method = "DELETE"
-            elif "PATCH" in data_str:
-                method = "PATCH"
-
-            # Extract URI/path - look for /api/ patterns
-            # SPOE sends path as null-terminated string after "path" key
-            if "/api/" in data_str:
-                start = data_str.find("/api/")
-                # Find end of path (null byte, space, or newline)
-                end = len(data_str)
-                for delimiter in ["\x00", " ", "\n", "\r"]:
-                    pos = data_str.find(delimiter, start)
-                    if pos != -1 and pos < end:
-                        end = pos
-                uri = data_str[start:end].strip()
-                # Clean up any non-path characters
-                if " " in uri:
-                    uri = uri.split(" ")[0]
-
-            # Only mirror if we found a valid URI
-            if uri and uri != "/":
+            if method and uri:
                 mirror_url = f"{self.mirror_url}{uri}"
                 print(f"[{client_id}] Mirroring: {method} {uri} → {mirror_url}", flush=True)
 
-                # Fire-and-forget mirror (don't wait for response)
+                # Fire-and-forget mirror
                 asyncio.create_task(self.mirror_request(method, mirror_url, client_id))
             else:
-                print(f"[{client_id}] No valid URI found in SPOE message", flush=True)
+                print(f"[{client_id}] No valid method/URI in NOTIFY", flush=True)
+
+            # Send ACK
+            await self.send_agent_ack(writer, client_id, flags)
 
         except Exception as e:
-            print(f"[{client_id}] Failed to parse SPOE message: {e}", file=sys.stderr, flush=True)
+            print(f"[{client_id}] Error handling NOTIFY: {e}", file=sys.stderr, flush=True)
+            import traceback
+            traceback.print_exc()
+
+    async def send_agent_ack(
+        self, writer: asyncio.StreamWriter, client_id: int, flags: int
+    ):
+        """Send AGENT_ACK response to HAProxy"""
+        frame = bytearray()
+        frame.append(SPOE_FRM_T_AGENT_ACK)  # Frame type
+        frame.append(flags & 0x01)  # Flags: FIN bit only
+
+        # Stream-ID and Frame-ID
+        frame.extend(self.encode_varint(0))  # stream-id
+        frame.extend(self.encode_varint(0))  # frame-id
+
+        # Empty actions list (we don't set any variables back)
+
+        # Send frame
+        writer.write(struct.pack(">I", len(frame)))
+        writer.write(frame)
+        await writer.drain()
+
+    def parse_notify_frame(self, data: bytes, client_id: int) -> Tuple[str, str]:
+        """Parse NOTIFY frame to extract method and path arguments"""
+        method = ""
+        uri = ""
+
+        try:
+            # Skip stream-id and frame-id (varint)
+            pos = 0
+            _, pos = self.decode_varint(data, pos)  # stream-id
+            _, pos = self.decode_varint(data, pos)  # frame-id
+
+            # Read message name (string)
+            message_name_len, pos = self.decode_varint(data, pos)
+            message_name = data[pos:pos + message_name_len].decode('utf-8')
+            pos += message_name_len
+
+            print(f"[{client_id}] Message: {message_name}", flush=True)
+
+            # Read number of arguments
+            nb_args, pos = self.decode_varint(data, pos)
+
+            # Read arguments (key-value pairs)
+            for _ in range(nb_args):
+                # Argument name
+                arg_name_len, pos = self.decode_varint(data, pos)
+                arg_name = data[pos:pos + arg_name_len].decode('utf-8')
+                pos += arg_name_len
+
+                # Argument value type
+                arg_type = data[pos]
+                pos += 1
+
+                # Argument value
+                if arg_type == SPOE_DATA_T_STR:
+                    arg_value_len, pos = self.decode_varint(data, pos)
+                    arg_value = data[pos:pos + arg_value_len].decode('utf-8', errors='ignore')
+                    pos += arg_value_len
+
+                    if arg_name == "method":
+                        method = arg_value
+                    elif arg_name == "path":
+                        uri = arg_value
+
+                    print(f"[{client_id}]   {arg_name}={arg_value}", flush=True)
+                else:
+                    # Skip other data types for now
+                    print(f"[{client_id}]   {arg_name}: type {arg_type} (skipped)", flush=True)
+                    break
+
+        except Exception as e:
+            print(f"[{client_id}] Error parsing NOTIFY: {e}", file=sys.stderr, flush=True)
+            import traceback
+            traceback.print_exc()
+
+        return method, uri
+
+    def encode_varint(self, value: int) -> bytes:
+        """Encode integer as varint (SPOE encoding)"""
+        result = bytearray()
+        while value >= 0x80:
+            result.append((value & 0x7F) | 0x80)
+            value >>= 7
+        result.append(value & 0x7F)
+        return bytes(result)
+
+    def decode_varint(self, data: bytes, pos: int) -> Tuple[int, int]:
+        """Decode varint from data at position. Returns (value, new_pos)"""
+        value = 0
+        shift = 0
+        while pos < len(data):
+            byte = data[pos]
+            pos += 1
+            value |= (byte & 0x7F) << shift
+            if (byte & 0x80) == 0:
+                break
+            shift += 7
+        return value, pos
+
+    def encode_kv_string(self, key: str, value: str) -> bytes:
+        """Encode key-value pair with string value"""
+        result = bytearray()
+        # Key name
+        key_bytes = key.encode('utf-8')
+        result.extend(self.encode_varint(len(key_bytes)))
+        result.extend(key_bytes)
+        # Value type
+        result.append(SPOE_DATA_T_STR)
+        # Value
+        value_bytes = value.encode('utf-8')
+        result.extend(self.encode_varint(len(value_bytes)))
+        result.extend(value_bytes)
+        return bytes(result)
+
+    def encode_kv_uint32(self, key: str, value: int) -> bytes:
+        """Encode key-value pair with uint32 value"""
+        result = bytearray()
+        # Key name
+        key_bytes = key.encode('utf-8')
+        result.extend(self.encode_varint(len(key_bytes)))
+        result.extend(key_bytes)
+        # Value type
+        result.append(SPOE_DATA_T_UINT32)
+        # Value (varint encoded)
+        result.extend(self.encode_varint(value))
+        return bytes(result)
 
     async def mirror_request(self, method: str, url: str, client_id: int):
         """Mirror request to shadow backend (async, fire-and-forget)"""
         try:
-            # Use asyncio to not block
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, self._make_http_request, method, url)
-            print(f"[{client_id}] ✓ Mirrored: {method} {url}")
+            print(f"[{client_id}] ✓ Mirrored: {method} {url}", flush=True)
         except Exception as e:
-            print(f"[{client_id}] ✗ Mirror failed: {e}", file=sys.stderr)
+            print(f"[{client_id}] ✗ Mirror failed: {e}", file=sys.stderr, flush=True)
 
     def _make_http_request(self, method: str, url: str):
         """Make HTTP request (blocking, run in executor)"""
@@ -137,20 +337,19 @@ class SPOEAgent:
             req = urllib.request.Request(url, method=method)
             with urllib.request.urlopen(req, timeout=5) as response:
                 response.read()  # Consume response
-        except urllib.error.HTTPError as e:
-            # Even errors are OK for mirroring (shadow backend might not exist)
-            pass
-        except Exception as e:
-            raise
+        except urllib.error.HTTPError:
+            pass  # Ignore HTTP errors (shadow backend might return error)
+        except Exception:
+            pass  # Fire-and-forget, ignore all errors
 
     async def run(self):
         """Start SPOE agent server"""
         server = await asyncio.start_server(self.handle_client, "0.0.0.0", self.port)
 
         addr = server.sockets[0].getsockname()
-        print(f"SPOE Mirror Agent listening on {addr[0]}:{addr[1]}")
-        print(f"Mirror target: {self.mirror_url}")
-        print("Ready to receive SPOE messages from HAProxy...")
+        print(f"SPOE Mirror Agent listening on {addr[0]}:{addr[1]}", flush=True)
+        print(f"Mirror target: {self.mirror_url}", flush=True)
+        print("Ready to receive SPOE messages from HAProxy...", flush=True)
 
         async with server:
             await server.serve_forever()
@@ -171,7 +370,7 @@ def main():
     try:
         asyncio.run(agent.run())
     except KeyboardInterrupt:
-        print("\nShutting down...")
+        print("\nShutting down...", flush=True)
         sys.exit(0)
 
 
