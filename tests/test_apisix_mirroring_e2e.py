@@ -354,7 +354,9 @@ class TestAPISIXRequestMirroringE2E:
         for i in range(num_requests):
             try:
                 payload = {"test": f"data_{i}", "index": i}
-                response = requests.post("http://localhost:10003/api/v1/test", json=payload, timeout=5)
+                response = requests.post(
+                    "http://localhost:10003/api/v1/test", json=payload, timeout=5
+                )
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
