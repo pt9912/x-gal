@@ -1,0 +1,24 @@
+# Traefik Static Configuration
+# This file configures Traefik's core settings (entrypoints, providers, API, metrics)
+
+api:
+  dashboard: true
+  insecure: false  # Disable insecure mode to avoid auto-creating port 8080 binding
+
+entryPoints:
+  web:
+    address: ":8080"  # Internal proxy port (mapped to 10003 externally)
+  traefik:
+    address: ":8081"  # Internal API/Dashboard port (mapped to 9903 externally)
+
+providers:
+  file:
+    filename: /etc/traefik/dynamic.yml
+    watch: true
+
+# Ping endpoint for health checks
+ping:
+  entryPoint: "traefik"  # Use traefik entrypoint for ping
+
+log:
+  level: INFO

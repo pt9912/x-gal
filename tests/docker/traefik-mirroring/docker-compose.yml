@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # Backend - Primary (production traffic)
+  backend-primary:
+    build:
+      context: ../backends
+      dockerfile: Dockerfile
+    command: ["python", "-u", "/app/primary.py"]
+    environment:
+      - PORT=8080
+    networks:
+      - test-network-mirroring
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080')"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # Backend - Shadow (mirrored traffic)
+  backend-shadow:
+    build:
+      context: ../backends
+      dockerfile: Dockerfile
+    command: ["python", "-u", "/app/shadow.py"]
+    environment:
+      - PORT=8080
+    networks:
+      - test-network-mirroring
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080')"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # Traefik Proxy with Request Mirroring
+  traefik:
+    image: traefik:v2.10
+    volumes:
+      - ./traefik-static.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik-dynamic.yml:/etc/traefik/dynamic.yml:ro
+    ports:
+      - "10003:8080"   # Proxy port (different from traffic-split tests)
+      - "9903:8081"    # Dashboard/API port
+    networks:
+      - test-network-mirroring
+    depends_on:
+      backend-primary:
+        condition: service_healthy
+      backend-shadow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+networks:
+  test-network-mirroring:
+    driver: bridge

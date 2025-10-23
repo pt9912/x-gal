@@ -1,0 +1,70 @@
+# Traefik Dynamic Configuration for Request Mirroring
+# Demonstrates Traefik's native mirroring service (v2.0+)
+
+http:
+  routers:
+    # Router 1: 100% Mirroring to /api/v1
+    router-api-v1:
+      rule: "PathPrefix(`/api/v1`)"
+      service: mirroring-service-100
+      entryPoints:
+        - web
+
+    # Router 2: 50% Mirroring to /api/v2
+    router-api-v2:
+      rule: "PathPrefix(`/api/v2`)"
+      service: mirroring-service-50
+      entryPoints:
+        - web
+
+    # Router 3: No Mirroring to /api/v3 (baseline)
+    router-api-v3:
+      rule: "PathPrefix(`/api/v3`)"
+      service: primary-service
+      entryPoints:
+        - web
+
+  services:
+    # Primary Service (no mirroring)
+    primary-service:
+      loadBalancer:
+        servers:
+          - url: "http://backend-primary:8080"
+        healthCheck:
+          path: /
+          interval: 5s
+          timeout: 3s
+
+    # Shadow Service
+    shadow-service:
+      loadBalancer:
+        servers:
+          - url: "http://backend-shadow:8080"
+        healthCheck:
+          path: /
+          interval: 5s
+          timeout: 3s
+
+    # Mirroring Service: 100% Mirroring
+    mirroring-service-100:
+      mirroring:
+        service: primary-service
+        maxBodySize: 1048576  # 1 MB max body size
+        mirrors:
+          - name: shadow-mirror
+            percent: 100  # Mirror 100% of requests
+
+    # Mirroring Service: 50% Mirroring
+    mirroring-service-50:
+      mirroring:
+        service: primary-service
+        maxBodySize: 1048576  # 1 MB max body size
+        mirrors:
+          - name: shadow-mirror
+            percent: 50  # Mirror 50% of requests
+
+    # Shadow Mirror Service
+    shadow-mirror:
+      loadBalancer:
+        servers:
+          - url: "http://backend-shadow:8080"
