@@ -29,7 +29,9 @@ make
 - ✅ Production-ready
 - ⚠️ Complex setup (external agent process)
 
-**See:** [REQUEST_MIRRORING.md](../../../docs/guides/REQUEST_MIRRORING.md#4-haproxy-️-spoe-basiert---haproxy-20) for complete SPOE configuration.
+**See:**
+- [REQUEST_MIRRORING.md](../../../docs/guides/REQUEST_MIRRORING.md#4-haproxy-️-spoe-basiert---haproxy-20) for complete SPOE documentation
+- **[../haproxy-mirroring-spoe/](../haproxy-mirroring-spoe/)** - Complete production-ready SPOE example with Docker Compose
 
 ---
 

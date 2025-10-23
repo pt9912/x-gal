@@ -1,0 +1,80 @@
+# HAProxy Request Mirroring with SPOE (Stream Processing Offload Engine)
+# Production-ready example with native HAProxy mirroring via spoa-mirror
+
+services:
+  # HAProxy with SPOE filter for request mirroring
+  haproxy:
+    image: haproxy:2.9
+    container_name: haproxy-spoe
+    volumes:
+      - ./haproxy-spoe.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./spoe-mirror.conf:/usr/local/etc/haproxy/spoe-mirror.conf:ro
+    ports:
+      - "10005:10000"  # Proxy port (external:internal)
+      - "9998:9999"    # Stats port
+    depends_on:
+      - spoa-mirror
+      - backend-primary
+      - backend-shadow
+    networks:
+      - haproxy-spoe-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # SPOA Mirror Agent - Handles async request mirroring
+  spoa-mirror:
+    image: haproxytech/spoa-mirror:latest
+    container_name: spoa-mirror-agent
+    environment:
+      - MIRROR_URL=http://backend-shadow:8080
+      - LOG_LEVEL=info
+    # Command: Listen on port 12345, mirror to shadow backend
+    command: ["-u", "http://backend-shadow:8080", "-p", "12345"]
+    networks:
+      - haproxy-spoe-network
+    healthcheck:
+      test: ["CMD-SHELL", "netstat -an | grep 12345 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # Primary Backend - Production traffic
+  backend-primary:
+    build:
+      context: ../backends
+      dockerfile: Dockerfile
+    command: ["python", "-u", "/app/primary.py"]
+    container_name: backend-primary-spoe
+    environment:
+      - PORT=8080
+    networks:
+      - haproxy-spoe-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080')"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # Shadow Backend - Mirrored traffic (fire-and-forget)
+  backend-shadow:
+    build:
+      context: ../backends
+      dockerfile: Dockerfile
+    command: ["python", "-u", "/app/shadow.py"]
+    container_name: backend-shadow-spoe
+    environment:
+      - PORT=8080
+    networks:
+      - haproxy-spoe-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080')"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+networks:
+  haproxy-spoe-network:
+    driver: bridge
