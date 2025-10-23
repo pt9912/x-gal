@@ -49,28 +49,36 @@ class SPOEAgent:
         self.connections += 1
         client_id = self.connections
         addr = writer.get_extra_info("peername")
-        print(f"[{client_id}] Connection from {addr}", flush=True)
+        print(f"[{client_id}] ====== New Connection from {addr} ======", flush=True)
 
         try:
+            frame_num = 0
             while True:
+                frame_num += 1
+                print(f"[{client_id}] Waiting for frame #{frame_num}...", flush=True)
+
                 # Read frame header (4 bytes: length)
                 try:
                     header = await reader.readexactly(4)
-                except asyncio.IncompleteReadError:
-                    print(f"[{client_id}] Client disconnected (no header)", flush=True)
+                    print(f"[{client_id}] Received header: {header.hex()}", flush=True)
+                except asyncio.IncompleteReadError as e:
+                    print(f"[{client_id}] Client disconnected (no header) - bytes read: {len(e.partial)}", flush=True)
                     break
 
                 # Parse frame length
                 frame_length = struct.unpack(">I", header)[0]
+                print(f"[{client_id}] Frame #{frame_num} length: {frame_length} bytes", flush=True)
+
                 if frame_length == 0:
-                    print(f"[{client_id}] Empty frame, closing", flush=True)
+                    print(f"[{client_id}] Empty frame, closing connection", flush=True)
                     break
 
                 # Read frame data
                 try:
                     frame_data = await reader.readexactly(frame_length)
-                except asyncio.IncompleteReadError:
-                    print(f"[{client_id}] Incomplete frame data", flush=True)
+                    print(f"[{client_id}] Frame data received ({len(frame_data)} bytes): {frame_data[:50].hex()}...", flush=True)
+                except asyncio.IncompleteReadError as e:
+                    print(f"[{client_id}] Incomplete frame data - expected {frame_length}, got {len(e.partial)}", flush=True)
                     break
 
                 # Process SPOE frame
@@ -78,7 +86,10 @@ class SPOEAgent:
                     frame_data, writer, client_id
                 )
                 if not should_continue:
+                    print(f"[{client_id}] Process returned False, closing connection", flush=True)
                     break
+
+                print(f"[{client_id}] Frame #{frame_num} processed successfully", flush=True)
 
         except Exception as e:
             print(f"[{client_id}] Error: {e}", file=sys.stderr, flush=True)
@@ -94,40 +105,51 @@ class SPOEAgent:
     ) -> bool:
         """Process SPOE frame from HAProxy. Returns False to close connection."""
         if len(data) == 0:
+            print(f"[{client_id}] ERROR: Empty frame data!", flush=True)
             return False
 
         # Frame type is first byte
         frame_type = data[0]
         frame_flags = data[1] if len(data) > 1 else 0
 
-        print(f"[{client_id}] Frame type={frame_type}, flags={frame_flags}, len={len(data)}", flush=True)
+        frame_type_name = {
+            1: "HAPROXY_HELLO",
+            2: "HAPROXY_DISCONNECT",
+            3: "HAPROXY_NOTIFY"
+        }.get(frame_type, f"UNKNOWN({frame_type})")
+
+        print(f"[{client_id}] >>> Processing frame: type={frame_type_name}, flags={frame_flags}, len={len(data)}", flush=True)
 
         if frame_type == SPOE_FRM_T_HAPROXY_HELLO:
-            # HAProxy sent HELLO, respond with AGENT_HELLO
+            print(f"[{client_id}] Handling HAPROXY_HELLO...", flush=True)
             await self.send_agent_hello(writer, client_id, frame_flags)
+            print(f"[{client_id}] HAPROXY_HELLO handled, waiting for next frame", flush=True)
             return True
 
         elif frame_type == SPOE_FRM_T_HAPROXY_DISCONNECT:
-            # HAProxy wants to disconnect
+            print(f"[{client_id}] Handling HAPROXY_DISCONNECT...", flush=True)
             await self.send_agent_disconnect(writer, client_id, frame_flags)
             return False
 
         elif frame_type == SPOE_FRM_T_HAPROXY_NOTIFY:
-            # HAProxy sent a NOTIFY message (actual request mirroring)
+            print(f"[{client_id}] Handling HAPROXY_NOTIFY (mirroring request)...", flush=True)
             await self.handle_notify(data, writer, client_id, frame_flags)
+            print(f"[{client_id}] HAPROXY_NOTIFY handled", flush=True)
             return True
 
         else:
-            print(f"[{client_id}] Unknown frame type: {frame_type}", flush=True)
+            print(f"[{client_id}] WARNING: Unknown frame type: {frame_type} (raw data: {data[:20].hex()})", flush=True)
             return True
 
     async def send_agent_hello(
         self, writer: asyncio.StreamWriter, client_id: int, flags: int
     ):
         """Send AGENT_HELLO response to HAProxy"""
+        print(f"[{client_id}] Building AGENT_HELLO response...", flush=True)
+
         # Build AGENT_HELLO frame
         frame = bytearray()
-        frame.append(SPOE_FRM_T_AGENT_HELLO)  # Frame type
+        frame.append(SPOE_FRM_T_AGENT_HELLO)  # Frame type = 101
         frame.append(flags & 0x01)  # Flags: FIN bit only
 
         # Stream-ID and Frame-ID (copy from HELLO, but we don't parse them)
@@ -143,11 +165,17 @@ class SPOEAgent:
         # Capabilities (empty string = no capabilities)
         frame.extend(self.encode_kv_string("capabilities", ""))
 
+        print(f"[{client_id}] AGENT_HELLO frame built: {len(frame)} bytes (hex: {bytes(frame[:50]).hex()}...)", flush=True)
+
         # Send frame with length prefix
-        writer.write(struct.pack(">I", len(frame)))
+        frame_length_bytes = struct.pack(">I", len(frame))
+        print(f"[{client_id}] Sending frame length: {len(frame)} (hex: {frame_length_bytes.hex()})", flush=True)
+
+        writer.write(frame_length_bytes)
         writer.write(frame)
         await writer.drain()
-        print(f"[{client_id}] Sent AGENT_HELLO", flush=True)
+
+        print(f"[{client_id}] ✓ AGENT_HELLO sent successfully", flush=True)
 
     async def send_agent_disconnect(
         self, writer: asyncio.StreamWriter, client_id: int, flags: int
@@ -201,8 +229,10 @@ class SPOEAgent:
         self, writer: asyncio.StreamWriter, client_id: int, flags: int
     ):
         """Send AGENT_ACK response to HAProxy"""
+        print(f"[{client_id}] Building AGENT_ACK response...", flush=True)
+
         frame = bytearray()
-        frame.append(SPOE_FRM_T_AGENT_ACK)  # Frame type
+        frame.append(SPOE_FRM_T_AGENT_ACK)  # Frame type = 103
         frame.append(flags & 0x01)  # Flags: FIN bit only
 
         # Stream-ID and Frame-ID
@@ -211,10 +241,14 @@ class SPOEAgent:
 
         # Empty actions list (we don't set any variables back)
 
+        print(f"[{client_id}] AGENT_ACK frame: {len(frame)} bytes", flush=True)
+
         # Send frame
         writer.write(struct.pack(">I", len(frame)))
         writer.write(frame)
         await writer.drain()
+
+        print(f"[{client_id}] ✓ AGENT_ACK sent", flush=True)
 
     def parse_notify_frame(self, data: bytes, client_id: int) -> Tuple[str, str]:
         """Parse NOTIFY frame to extract method and path arguments"""
