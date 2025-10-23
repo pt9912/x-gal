@@ -1,10 +1,9 @@
-# Pre-Push Code Quality Check Skill
-
-**Name:** pre-push
-**Beschreibung:** Führt automatisch Code Quality Checks (black, isort, flake8) vor jedem git push aus, um CI/CD Fehler zu vermeiden.
-**Trigger:** Nutze diesen Skill PROAKTIV vor jedem `git push`, um sicherzustellen, dass alle Code Quality Standards erfüllt sind.
-
 ---
+name: pre-push
+description: Führt automatisch Code Quality Checks (black, isort, flake8) vor jedem git push aus, um CI/CD Fehler zu vermeiden. Nutze diesen Skill PROAKTIV vor jedem `git push`, um sicherzustellen, dass alle Code Quality Standards erfüllt sind.
+---
+
+# Pre-Push Code Quality Check Skill
 
 ## Zweck
 
