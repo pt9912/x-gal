@@ -340,6 +340,8 @@ make
 global
     # SPOE Config einbinden
     log stdout format raw local0 info
+    # SPOE socket für Agent-Kommunikation
+    stats socket /var/run/haproxy.sock mode 600 level admin
 
 backend spoe-mirror
     mode tcp
@@ -361,6 +363,12 @@ frontend http_front
 
 backend primary_backend
     mode http
+
+    # WICHTIG: Für Body-Transfer bei POST/PUT Requests
+    # Buffert den kompletten Request Body vor dem Senden
+    option http-buffer-request
+
+    # Server Definition
     server api1 api-v1.internal:8080 check
 ```
 
@@ -373,17 +381,35 @@ spoe-agent mirror-agent
     messages   mirror-request
     option     async
     option     send-frag-payload
+    option     var-prefix mirror
     timeout    hello      2s
     timeout    idle       2m
     timeout    processing 500ms
+    maxconnrate 100
+    maxerrrate  50
     use-backend spoe-mirror
     log        global
 
 spoe-message mirror-request
     # Request Details an SPOE Agent senden
-    args method=method path=path headers=req.hdrs body=req.body
+    # Captures: HTTP Method, URI, Version, Headers, Body
+    args method=method \
+         uri=path \
+         version=req.ver \
+         headers=req.hdrs \
+         body_len=req.body_len \
+         body=req.body
+
+    # Nur Events triggern wenn mirroring enabled
     event on-frontend-http-request if { var(txn.mirror_enabled) -m bool }
 ```
+
+**Wichtige SPOE Optionen:**
+- `async`: Fire-and-forget, wartet nicht auf Response
+- `send-frag-payload`: Sendet große Payloads in Fragmenten
+- `var-prefix mirror`: Prefix für SPOE-Variablen (namespace)
+- `maxconnrate 100`: Max 100 neue Connections/Sekunde zum Agent
+- `maxerrrate 50`: Max 50 Fehler/Sekunde toleriert
 
 **Schritt 4: spoa-mirror Agent Konfiguration**
 
@@ -407,13 +433,57 @@ log-level = info
 - ✅ Custom headers via SPOE Agent Config
 - ✅ Production-ready in HAProxy Enterprise
 - ✅ Multiple mirrors möglich (mehrere SPOE Agents)
+- ✅ Request Body Transfer (mit `option http-buffer-request`)
 
 **Nachteile:**
 - ⚠️ Komplex: Erfordert externen SPOE Agent (`spoa-mirror`)
 - ⚠️ Setup: Agent muss kompiliert und deployed werden
 - ⚠️ Monitoring: Zusätzlicher Prozess zu überwachen
+- ⚠️ Body Buffering: CPU/Memory Overhead bei großen Request Bodies
 
 **HAProxy Version:** HAProxy 2.0+ (SPOE support)
+
+**Einschränkungen & Best Practices:**
+
+1. **Protokollabhängig:**
+   - ✅ Primär für HTTP/HTTPS
+   - ⚠️ TCP-Mirroring möglich, aber erfordert Custom SPOE Agent
+   - ❌ Keine native Unterstützung für beliebige TCP-Protokolle
+
+2. **Request Body Transfer:**
+   - ✅ `option http-buffer-request` im Backend aktivieren
+   - ⚠️ Buffert **kompletten** Request Body im Memory
+   - ⚠️ Performance-Impact bei großen Bodies (>1MB)
+   - 💡 Best Practice: Limitieren via `req.body_size` ACL
+
+   ```haproxy
+   # Body Size Limit (nur Bodies <1MB spiegeln)
+   acl body_too_large req.body_size gt 1048576
+   http-request set-var(txn.mirror_enabled) bool(false) if body_too_large
+   ```
+
+3. **TLS-Mirroring:**
+   - ⚠️ Traffic muss **vor** dem Spiegeln terminiert werden
+   - ✅ HAProxy terminiert TLS, sendet plaintext an SPOE Agent
+   - ❌ End-to-End Encrypted Mirroring nicht möglich
+
+4. **Performance:**
+   - ✅ Minimal overhead (async)
+   - ⚠️ CPU-Verbrauch steigt bei hohem Traffic + Body Buffering
+   - 💡 Best Practice: Monitoring von SPOE Agent Connection Pool
+
+5. **Fehlerbehandlung:**
+   - `maxerrrate 50`: Toleriert bis zu 50 Fehler/Sekunde
+   - Bei Überschreitung: SPOE Agent temporär disabled
+   - 💡 Best Practice: Alerting bei SPOE Agent Downtime
+
+**Production Checklist:**
+- [ ] SPOE Agent redundant deployen (mindestens 2 Instanzen)
+- [ ] Monitoring: SPOE Agent Health, Connection Count, Error Rate
+- [ ] Body Size Limits konfigurieren (z.B. max 1MB)
+- [ ] Sample Rate anpassen (Start: 10%, dann schrittweise erhöhen)
+- [ ] Alerting bei SPOE Agent Failures
+- [ ] Logging: SPOE Agent Logs nach Shadow Backend Errors durchsuchen
 
 ---
 
