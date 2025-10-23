@@ -22,6 +22,13 @@ Test Scenarios:
 1. Primary backend routing works correctly (/api/v1)
 2. 50% traffic can be routed to different backends (/api/v2)
 3. No mirroring baseline (/api/v3)
+4. POST request routing and body handling
+5. Backend health checks through HAProxy
+6. HAProxy stats endpoint accessibility
+7. HAProxy backend statistics (mirroring stats require SPOE)
+8. Concurrent request handling
+9. HAProxy configuration verification
+10. HAProxy mirroring solutions documentation
 
 Requirements:
 - Docker and Docker Compose installed
@@ -306,6 +313,76 @@ class TestHAProxyRequestMirroringE2E:
 
         except Exception as e:
             print(f"⚠️  Could not access stats endpoint: {e}")
+
+    def test_haproxy_mirroring_stats(self, haproxy_mirroring_setup):
+        """Test HAProxy stats show backend traffic (mirroring requires SPOE)"""
+        print("\n📊 Testing HAProxy Backend Statistics...")
+
+        # Send some requests first to generate stats
+        print("  Sending 20 requests to /api/v1...")
+        for i in range(20):
+            try:
+                requests.get("http://localhost:10004/api/v1", timeout=5)
+            except Exception:
+                pass
+
+        time.sleep(2)  # Allow stats to update
+
+        try:
+            # Get HAProxy stats in CSV format
+            response = requests.get("http://localhost:9999/stats;csv", timeout=5)
+            assert response.status_code == 200
+
+            stats_lines = response.text.strip().split("\n")
+            print(f"\n📈 HAProxy Stats (CSV format):")
+            print(f"  Total lines: {len(stats_lines)}")
+
+            # Parse CSV to find backend stats
+            # CSV format: pxname,svname,qcur,qmax,scur,smax,slim,stot,...
+            backend_stats = {}
+            for line in stats_lines[1:]:  # Skip header
+                if not line.strip():
+                    continue
+                fields = line.split(",")
+                if len(fields) < 8:
+                    continue
+
+                pxname = fields[0]  # Proxy name (backend name)
+                svname = fields[1]  # Server name
+                stot = fields[7]    # Total sessions (requests)
+
+                # Look for our backends
+                if "backend" in pxname.lower() and svname == "BACKEND":
+                    backend_stats[pxname] = int(stot) if stot.isdigit() else 0
+
+            print("\n  Backend Request Counts:")
+            for backend, count in sorted(backend_stats.items()):
+                print(f"    {backend}: {count} requests")
+
+            # Verify we found backend stats
+            assert len(backend_stats) > 0, "No backend stats found!"
+
+            # Check that api_v1_backend received requests (this is our primary test route)
+            api_v1_count = backend_stats.get("api_v1_backend", 0)
+            assert api_v1_count > 0, f"api_v1_backend has no requests: {api_v1_count}"
+
+            # Count total requests across all non-health backends
+            total_requests = sum(
+                count for name, count in backend_stats.items()
+                if "health" not in name.lower()
+            )
+
+            print(f"\n✅ Found backend statistics!")
+            print(f"   api_v1_backend: {api_v1_count} requests")
+            print(f"   Total across all backends: {total_requests} requests")
+            print("\nℹ️  Note: HAProxy Request Mirroring Statistics")
+            print("   - These stats show primary backend traffic only")
+            print("   - For TRUE mirroring stats, SPOE + spoa-mirror required")
+            print("   - SPOE would provide separate shadow backend stats")
+            print("   - Alternative: Use GoReplay for external mirroring metrics")
+
+        except Exception as e:
+            pytest.fail(f"Failed to check HAProxy stats: {e}")
 
     def test_multiple_concurrent_requests(self, haproxy_mirroring_setup):
         """Test that HAProxy handles concurrent requests correctly"""

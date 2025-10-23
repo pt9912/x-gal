@@ -181,15 +181,22 @@ docker compose down -v
 - **Endpoint:** `http://localhost:9999/stats`
 - **Validates:** HAProxy statistics UI is accessible
 
-### 7. Concurrent Requests (`test_multiple_concurrent_requests`)
+### 7. Mirroring Statistics (`test_haproxy_mirroring_stats`)
+- **Purpose:** Analyze HAProxy backend traffic statistics
+- **Method:** Parse HAProxy stats CSV format (`/stats;csv`)
+- **Validates:** Primary backend receives requests correctly
+- **Note:** True mirroring stats require SPOE + spoa-mirror setup
+- **CSV Fields:** `pxname` (backend name), `svname` (server), `stot` (total sessions)
+
+### 8. Concurrent Requests (`test_multiple_concurrent_requests`)
 - **Load:** 50 concurrent requests
 - **Expected:** ≥95% success rate
 - **Validates:** HAProxy handles concurrent traffic
 
-### 8. Configuration Verification (`test_haproxy_configuration_verification`)
+### 9. Configuration Verification (`test_haproxy_configuration_verification`)
 - **Validates:** HAProxy config syntax is valid
 
-### 9. Mirroring Solutions Note (`test_haproxy_mirroring_limitation_note`)
+### 10. Mirroring Solutions Note (`test_haproxy_mirroring_limitation_note`)
 - **Purpose:** Documents HAProxy's request mirroring solutions (SPOE, GoReplay, etc.)
 - **Always passes** - informational test
 
