@@ -203,10 +203,10 @@ class APISIXProvider(Provider):
 
             # Create routes
             for route in service.routes:
-                # Use /prefix* to match both /prefix and /prefix/...
-                # (APISIX /* requires at least one char after /)
+                # Use /prefix/* to match /prefix/... (APISIX standard pattern)
+                # Note: APISIX /* matches paths with at least one char after /
                 route_config = {
-                    "uri": f"{route.path_prefix}*",
+                    "uri": f"{route.path_prefix}/*",
                     "name": f"{service.name}_route",
                     "service_id": service.name,
                 }
