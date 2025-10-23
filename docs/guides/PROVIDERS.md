@@ -2103,6 +2103,66 @@ aws apigateway update-stage \
 
 ## Provider-Vergleich
 
+### Feature-Matrix
+
+Vollständiger Überblick über alle Gateway-Features für jeden Provider:
+
+| Feature | Envoy | Kong | APISIX | Traefik | Nginx | HAProxy | Azure APIM | GCP Gateway | AWS Gateway |
+|---------|-------|------|--------|---------|-------|---------|------------|-------------|-------------|
+| **Traffic Management** |||||||||
+| Request Mirroring | ✅ Native | ✅ Nginx Module | ✅ Native | ⚠️ Custom | ✅ Native | ✅ Native | ✅ Native | ⚠️ Workaround | ⚠️ Workaround |
+| Traffic Splitting | ✅ Weighted | ✅ Plugin | ✅ Weighted | ✅ Weighted | ✅ split_clients | ⚠️ ACL | ✅ Policy | ⚠️ Backend | ✅ Stages |
+| Load Balancing | ✅ Advanced | ✅ Advanced | ✅ Advanced | ✅ Basic | ✅ Advanced | ✅ Advanced | ✅ Built-in | ✅ Backend | ✅ Backend |
+| Canary Deployments | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | ⚠️ | ✅ |
+| Blue/Green | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ |
+| **Protocol Support** |||||||||
+| HTTP/1.1 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| HTTP/2 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| gRPC | ✅ Native | ✅ Native | ✅ Native | ✅ Native | ✅ Native | ⚠️ TCP | ⚠️ Limited | ⚠️ Endpoints | ⚠️ Lambda |
+| WebSocket | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ Separate |
+| **Security** |||||||||
+| JWT Authentication | ✅ JWKS | ✅ Plugin | ✅ Plugin | ✅ Middleware | ✅ OpenResty | ⚠️ Lua | ✅ Azure AD | ✅ Google | ✅ Cognito |
+| OAuth2/OIDC | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ Native | ✅ Native | ✅ Native |
+| API Keys | ⚠️ Custom | ✅ Plugin | ✅ Plugin | ⚠️ Custom | ⚠️ Custom | ⚠️ Custom | ✅ Built-in | ⚠️ Limited | ✅ Built-in |
+| mTLS | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Rate Limiting | ✅ Native | ✅ Plugin | ✅ Plugin | ✅ Middleware | ✅ Native | ✅ Native | ✅ Built-in | ❌ Backend | ✅ Usage Plans |
+| IP Whitelisting | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ Backend | ✅ Resource Policy |
+| **Resilience** |||||||||
+| Circuit Breaker | ✅ Outlier | ✅ Plugin | ✅ Plugin | ❌ | ⚠️ Custom | ⚠️ Custom | ⚠️ Backend | ❌ | ❌ |
+| Retries | ✅ | ✅ | ✅ | ✅ | ⚠️ Custom | ⚠️ Custom | ✅ Policy | ⚠️ Backend | ⚠️ Lambda |
+| Timeouts | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ 29s max |
+| Health Checks | ✅ Active | ✅ Active | ✅ Active | ✅ Active | ✅ Active | ✅ Active | ⚠️ Backend | ⚠️ Backend | ⚠️ Backend |
+| **Transformations** |||||||||
+| Request Transform | ✅ Lua | ⚠️ Headers | ✅ Lua | ⚠️ Plugin | ✅ Lua | ⚠️ Headers | ✅ Policy | ❌ Backend | ⚠️ VTL |
+| Response Transform | ✅ Lua | ⚠️ Headers | ✅ Lua | ⚠️ Plugin | ✅ Lua | ⚠️ Headers | ✅ Policy | ❌ Backend | ⚠️ VTL |
+| Header Manipulation | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ Limited | ✅ |
+| Body Manipulation | ✅ Lua | ⚠️ Plugin | ✅ Lua | ⚠️ Plugin | ✅ Lua | ⚠️ Lua | ✅ Policy | ❌ Backend | ⚠️ VTL |
+| Computed Fields | ✅ UUID | ❌ | ✅ UUID | ❌ | ✅ UUID | ❌ | ⚠️ Custom | ❌ | ⚠️ Lambda |
+| Validation | ⚠️ Limited | ⚠️ Limited | ✅ Full | ❌ | ⚠️ Limited | ⚠️ Limited | ✅ Policy | ⚠️ OpenAPI | ⚠️ OpenAPI |
+| **Observability** |||||||||
+| Access Logs | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Cloud Logs | ✅ Cloud Logs | ✅ CloudWatch |
+| Metrics (Prometheus) | ✅ Native | ✅ Plugin | ✅ Native | ✅ Native | ⚠️ Module | ✅ Native | ⚠️ Azure Mon | ⚠️ Cloud Mon | ⚠️ CloudWatch |
+| Distributed Tracing | ✅ Zipkin/Jaeger | ✅ Plugin | ✅ SkyWalking | ⚠️ Limited | ⚠️ Custom | ❌ | ⚠️ App Insights | ✅ Cloud Trace | ✅ X-Ray |
+| Admin API | ✅ :9901 | ✅ :8001 | ✅ :9180 | ✅ :8080 | ⚠️ Reload | ⚠️ Stats | ✅ Azure API | ✅ gcloud CLI | ✅ AWS CLI |
+| Dashboard UI | ⚠️ Third-party | ✅ Kong Manager | ✅ Dashboard | ✅ Built-in | ❌ | ✅ Stats | ✅ Azure Portal | ✅ GCP Console | ✅ AWS Console |
+| **Deployment** |||||||||
+| Docker | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | N/A Cloud | N/A Cloud | N/A Cloud |
+| Kubernetes | ✅ Ingress | ✅ Ingress | ✅ Ingress | ✅ Ingress | ✅ Ingress | ✅ Ingress | ⚠️ Hybrid | ⚠️ Hybrid | ⚠️ VPC Link |
+| Service Mesh | ✅ Istio/Consul | ⚠️ Kuma | ⚠️ Custom | ⚠️ Limited | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Multi-Region | ⚠️ Manual | ⚠️ Manual | ⚠️ Manual | ⚠️ Manual | ⚠️ Manual | ⚠️ Manual | ✅ Premium | ✅ Native | ✅ CloudFront |
+| Auto-Scaling | ⚠️ K8s HPA | ⚠️ K8s HPA | ⚠️ K8s HPA | ⚠️ K8s HPA | ⚠️ K8s HPA | ⚠️ K8s HPA | ✅ Native | ✅ Serverless | ✅ Serverless |
+| **Developer Experience** |||||||||
+| Config Format | YAML | YAML | JSON | YAML | CONF | CFG | ARM+JSON | OpenAPI 2.0 | OpenAPI 3.0 |
+| Dynamic Config | ⚠️ xDS | ✅ Admin API | ✅ Admin API | ✅ File | ⚠️ Reload | ⚠️ Reload | ✅ Native | ✅ Native | ✅ Native |
+| Developer Portal | ❌ | ✅ Enterprise | ⚠️ Limited | ❌ | ❌ | ❌ | ✅ Built-in | ⚠️ Limited | ⚠️ Limited |
+| OpenAPI Import | ⚠️ Custom | ⚠️ Plugin | ⚠️ Custom | ⚠️ Custom | ❌ | ❌ | ✅ Native | ✅ Native | ✅ Native |
+| API Versioning | ⚠️ Manual | ✅ Routes | ✅ Routes | ✅ Routes | ⚠️ Manual | ⚠️ Manual | ✅ Revisions | ✅ Configs | ✅ Stages |
+
+**Legende:**
+- ✅ **Native/Full Support:** Feature vollständig unterstützt, production-ready
+- ⚠️ **Partial/Workaround:** Feature teilweise unterstützt, erfordert Konfiguration/Plugin/externe Lösung
+- ❌ **Not Supported:** Feature nicht unterstützt
+
 ### Performance
 
 | Provider | Requests/sec | Latency (p50) | Latency (p99) | Deployment |
@@ -2140,7 +2200,7 @@ aws apigateway update-stage \
 | Nginx | ✅ Native | mirror directive | Full support, sample percentage, multiple targets |
 | APISIX | ✅ Native | proxy-mirror plugin | Full support, sample percentage, sample_ratio |
 | HAProxy | ✅ Native (2.4+) | http-request mirror | Requires HAProxy 2.4+, Lua scripts for older versions |
-| Kong | ⚠️ Plugin/Enterprise | request-transformer or Enterprise plugin | `kong_mirroring_enable_enterprise: true` for full support |
+| Kong | ✅ Native (OpenSource) | Nginx mirror module or Enterprise plugin | Nginx mirror module (OpenSource, recommended) or request-mirror plugin (Enterprise) |
 | Traefik | ⚠️ Limited | Middleware | Custom solution required, limited native support |
 | Azure APIM | ✅ Native | send-request policy | Full support, cloud-based mirroring |
 | AWS API Gateway | ⚠️ Workaround | Lambda@Edge | Requires `mirroring_lambda_edge_arn` config |
