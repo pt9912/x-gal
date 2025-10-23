@@ -70,7 +70,7 @@ class TestAPISIXRequestMirroringE2E:
                 response = requests.get(
                     "http://localhost:9182/apisix/admin/routes",
                     headers={"X-API-KEY": "edd1c9f034335f136f87ad84b625c8f1"},
-                    timeout=2
+                    timeout=2,
                 )
                 if response.status_code == 200:
                     print("✅ APISIX is ready!")
