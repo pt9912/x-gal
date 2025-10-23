@@ -22,7 +22,7 @@ services:
     networks:
       - haproxy-spoe-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:10000/health"]
+      test: ["CMD-SHELL", "test -e /proc/net/tcp && grep -q ':2710' /proc/net/tcp || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 3
