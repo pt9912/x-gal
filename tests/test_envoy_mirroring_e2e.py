@@ -41,35 +41,30 @@ class TestEnvoyRequestMirroringE2E:
         """Setup and teardown Docker Compose environment for mirroring"""
         compose_dir = Path(docker_compose_file).parent
 
-        # Cleanup any previous containers
-        print("\n🧹 Cleaning up previous containers...")
-        subprocess.run(
-            ["docker", "compose", "down", "-v"],
-            cwd=compose_dir,
-            capture_output=True,
-        )
-
         # Build and start containers
         print("\n🐳 Starting Docker Compose environment for Request Mirroring...")
-        result = subprocess.run(
+        subprocess.run(
             ["docker", "compose", "up", "-d", "--build"],
             cwd=compose_dir,
+            check=True,
             capture_output=True,
-            text=True,
         )
-        if result.returncode != 0:
-            print(f"❌ Failed to start containers: {result.stderr}")
-            pytest.fail("Failed to start Docker Compose environment")
 
         # Wait for Envoy to be ready
         print("⏳ Waiting for Envoy to be healthy...")
-        max_wait = 60
+        max_wait = 30
         for i in range(max_wait):
+            # Check container status
+            result = subprocess.run(
+                ["docker", "compose", "ps", "--format", "json"],
+                cwd=compose_dir,
+                capture_output=True,
+                text=True,
+            )
             if i % 10 == 0:  # Log every 10 seconds
-                print(f"  Waiting... ({i}s)")
+                print(f"  Waiting... ({i}s) - Container status check")
 
             try:
-                # Check Envoy admin endpoint
                 response = requests.get("http://localhost:9902/ready", timeout=2)
                 if response.status_code == 200:
                     print("✅ Envoy is ready!")
@@ -82,32 +77,17 @@ class TestEnvoyRequestMirroringE2E:
             print("❌ Envoy did not become ready in time. Showing logs:")
             subprocess.run(["docker", "compose", "ps"], cwd=compose_dir)
             subprocess.run(["docker", "compose", "logs", "envoy"], cwd=compose_dir)
-            subprocess.run(["docker", "compose", "logs", "backend-primary"], cwd=compose_dir)
-            subprocess.run(["docker", "compose", "logs", "backend-shadow"], cwd=compose_dir)
             pytest.fail("Envoy did not become ready in time")
 
-        # Additional wait for backends to stabilize
-        print("⏳ Waiting for backends to stabilize...")
-        time.sleep(3)
-
-        # Verify backends are accessible
-        try:
-            resp_primary = requests.get("http://localhost:10001/api/v1", timeout=5)
-            print(f"✅ Primary backend accessible: {resp_primary.status_code}")
-        except Exception as e:
-            print(f"❌ Primary backend not accessible: {e}")
-            subprocess.run(["docker", "compose", "logs"], cwd=compose_dir)
-            pytest.fail("Primary backend not accessible")
+        # Additional wait for backends
+        time.sleep(2)
 
         yield
 
         # Cleanup
         print("\n🧹 Stopping Docker Compose environment...")
         subprocess.run(
-            ["docker", "compose", "down", "-v"],
-            cwd=compose_dir,
-            check=True,
-            capture_output=True,
+            ["docker", "compose", "down", "-v"], cwd=compose_dir, check=True, capture_output=True
         )
 
     def test_100_percent_mirroring(self, envoy_mirroring_setup):
