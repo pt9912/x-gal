@@ -276,9 +276,13 @@ class SPOEAgent:
 
         frame = bytearray()
         frame.append(SPOE_FRM_T_AGENT_ACK)  # Frame type = 103
-        frame.append(flags & 0x01)  # Flags: FIN bit only
 
-        # Stream-ID and Frame-ID
+        # Flags: 4 bytes in network byte order (big-endian) - CRITICAL FIX!
+        # Use FIN flag (0x01) to indicate frame completion
+        flags_32bit = flags & 0x01  # FIN bit only
+        frame.extend(struct.pack(">I", flags_32bit))  # 4 bytes, big-endian
+
+        # Stream-ID and Frame-ID (varints)
         frame.extend(self.encode_varint(0))  # stream-id
         frame.extend(self.encode_varint(0))  # frame-id
 
