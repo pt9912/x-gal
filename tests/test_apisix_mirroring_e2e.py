@@ -196,7 +196,7 @@ class TestAPISIXRequestMirroringE2E:
 
         for i in range(num_requests):
             try:
-                response = requests.get("http://localhost:10003/api/v1", timeout=5)
+                response = requests.get("http://localhost:10003/api/v1/test", timeout=5)
 
                 # Enhanced logging for debugging
                 if i < 3:  # Log first 3 requests in detail
@@ -274,7 +274,7 @@ class TestAPISIXRequestMirroringE2E:
 
         for i in range(num_requests):
             try:
-                response = requests.get("http://localhost:10003/api/v2", timeout=5)
+                response = requests.get("http://localhost:10003/api/v2/test", timeout=5)
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
@@ -315,7 +315,7 @@ class TestAPISIXRequestMirroringE2E:
 
         for i in range(num_requests):
             try:
-                response = requests.get("http://localhost:10003/api/v3", timeout=5)
+                response = requests.get("http://localhost:10003/api/v3/test", timeout=5)
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
@@ -354,7 +354,7 @@ class TestAPISIXRequestMirroringE2E:
         for i in range(num_requests):
             try:
                 payload = {"test": f"data_{i}", "index": i}
-                response = requests.post("http://localhost:10003/api/v1", json=payload, timeout=5)
+                response = requests.post("http://localhost:10003/api/v1/test", json=payload, timeout=5)
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
@@ -467,7 +467,7 @@ class TestAPISIXRequestMirroringE2E:
 
         def make_request(i):
             try:
-                response = requests.get("http://localhost:10003/api/v1", timeout=5)
+                response = requests.get("http://localhost:10003/api/v1/test", timeout=5)
                 if response.status_code == 200:
                     return "success"
                 return "failed"
