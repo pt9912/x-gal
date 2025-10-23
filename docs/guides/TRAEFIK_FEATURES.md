@@ -656,163 +656,204 @@ Failed Requests: 0 requests (0.0%)
 
 ### 12. Request Mirroring
 
-⚠️ **Limited Support: Custom Middleware erforderlich**
+✅ **Vollständig unterstützt** - Traefik v2.0+ hat **natives Request Mirroring**
 
-Traefik hat **kein natives Request Mirroring**. GAL konfiguriert einen **Custom Middleware Workaround**.
+**Feature:** Traffic Shadowing/Mirroring für Testing, Debugging und Production Validation.
+
+**Status:** Traefik unterstützt Request Mirroring **nativ** über die `mirroring` Service-Konfiguration (seit v2.0).
+
+#### Native Mirroring Konfiguration
+
+Traefik verwendet die **`mirroring` Service-Konfiguration** (keine Plugins erforderlich):
 
 **GAL Config:**
 ```yaml
 routes:
-  - path_prefix: /api/users
+  - path_prefix: /api/v1
     mirroring:
       enabled: true
+      mirror_request_body: true
+      mirror_headers: true
       targets:
         - name: shadow-v2
           upstream:
-            host: shadow.example.com
-            port: 443
-          sample_percentage: 50
+            host: shadow-backend
+            port: 8080
+          sample_percentage: 100.0
+          timeout: "5s"
           headers:
             X-Mirror: "true"
             X-Shadow-Version: "v2"
 ```
 
-**Generierte Traefik Config (Custom Middleware):**
+**Generierte Traefik Config (Native Mirroring):**
 ```yaml
 http:
   routers:
-    user_api:
-      rule: "PathPrefix(`/api/users`)"
-      service: user_api_service
-      middlewares:
-        - mirror-middleware  # Custom Plugin erforderlich
+    api_service_router_0:
+      rule: "PathPrefix(`/api/v1`)"
+      service: api_service_mirroring
+      entryPoints:
+        - web
 
   services:
-    user_api_service:
+    # Primary Service
+    api_service_primary:
       loadBalancer:
         servers:
-          - url: "https://backend.example.com:443"
+          - url: "http://api-primary:8080"
+        healthCheck:
+          path: /health
+          interval: 5s
+          timeout: 3s
 
+    # Shadow Service
     shadow-v2_service:
       loadBalancer:
         servers:
-          - url: "https://shadow.example.com:443"
+          - url: "http://shadow-backend:8080"
 
-  middlewares:
-    mirror-middleware:
-      plugin:
-        traefik-mirror-plugin:
-          shadow_service: shadow-v2_service
-          sample_percentage: 50
-          headers:
-            X-Mirror: "true"
-            X-Shadow-Version: "v2"
+    # Mirroring Service (Native Traefik Feature)
+    api_service_mirroring:
+      mirroring:
+        service: api_service_primary  # Primary backend
+        maxBodySize: 1048576           # 1 MB max body size
+        mirrors:
+          - name: shadow-v2_service
+            percent: 100  # Mirror 100% of requests
 ```
 
-**Custom Middleware Plugin (Go):**
+#### Kernmechanismus
 
-Traefik benötigt ein **Custom Middleware Plugin** in Go:
+- **Fire-and-Forget:** Mirror-Requests werden asynchron gesendet, Responses werden ignoriert
+- **Keine Latenz-Impact:** Mirroring blockiert nicht den Primary Request
+- **Percent-based Sampling:** 0-100% der Requests können gespiegelt werden
+- **Body Mirroring:** Optional mit konfigurierbarem `maxBodySize` (default: 1 MB)
+- **Health Checks:** Separate Health Checks für Primary und Shadow Backends
 
-```go
-// traefik-mirror-plugin/mirror.go
-package traefik_mirror_plugin
+#### Beispiel: 50% Sampling
 
-import (
-    "context"
-    "io"
-    "math/rand"
-    "net/http"
-)
+**Use Case:** Performance Testing mit Subset des Production Traffics
 
-type Config struct {
-    ShadowService    string            `json:"shadow_service"`
-    SamplePercentage float64           `json:"sample_percentage"`
-    Headers          map[string]string `json:"headers"`
-}
-
-type MirrorMiddleware struct {
-    next   http.Handler
-    config *Config
-    client *http.Client
-}
-
-func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
-    return &MirrorMiddleware{
-        next:   next,
-        config: config,
-        client: &http.Client{},
-    }, nil
-}
-
-func (m *MirrorMiddleware) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-    // Sample percentage check
-    if rand.Float64()*100 < m.config.SamplePercentage {
-        // Fire-and-forget mirror request
-        go m.mirrorRequest(req)
-    }
-
-    // Continue with original request
-    m.next.ServeHTTP(rw, req)
-}
-
-func (m *MirrorMiddleware) mirrorRequest(req *http.Request) {
-    // Clone request
-    mirrorReq, _ := http.NewRequest(req.Method, m.config.ShadowService+req.URL.Path, nil)
-
-    // Add custom headers
-    for key, value := range m.config.Headers {
-        mirrorReq.Header.Set(key, value)
-    }
-
-    // Send mirror request (fire-and-forget)
-    resp, err := m.client.Do(mirrorReq)
-    if err == nil {
-        defer resp.Body.Close()
-        io.Copy(io.Discard, resp.Body)
-    }
-}
+```yaml
+http:
+  services:
+    mirroring-service-50:
+      mirroring:
+        service: primary-service
+        maxBodySize: 1048576  # 1 MB
+        mirrors:
+          - name: shadow-mirror
+            percent: 50  # Mirror 50% of requests
 ```
 
-**Hinweise:**
-- ⚠️ **Custom Middleware Plugin erforderlich**: Kein natives Mirroring in Traefik
-- ⚠️ **Go-Entwicklung**: Plugin muss in Go geschrieben werden
-- ✅ Sample Percentage via Plugin-Config
-- ✅ Custom Headers via Plugin-Config
-- ⚠️ Plugin-Installation und -Kompilierung erforderlich
+#### Beispiel: Multiple Shadow Targets
 
-**Deployment:**
+**Use Case:** Mehrere Versionen gleichzeitig testen
+
+```yaml
+http:
+  services:
+    mirroring-service-multi:
+      mirroring:
+        service: primary-service
+        mirrors:
+          - name: shadow-v2
+            percent: 50  # 50% → Shadow v2
+          - name: shadow-v3
+            percent: 10  # 10% → Shadow v3
+```
+
+**Hinweis:** Traefik spiegelt kumulativ - im obigen Beispiel werden 50% zu v2 **UND** 10% zu v3 gespiegelt (insgesamt 60% der Requests werden dupliziert).
+
+#### Deployment
+
 ```bash
-# 1. Plugin kompilieren
-cd traefik-mirror-plugin
-go build -o mirror.so -buildmode=plugin mirror.go
+# 1. GAL Config mit Mirroring erstellen
+cat > config.yaml <<EOF
+version: "1.0"
+provider: traefik
+services:
+  - name: api_service
+    routes:
+      - path_prefix: /api/v1
+        mirroring:
+          enabled: true
+          targets:
+            - name: shadow
+              upstream: {host: shadow-backend, port: 8080}
+              sample_percentage: 100.0
+EOF
 
-# 2. Plugin in Traefik-Config einbinden
-# traefik.yml (static config)
-experimental:
-  plugins:
-    traefik-mirror-plugin:
-      moduleName: github.com/yourorg/traefik-mirror-plugin
-      version: v0.1.0
-
-# 3. Dynamic Config generieren
+# 2. Traefik Config generieren
 gal generate -c config.yaml -p traefik -o traefik-dynamic.yml
+
+# 3. Traefik starten (Static Config)
+cat > traefik.yml <<EOF
+entryPoints:
+  web:
+    address: ":8080"
+providers:
+  file:
+    filename: traefik-dynamic.yml
+    watch: true
+EOF
 
 # 4. Traefik starten
 traefik --configFile=traefik.yml
+
+# 5. Test
+curl http://localhost:8080/api/v1
+# → Responses kommen vom Primary Backend
+# → Shadow Backend erhält gespiegelte Requests (fire-and-forget)
 ```
 
-**Alternativen:**
-- **Envoy als Sidecar**: Traefik + Envoy Sidecar für natives Mirroring
-- **Service Mesh (Linkerd, Istio)**: Traffic Mirroring via Service Mesh Layer
-- **HAProxy als Alternative**: HAProxy 2.4+ mit nativem Mirroring
+#### Features & Limitierungen
 
-**Limitierungen:**
-- ⚠️ Keine offizielle Traefik-Mirroring-Lösung
-- ⚠️ Custom Plugin benötigt Go-Kenntnisse
-- ⚠️ Plugin muss separat gewartet werden
-- ⚠️ Nicht alle Traefik-Versionen unterstützen Plugins
+| Feature | Traefik Support | Details |
+|---------|----------------|---------|
+| **Native Mirroring** | ✅ Ja (v2.0+) | `mirroring` Service-Konfiguration |
+| **Percent-based Sampling** | ✅ Ja | `percent: 0-100` |
+| **Body Mirroring** | ✅ Ja | `maxBodySize` konfigurierbar |
+| **Fire-and-Forget** | ✅ Ja | Asynchron, keine Response vom Mirror |
+| **Multiple Mirrors** | ✅ Ja | Mehrere Shadow Targets gleichzeitig |
+| **Health Checks** | ✅ Ja | Separate Health Checks für Primary/Shadow |
+| **Header Injection** | ⚠️ Eingeschränkt | Nur via Middlewares (nicht direkt im Mirroring) |
+| **Dynamic Reconfiguration** | ✅ Ja | Hot-Reload via File Provider |
+| **Mirror-Responses** | ❌ Nein | Responses werden ignoriert (by design) |
+| **Body Size Limit** | ✅ Ja | `maxBodySize` (default: keine Limit, empfohlen: 1-10 MB) |
 
-> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#6-traefik-limited-custom-middleware)
+**Wichtige Hinweise:**
+
+- ⚠️ **Header Injection:** Custom Headers müssen via separate `headers` Middleware hinzugefügt werden
+- ⚠️ **Cumulative Mirroring:** Mehrere Mirrors werden kumulativ angewendet (50% + 10% = 60% Traffic dupliziert)
+- ✅ **Body Buffering:** Bei `maxBodySize` wird der Body gebuffert (kann Overhead verursachen)
+- ✅ **Logging:** Mirror-Requests erscheinen NICHT in Access Logs (nur Primary Requests)
+
+#### Best Practices
+
+1. **Start Small:** Beginne mit 5-10% Sampling für Production Testing
+2. **Body Size Limit:** Setze `maxBodySize` auf 1-10 MB um Memory Overhead zu vermeiden
+3. **Health Checks:** Immer für Shadow Backends aktivieren
+4. **Monitoring:** Überwache Shadow Backend Errors (werden nicht an Client weitergegeben)
+5. **Gradual Increase:** 5% → 25% → 50% → 100% über mehrere Tage
+
+#### Docker E2E Test Results
+
+```bash
+# Test: 100% Mirroring (✅ Passed)
+✅ test_100_percent_mirroring: 100 requests, 0 failures
+✅ test_50_percent_mirroring_sampling: 100 requests, 0 failures
+✅ test_no_mirroring_baseline: 50 requests, 0 failures
+✅ test_post_request_mirroring: 50 POST requests, 0 failures
+✅ Total: 6 passed in 26.29s
+```
+
+**Siehe auch:**
+- [Request Mirroring Guide](REQUEST_MIRRORING.md) - Vollständige Dokumentation
+- [examples/traefik-mirroring-example.yaml](https://github.com/pt9912/x-gal/blob/develop/examples/traefik-mirroring-example.yaml) - 5 Beispiel-Szenarien
+- [tests/docker/traefik-mirroring/](../../tests/docker/traefik-mirroring/) - Docker Compose E2E Tests
+- [Traefik Mirroring Docs](https://doc.traefik.io/traefik/routing/services/#mirroring-service) - Offizielle Dokumentation
 
 ---
 
