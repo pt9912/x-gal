@@ -125,7 +125,11 @@ class SPOEAgent:
             # Parse stream-id and frame-id from HELLO
             stream_id, frame_id = self.parse_hello_ids(data[2:])  # Skip type+flags
             print(f"[{client_id}] HELLO stream_id={stream_id}, frame_id={frame_id}", flush=True)
-            await self.send_agent_hello(writer, client_id, frame_flags, stream_id, frame_id)
+            # Parse and log HAProxy capabilities
+            haproxy_caps = self.extract_capabilities_from_hello(data)
+            print(f"[{client_id}] HAProxy capabilities: '{haproxy_caps}'", flush=True)
+            # Send AGENT_HELLO with matching capabilities
+            await self.send_agent_hello(writer, client_id, frame_flags, stream_id, frame_id, haproxy_caps)
             print(f"[{client_id}] HAPROXY_HELLO handled, waiting for next frame", flush=True)
             return True
 
@@ -146,7 +150,7 @@ class SPOEAgent:
 
     async def send_agent_hello(
         self, writer: asyncio.StreamWriter, client_id: int, flags: int,
-        stream_id: int = 0, frame_id: int = 0
+        stream_id: int = 0, frame_id: int = 0, haproxy_capabilities: str = ""
     ):
         """Send AGENT_HELLO response to HAProxy"""
         print(f"[{client_id}] Building AGENT_HELLO response...", flush=True)
@@ -165,8 +169,18 @@ class SPOEAgent:
         frame.extend(self.encode_kv_string("version", "2.0"))
         # Max frame size
         frame.extend(self.encode_kv_uint32("max-frame-size", 16384))
-        # Capabilities (empty string = no capabilities)
-        frame.extend(self.encode_kv_string("capabilities", ""))
+        # Capabilities: Return what HAProxy supports (intersection)
+        # HAProxy sends capabilities it supports, we reply with same or subset
+        # IMPORTANT: Always include "fragmentation" - HAProxy requires it for payload handling
+        agent_caps_list = []
+        if haproxy_capabilities:
+            agent_caps_list = haproxy_capabilities.split(',')
+        # Always add fragmentation support
+        if "fragmentation" not in agent_caps_list:
+            agent_caps_list.append("fragmentation")
+        agent_caps = ','.join(agent_caps_list)
+        print(f"[{client_id}] Responding with capabilities: '{agent_caps}'", flush=True)
+        frame.extend(self.encode_kv_string("capabilities", agent_caps))
 
         print(f"[{client_id}] AGENT_HELLO frame built: {len(frame)} bytes (hex: {bytes(frame[:50]).hex()}...)", flush=True)
 
@@ -264,6 +278,31 @@ class SPOEAgent:
             print(f"Error parsing HELLO IDs: {e}", file=sys.stderr, flush=True)
             return 0, 0
 
+    def extract_capabilities_from_hello(self, data: bytes) -> str:
+        """Extract capabilities string from HAPROXY_HELLO frame"""
+        try:
+            # Look for "capabilities" in the frame
+            caps_pos = data.find(b'capabilities')
+            if caps_pos == -1:
+                return ""
+
+            # Skip "capabilities" (12 bytes), type byte (1), length (varint)
+            pos = caps_pos + 12 + 1
+            if pos >= len(data):
+                return ""
+
+            # Decode length (varint)
+            caps_len, pos = self.decode_varint(data, pos)
+            if pos + caps_len > len(data):
+                return ""
+
+            # Extract capabilities string
+            caps = data[pos:pos+caps_len].decode('utf-8', errors='replace')
+            return caps
+        except Exception as e:
+            print(f"Error extracting capabilities: {e}", file=sys.stderr, flush=True)
+            return ""
+
     def parse_notify_frame(self, data: bytes, client_id: int) -> Tuple[str, str]:
         """Parse NOTIFY frame to extract method and path arguments"""
         method = ""
@@ -304,7 +343,7 @@ class SPOEAgent:
 
                     if arg_name == "method":
                         method = arg_value
-                    elif arg_name == "path":
+                    elif arg_name == "path" or arg_name == "uri":
                         uri = arg_value
 
                     print(f"[{client_id}]   {arg_name}={arg_value}", flush=True)
@@ -345,6 +384,8 @@ class SPOEAgent:
     def encode_kv_string(self, key: str, value: str) -> bytes:
         """Encode key-value pair with string value"""
         result = bytearray()
+        # Flags byte (0 = no special flags)
+        result.append(0)
         # Key name
         key_bytes = key.encode('utf-8')
         result.extend(self.encode_varint(len(key_bytes)))
@@ -360,6 +401,8 @@ class SPOEAgent:
     def encode_kv_uint32(self, key: str, value: int) -> bytes:
         """Encode key-value pair with uint32 value"""
         result = bytearray()
+        # Flags byte (0 = no special flags)
+        result.append(0)
         # Key name
         key_bytes = key.encode('utf-8')
         result.extend(self.encode_varint(len(key_bytes)))
