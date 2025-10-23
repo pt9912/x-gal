@@ -122,7 +122,10 @@ class SPOEAgent:
 
         if frame_type == SPOE_FRM_T_HAPROXY_HELLO:
             print(f"[{client_id}] Handling HAPROXY_HELLO...", flush=True)
-            await self.send_agent_hello(writer, client_id, frame_flags)
+            # Parse stream-id and frame-id from HELLO
+            stream_id, frame_id = self.parse_hello_ids(data[2:])  # Skip type+flags
+            print(f"[{client_id}] HELLO stream_id={stream_id}, frame_id={frame_id}", flush=True)
+            await self.send_agent_hello(writer, client_id, frame_flags, stream_id, frame_id)
             print(f"[{client_id}] HAPROXY_HELLO handled, waiting for next frame", flush=True)
             return True
 
@@ -142,7 +145,8 @@ class SPOEAgent:
             return True
 
     async def send_agent_hello(
-        self, writer: asyncio.StreamWriter, client_id: int, flags: int
+        self, writer: asyncio.StreamWriter, client_id: int, flags: int,
+        stream_id: int = 0, frame_id: int = 0
     ):
         """Send AGENT_HELLO response to HAProxy"""
         print(f"[{client_id}] Building AGENT_HELLO response...", flush=True)
@@ -152,10 +156,9 @@ class SPOEAgent:
         frame.append(SPOE_FRM_T_AGENT_HELLO)  # Frame type = 101
         frame.append(flags & 0x01)  # Flags: FIN bit only
 
-        # Stream-ID and Frame-ID (copy from HELLO, but we don't parse them)
-        # For simplicity, use zeros
-        frame.extend(self.encode_varint(0))  # stream-id
-        frame.extend(self.encode_varint(0))  # frame-id
+        # Stream-ID and Frame-ID (must match from HELLO)
+        frame.extend(self.encode_varint(stream_id))
+        frame.extend(self.encode_varint(frame_id))
 
         # KV pairs: version, max-frame-size, capabilities
         # Version
@@ -249,6 +252,17 @@ class SPOEAgent:
         await writer.drain()
 
         print(f"[{client_id}] ✓ AGENT_ACK sent", flush=True)
+
+    def parse_hello_ids(self, data: bytes) -> Tuple[int, int]:
+        """Parse stream-id and frame-id from HELLO frame"""
+        try:
+            pos = 0
+            stream_id, pos = self.decode_varint(data, pos)
+            frame_id, pos = self.decode_varint(data, pos)
+            return stream_id, frame_id
+        except Exception as e:
+            print(f"Error parsing HELLO IDs: {e}", file=sys.stderr, flush=True)
+            return 0, 0
 
     def parse_notify_frame(self, data: bytes, client_id: int) -> Tuple[str, str]:
         """Parse NOTIFY frame to extract method and path arguments"""
