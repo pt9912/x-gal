@@ -10,8 +10,8 @@ services:
       - ./haproxy-spoe.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
       - ./spoe-mirror.conf:/usr/local/etc/haproxy/spoe-mirror.conf:ro
     ports:
-      - "10005:10000"  # Proxy port (external:internal)
-      - "9998:9999"    # Stats port
+      - "10005:10000" # Proxy port (external:internal)
+      - "9998:9999" # Stats port
     depends_on:
       spoa-mirror:
         condition: service_healthy
@@ -22,7 +22,11 @@ services:
     networks:
       - haproxy-spoe-network
     healthcheck:
-      test: ["CMD-SHELL", "test -e /proc/net/tcp && grep -q ':2710' /proc/net/tcp || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "test -e /proc/net/tcp && grep -q ':2710' /proc/net/tcp || exit 1",
+        ]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -34,11 +38,20 @@ services:
       dockerfile: Dockerfile.spoa-mirror
     container_name: spoa-mirror-agent
     # Command: Listen on port 12345, mirror to shadow backend
-    command: ["-p", "12345", "-u", "http://backend-shadow:8080"]
+    #command: ["-p", "12345", "-u", "http://backend-shadow:8080"]
+    command:
+      [
+        "-p",
+        "12345",
+        "-u",
+        "http://backend-shadow:8080",
+        "--health-port",
+        "12346",
+      ]
     networks:
       - haproxy-spoe-network
     healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 12345 || exit 1"]
+      test: ["CMD-SHELL", "nc -z localhost 12346 || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -55,7 +68,13 @@ services:
     networks:
       - haproxy-spoe-network
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8080')",
+        ]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -72,7 +91,13 @@ services:
     networks:
       - haproxy-spoe-network
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8080')",
+        ]
       interval: 5s
       timeout: 3s
       retries: 3
