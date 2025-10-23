@@ -56,13 +56,13 @@ Client Request ──────►│   API Gateway   │
 
 | Feature | Envoy | Nginx | APISIX | HAProxy | Kong | Traefik | Azure APIM | AWS API GW | GCP API GW |
 |---------|-------|-------|--------|---------|------|---------|------------|------------|------------|
-| **Request Mirroring** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | ⚠️ | ⚠️ |
-| **Native Support** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ |
-| **Sample Percentage** | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ✅ |
-| **Custom Headers** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Multiple Mirrors** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | ⚠️ | ⚠️ |
-| **Fire-and-Forget** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | ⚠️ | ⚠️ |
-| **Setup Komplexität** | 🟢 | 🟢 | 🟢 | 🟡 | 🟢 | 🟡 | 🟢 | 🟡 | 🟡 |
+| **Request Mirroring** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| **Native Support** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Sample Percentage** | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ |
+| **Custom Headers** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ |
+| **Multiple Mirrors** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| **Fire-and-Forget** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| **Setup Komplexität** | 🟢 | 🟢 | 🟢 | 🟡 | 🟢 | 🟢 | 🟢 | 🟡 | 🟡 |
 
 **Legende:**
 - ✅ Native Support (eingebautes Feature)
@@ -678,48 +678,78 @@ plugins:
 
 ---
 
-### 6. Traefik (⚠️ Limited - Custom Middleware)
+### 6. Traefik (✅ Native - v2.0+)
 
-**Mechanismus:** Custom Middleware (Plugin erforderlich)
+**Mechanismus:** Native `mirroring` Service-Konfiguration
 
-**Traefik Middleware (Custom Plugin erforderlich):**
+**Traefik Config (generiert von GAL):**
 
 ```yaml
-# Traefik Config (generiert von GAL)
+# Traefik Dynamic Config (generiert von GAL)
 http:
   routers:
     api-router:
       rule: "PathPrefix(`/api/users`)"
-      service: api-service
-      middlewares:
-        - mirror-middleware
+      service: api-mirroring-service
+      entryPoints:
+        - web
 
   services:
-    api-service:
+    # Primary Service
+    api-primary-service:
       loadBalancer:
         servers:
           - url: "http://api-v1.internal:8080"
+        healthCheck:
+          path: /health
+          interval: 5s
+          timeout: 3s
 
-  middlewares:
-    mirror-middleware:
-      plugin:
-        traefik-mirror-plugin:
-          shadow_url: "http://shadow-api-v2.internal:8080"
-          sample_percentage: 50
-          headers:
-            X-Mirror: "true"
-            X-Shadow-Version: "v2"
+    # Shadow Service
+    shadow-service:
+      loadBalancer:
+        servers:
+          - url: "http://shadow-api-v2.internal:8080"
+
+    # Mirroring Service (Native Traefik Feature v2.0+)
+    api-mirroring-service:
+      mirroring:
+        service: api-primary-service  # Primary backend
+        maxBodySize: 1048576           # 1 MB max body size
+        mirrors:
+          - name: shadow-service
+            percent: 50  # Mirror 50% of requests
 ```
 
-**⚠️ Achtung:** Traefik hat KEIN natives Request Mirroring Feature. Ein Custom Plugin muss entwickelt werden.
-
-**Workaround:**
-- Entwickle ein Traefik Plugin (Go)
-- Oder verwende einen externen Service Mesh (Linkerd, Istio)
-
 **Features:**
-- ⚠️ Custom Plugin erforderlich
-- ⚠️ Kein natives Feature in Traefik
+- ✅ **Native Mirroring** (seit Traefik v2.0, released 2019)
+- ✅ **Percent-based Sampling:** `percent: 0-100`
+- ✅ **Fire-and-Forget:** Asynchron, Mirror-Responses werden ignoriert
+- ✅ **Body Mirroring:** Konfigurierbar via `maxBodySize` (default: keine Limit)
+- ✅ **Multiple Mirrors:** Mehrere Shadow Targets gleichzeitig
+- ✅ **Health Checks:** Separate Health Checks für Primary/Shadow
+- ⚠️ **Header Injection:** Custom Headers erfordern separate `headers` Middleware
+- ✅ **Hot-Reload:** Dynamic Config kann ohne Downtime neu geladen werden
+
+**Wichtige Hinweise:**
+- **Cumulative Mirroring:** Mehrere Mirrors sind kumulativ (50% + 10% = 60% Traffic)
+- **Body Buffering:** Bei `maxBodySize` wird der Body gebuffert (Memory Overhead)
+- **Logging:** Mirror-Requests erscheinen NICHT in Access Logs (nur Primary Requests)
+- **No Response:** Mirror-Responses werden immer ignoriert (by design)
+
+**Docker E2E Tests:**
+```bash
+✅ test_100_percent_mirroring: 100 requests, 0 failures
+✅ test_50_percent_mirroring_sampling: 100 requests, 0 failures
+✅ test_no_mirroring_baseline: 50 requests, 0 failures
+✅ test_post_request_mirroring: 50 POST requests, 0 failures
+✅ Total: 6 passed in 26.29s
+```
+
+**Referenzen:**
+- [Traefik Mirroring Docs](https://doc.traefik.io/traefik/routing/services/#mirroring-service)
+- [examples/traefik-mirroring-example.yaml](https://github.com/pt9912/x-gal/blob/develop/examples/traefik-mirroring-example.yaml)
+- [tests/docker/traefik-mirroring/](../../tests/docker/traefik-mirroring/)
 
 ---
 
