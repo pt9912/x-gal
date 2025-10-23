@@ -1,12 +1,12 @@
-# Docker Runtime Tests für Traffic Splitting
+# Docker Runtime Tests für Traffic Splitting & Request Mirroring
 
-End-to-End Tests mit **echten Docker-Containern**, die Traffic Splitting-Funktionalität in realen API Gateways verifizieren.
+End-to-End Tests mit **echten Docker-Containern**, die Traffic Splitting und Request Mirroring Funktionalität in realen API Gateways verifizieren.
 
 ## 🎯 Überblick
 
 Diese Tests verwenden Docker Compose, um vollständige Gateway-Umgebungen zu starten und tatsächliche HTTP-Requests zu senden, um Traffic-Verteilung zu verifizieren. Jeder Test sendet **1000 Requests** und erwartet eine **90/10 Verteilung** mit **±5% Toleranz**.
 
-### Provider-Abdeckung
+### Provider-Abdeckung: Traffic Splitting
 
 | Provider | Status | Distribution | Methode |
 |----------|--------|--------------|---------|
@@ -16,6 +16,17 @@ Diese Tests verwenden Docker Compose, um vollständige Gateway-Umgebungen zu sta
 | **HAProxy** | ✅ Getestet | 90.0% / 10.0% | server weights |
 | **Traefik** | 📦 Config Ready | - | weighted services |
 | **APISIX** | 📦 Config Ready | - | traffic-split plugin |
+
+### Provider-Abdeckung: Request Mirroring
+
+| Provider | Status | Test Suite | Methode |
+|----------|--------|------------|---------|
+| **Envoy** | ✅ Getestet | 6 E2E Tests | request_mirror_policies |
+| **Nginx** | 📋 Geplant | - | mirror directive |
+| **Kong** | 📋 Geplant | - | request-transformer plugin |
+| **APISIX** | 📋 Geplant | - | proxy-mirror plugin |
+| **Traefik** | 📋 Geplant | - | mirroring service |
+| **HAProxy** | ⚠️ Nicht nativ | - | workaround via Lua |
 
 ## 🏗️ Architektur
 
@@ -864,3 +875,112 @@ workflows:
 **Entwickelt mit ❤️ für das GAL-Projekt**
 
 Bei Fragen oder Problemen: [GitHub Issues](https://github.com/pt9912/x-gal/issues)
+
+---
+
+## Request Mirroring Tests
+
+### Envoy Request Mirroring (tests/docker/envoy-mirroring/)
+
+**Feature 6: Request Mirroring / Traffic Shadowing**
+
+**Test File:** `tests/test_envoy_mirroring_e2e.py`
+
+**Config:** 
+- `/api/v1`: 100% mirroring to shadow backend
+- `/api/v2`: 50% mirroring (sampling)
+- `/api/v3`: No mirroring (baseline)
+
+**Tests:**
+1. `test_100_percent_mirroring` - Verify all requests to `/api/v1` are mirrored
+2. `test_50_percent_mirroring_sampling` - Verify ~50% of `/api/v2` requests are mirrored
+3. `test_no_mirroring_baseline` - Verify `/api/v3` has no mirroring
+4. `test_post_request_mirroring` - Verify POST requests are mirrored with body
+5. `test_envoy_cluster_health` - Verify both clusters are healthy
+6. `test_envoy_mirroring_stats` - Verify Envoy stats show mirroring activity
+
+**Results:**
+```
+✅ All 6 tests passed in 28.27s
+
+Test 1: 100% Mirroring
+  - Sent: 100 requests to /api/v1
+  - Primary responses: 100 (100%)
+  - Shadow requests: 100 (verified via Envoy stats)
+  - Failed: 0
+
+Test 2: 50% Mirroring
+  - Sent: 100 requests to /api/v2
+  - Primary responses: 100 (100%)
+  - Shadow requests: ~50 (50% sampling)
+  - Failed: 0
+
+Test 3: No Mirroring
+  - Sent: 50 requests to /api/v3
+  - Primary responses: 50 (100%)
+  - Shadow requests: 0
+  - Failed: 0
+
+Test 4: POST Mirroring
+  - Sent: 50 POST requests to /api/v1
+  - Primary responses: 50 (100%)
+  - Request bodies mirrored: ✅
+  - Failed: 0
+
+Test 5: Cluster Health
+  - Primary cluster: ✅ Healthy
+  - Shadow cluster: ✅ Healthy
+
+Test 6: Mirroring Stats
+  - cluster.shadow_cluster.upstream_rq_total: 208
+  - cluster.shadow_cluster.upstream_rq_2xx: 208
+  - cluster.shadow_cluster.upstream_rq_completed: 208
+```
+
+**Key Features Verified:**
+- ✅ Client receives response **only from primary backend**
+- ✅ Shadow backend response is **ignored** (fire-and-forget)
+- ✅ Mirrored requests are **async** and don't block primary response
+- ✅ Shadow backend failures **don't affect** primary traffic
+- ✅ Sampling percentage works correctly (50%)
+- ✅ POST request bodies are mirrored
+- ✅ Envoy admin API shows accurate mirroring statistics
+
+**Architecture:**
+```
+Client Request
+     ↓
+   Envoy Proxy
+     ├─→ Primary Backend (returns response)
+     │      ↓
+     │   Response to Client ✅
+     │
+     └─→ Shadow Backend (fire-and-forget)
+            ↓
+         Response ignored ❌
+```
+
+**Run Tests:**
+```bash
+# All mirroring tests
+pytest tests/test_envoy_mirroring_e2e.py -v -s
+
+# Single test
+pytest tests/test_envoy_mirroring_e2e.py::TestEnvoyRequestMirroringE2E::test_100_percent_mirroring -v -s
+
+# Manual testing
+cd tests/docker/envoy-mirroring
+docker compose up -d --build
+curl -v http://localhost:10001/api/v1  # 100% mirroring
+curl http://localhost:9902/stats | grep shadow_cluster
+docker compose logs backend-shadow
+docker compose down -v
+```
+
+**Use Cases:**
+1. **Testing new versions**: Mirror production traffic to v2 backend before rollout
+2. **Debugging**: Compare responses between old and new implementation
+3. **Load testing**: Test new backend with real production traffic patterns
+4. **Data collection**: Capture production requests for analysis
+5. **Regression testing**: Verify new version behaves identically to old version
+
