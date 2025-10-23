@@ -6,9 +6,17 @@ configured, then verify that requests are properly handled by primary backend.
 
 Feature 6: Request Mirroring / Traffic Shadowing
 
-NOTE: HAProxy does not have native async request mirroring like Envoy or Nginx.
-HAProxy requires external tools (SPOE, Lua, gor, teeproxy) for true mirroring.
-These tests validate HAProxy routing and demonstrate the limitation.
+NOTE: HAProxy supports native request mirroring via SPOE (Stream Processing Offload Engine)
+since version 2.0. However, SPOE requires an external SPOE agent process (spoa-mirror).
+
+For simplicity, these E2E tests validate HAProxy routing configuration without SPOE setup.
+Production HAProxy mirroring requires:
+- SPOE + spoa-mirror (native, but complex setup)
+- GoReplay (gor) - external tool, simple setup
+- Teeproxy - external tool, synchronous
+- Lua scripting - not fire-and-forget
+
+These tests validate HAProxy routing and demonstrate the configuration approach.
 
 Test Scenarios:
 1. Primary backend routing works correctly (/api/v1)
@@ -131,8 +139,9 @@ class TestHAProxyRequestMirroringE2E:
         print(f"\n✅ Received {len(primary_responses)} responses from primary backend")
         print(f"   Failed requests: {failed}")
         print(
-            "\nℹ️  Note: HAProxy does NOT have native async request mirroring."
-            "\n   Production setups require external tools (SPOE, Lua, gor, teeproxy)."
+            "\nℹ️  Note: HAProxy has native request mirroring via SPOE (since 2.0)."
+            "\n   SPOE requires external spoa-mirror agent (complex setup)."
+            "\n   Alternatives: GoReplay (gor), Teeproxy, Lua scripting."
             "\n   This test validates HAProxy routing configuration."
         )
 
@@ -354,21 +363,29 @@ class TestHAProxyRequestMirroringE2E:
         print("✅ HAProxy configuration is valid!")
 
     def test_haproxy_mirroring_limitation_note(self, haproxy_mirroring_setup):
-        """Document HAProxy's request mirroring limitation"""
-        print("\n📝 HAProxy Request Mirroring Limitation:")
+        """Document HAProxy's request mirroring approach"""
+        print("\n📝 HAProxy Request Mirroring Solutions:")
         print("=" * 70)
-        print("HAProxy does NOT support native async request mirroring.")
+        print("HAProxy supports request mirroring via SPOE (since version 2.0).")
         print()
-        print("To implement request mirroring with HAProxy, you need:")
-        print("  1. SPOE (Stream Processing Offload Engine) - requires external process")
-        print("  2. Lua scripting with async HTTP client")
-        print("  3. External mirroring tools:")
-        print("     - gor (https://github.com/buger/goreplay)")
-        print("     - teeproxy (https://github.com/chrissnell/teeproxy)")
-        print("     - Shadow Proxy (https://github.com/linkedin/simoorg)")
+        print("✅ NATIVE Solution:")
+        print("  1. SPOE (Stream Processing Offload Engine) - HAProxy 2.0+")
+        print("     - Native HAProxy feature")
+        print("     - Requires external spoa-mirror agent process")
+        print("     - Fire-and-forget, async mirroring")
+        print("     - Complex setup, production-ready")
+        print()
+        print("⚠️ ALTERNATIVE Solutions (External Tools):")
+        print("  2. GoReplay (gor) - https://github.com/buger/goreplay")
+        print("     - Simple setup, no HAProxy changes needed")
+        print("     - Recommended for testing/staging")
+        print("  3. Teeproxy - https://github.com/chrissnell/teeproxy")
+        print("     - Lightweight, but synchronous")
+        print("  4. Lua scripting")
+        print("     - Custom implementation, not fire-and-forget")
         print()
         print("These E2E tests validate HAProxy routing configuration.")
-        print("For true mirroring, integrate external tools in your deployment.")
+        print("For production mirroring, use SPOE + spoa-mirror or GoReplay.")
         print("=" * 70)
         assert True  # This test always passes, it's just documentation
 

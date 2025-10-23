@@ -2,46 +2,102 @@
 
 Docker-based end-to-end tests for HAProxy request routing with mirroring configuration.
 
-## Important Note: HAProxy Request Mirroring Limitation
+## Important Note: HAProxy Request Mirroring Support
 
-**HAProxy does NOT support native async request mirroring** like Envoy or Nginx.
+**HAProxy supports request mirroring via SPOE (Stream Processing Offload Engine)** since version 2.0.
 
-To implement request mirroring/shadowing with HAProxy in production, you need external tools:
+SPOE is a **native HAProxy feature**, but requires an **external SPOE agent process** (`spoa-mirror`) for request mirroring implementation.
 
-### Recommended Solutions
+### HAProxy Mirroring Solutions
 
-1. **GoReplay (gor)** - [https://github.com/buger/goreplay](https://github.com/buger/goreplay)
-   ```bash
-   # Capture traffic from HAProxy and replay to shadow backend
-   gor --input-raw :8080 --output-http http://shadow-backend:8080
-   ```
+#### 1. **SPOE + spoa-mirror** - ✅ **Native HAProxy** (Recommended for Production)
 
-2. **Teeproxy** - [https://github.com/chrissnell/teeproxy](https://github.com/chrissnell/teeproxy)
-   ```bash
-   # Mirror requests to multiple backends
-   teeproxy -l :8080 -a localhost:9000 -b localhost:9001
-   ```
+**SPOE (Stream Processing Offload Engine)** is HAProxy's native method for request mirroring.
 
-3. **SPOE (Stream Processing Offload Engine)**
-   - Requires external SPOE agent
-   - Complex setup, high performance
-   - Used in production HAProxy deployments
+```bash
+# Compile spoa-mirror agent (from HAProxy contrib/)
+cd contrib/spoa_example
+make
+./spoa-mirror -p 12345 -f /etc/haproxy/spoa-mirror.conf
+```
 
-4. **Lua Scripting**
-   - Requires HAProxy compiled with Lua support
-   - Async HTTP client needed for true fire-and-forget
-   - Custom implementation per use case
+**Features:**
+- ✅ Native HAProxy feature (since 2.0)
+- ✅ Fire-and-forget (async)
+- ✅ Sample percentage support
+- ✅ Custom headers
+- ✅ Production-ready
+- ⚠️ Complex setup (external agent process)
+
+**See:** [REQUEST_MIRRORING.md](../../../docs/guides/REQUEST_MIRRORING.md#4-haproxy-️-spoe-basiert---haproxy-20) for complete SPOE configuration.
+
+---
+
+#### 2. **GoReplay (gor)** - ⭐ **Easiest Alternative**
+
+[https://github.com/buger/goreplay](https://github.com/buger/goreplay)
+
+```bash
+# Capture traffic from HAProxy and replay to shadow backend
+docker run -d --name gor \
+  --network host \
+  goreplay/goreplay:latest \
+  --input-raw :8080 \
+  --output-http "http://shadow-backend:8080|50%"
+```
+
+**Features:**
+- ✅ Simple setup (no HAProxy changes)
+- ✅ Sample percentage support
+- ✅ Recommended for testing/staging
+- ⚠️ External dependency
+
+---
+
+#### 3. **Teeproxy** - Simple but Synchronous
+
+[https://github.com/chrissnell/teeproxy](https://github.com/chrissnell/teeproxy)
+
+```bash
+# Mirror requests to multiple backends
+teeproxy -l :8080 -a localhost:9000 -b localhost:9001
+```
+
+**Features:**
+- ✅ Lightweight
+- ⚠️ Synchronous (waits for both responses)
+
+---
+
+#### 4. **Lua Scripting** - Custom Implementation
+
+```haproxy
+# Requires HAProxy with Lua support
+global
+    lua-load /etc/haproxy/mirror.lua
+
+frontend http_front
+    http-request lua.mirror-request
+```
+
+**Features:**
+- ⚠️ Custom implementation needed
+- ⚠️ Not fire-and-forget by default
+
+---
 
 ### What These Tests Validate
 
-These E2E tests validate:
+These E2E tests validate HAProxy routing configuration **without SPOE setup**:
 - ✅ HAProxy routing configuration
 - ✅ Backend health checks
 - ✅ Request handling (GET, POST)
 - ✅ Concurrent request handling
 - ✅ HAProxy stats endpoint
 
-They do **NOT** test actual request mirroring (as HAProxy lacks this feature).
+For **production mirroring**, use:
+1. **SPOE + spoa-mirror** (native, complex)
+2. **GoReplay** (external, simple)
 
 ## Architecture
 
@@ -133,8 +189,8 @@ docker compose down -v
 ### 8. Configuration Verification (`test_haproxy_configuration_verification`)
 - **Validates:** HAProxy config syntax is valid
 
-### 9. Mirroring Limitation Note (`test_haproxy_mirroring_limitation_note`)
-- **Purpose:** Documents HAProxy's request mirroring limitation
+### 9. Mirroring Solutions Note (`test_haproxy_mirroring_limitation_note`)
+- **Purpose:** Documents HAProxy's request mirroring solutions (SPOE, GoReplay, etc.)
 - **Always passes** - informational test
 
 ## Configuration Files
@@ -156,30 +212,36 @@ HAProxy configuration with:
 GAL configuration demonstrating mirroring syntax:
 - 3 services with different mirroring configurations
 - 100% mirroring, 50% mirroring, no mirroring scenarios
-- Note: Actual implementation requires external tools
+- Note: Production requires SPOE + spoa-mirror or external tools
 
 ## HAProxy Request Mirroring in Production
 
-### Option 1: GoReplay (Recommended)
+### Option 1: SPOE + spoa-mirror (Native, Recommended for Production)
+
+**SPOE (Stream Processing Offload Engine)** is HAProxy's native mirroring solution since version 2.0.
+
 ```bash
-# Deploy alongside HAProxy
-docker run -d --name gor \
-  --network host \
-  goreplay/goreplay:latest \
-  --input-raw :8080 \
-  --output-http http://shadow-backend:8080 \
-  --output-http-track-response
+# Compile and start spoa-mirror agent
+cd contrib/spoa_example
+make
+./spoa-mirror -p 12345 -f /etc/haproxy/spoa-mirror.conf
 ```
 
-### Option 2: SPOE Agent
 ```haproxy
 # haproxy.cfg
 backend spoe-mirror
     mode tcp
-    server spoe1 127.0.0.1:12345
+    server spoe1 127.0.0.1:12345 check
 
 frontend http_front
+    bind *:8080
     filter spoe engine mirror config /etc/haproxy/spoe-mirror.conf
+
+    # 50% sampling
+    acl mirror_sample rand(50)
+    http-request set-var(txn.mirror_enabled) bool(true) if mirror_sample
+
+    default_backend primary_backend
 ```
 
 ```
@@ -188,17 +250,33 @@ frontend http_front
 spoe-agent mirror-agent
     messages   mirror-request
     option     async
-    timeout    processing 2s
-    maxconnrate 100
-    maxerrrate  50
+    option     send-frag-payload
+    timeout    processing 500ms
     use-backend spoe-mirror
 
 spoe-message mirror-request
-    args method=method path=path
-    event on-frontend-http-request
+    args method=method path=path headers=req.hdrs body=req.body
+    event on-frontend-http-request if { var(txn.mirror_enabled) -m bool }
 ```
 
-### Option 3: Lua Scripting
+**See:** [REQUEST_MIRRORING.md](../../../docs/guides/REQUEST_MIRRORING.md#4-haproxy-️-spoe-basiert---haproxy-20) for complete configuration.
+
+---
+
+### Option 2: GoReplay (gor) - Easiest Alternative
+
+```bash
+# Deploy alongside HAProxy (no HAProxy changes needed!)
+docker run -d --name gor \
+  --network host \
+  goreplay/goreplay:latest \
+  --input-raw :8080 \
+  --output-http "http://shadow-backend:8080|50%"
+```
+
+---
+
+### Option 3: Lua Scripting (Not Recommended)
 ```haproxy
 # haproxy.cfg (requires HAProxy with Lua support)
 global
@@ -220,15 +298,17 @@ end)
 
 | Feature | Envoy | Nginx | APISIX | HAProxy |
 |---------|-------|-------|--------|---------|
-| **Native Mirroring** | ✅ Yes (async) | ✅ Yes (mirror directive) | ✅ Yes (proxy-mirror plugin) | ❌ No |
-| **Sample Percentage** | ✅ Yes (runtime_fraction) | ✅ Yes (split_clients) | ✅ Yes (sample_ratio) | ⚠️  External tool |
-| **Mirror Request Body** | ✅ Yes | ✅ Yes | ✅ Yes | ⚠️  External tool |
-| **Mirror Headers** | ✅ Yes | ✅ Yes | ✅ Yes | ⚠️  External tool |
-| **Fire-and-Forget** | ✅ Yes | ✅ Yes | ✅ Yes | ⚠️  External tool |
-| **Production Ready** | ✅ Built-in | ✅ Built-in | ✅ Built-in | ⚠️  SPOE/gor/teeproxy |
+| **Native Mirroring** | ✅ Yes (async) | ✅ Yes (mirror directive) | ✅ Yes (proxy-mirror plugin) | ⚠️ Yes (SPOE, complex) |
+| **Sample Percentage** | ✅ Yes (runtime_fraction) | ✅ Yes (split_clients) | ✅ Yes (sample_ratio) | ✅ Yes (rand() ACL) |
+| **Mirror Request Body** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes (SPOE) |
+| **Mirror Headers** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes (SPOE) |
+| **Fire-and-Forget** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes (SPOE async) |
+| **Setup Complexity** | 🟢 Low | 🟢 Low | 🟢 Low | 🔴 High (SPOE agent) |
+| **Production Ready** | ✅ Built-in | ✅ Built-in | ✅ Built-in | ✅ SPOE (2.0+) |
 
-**Recommendation:** For request mirroring, use **Envoy**, **Nginx**, or **APISIX** if possible.
-If HAProxy is required, integrate **GoReplay** or **SPOE** for production mirroring.
+**Recommendation:**
+- **Simple setup:** Use **Envoy**, **Nginx**, or **APISIX** (easier mirroring)
+- **HAProxy required:** Use **SPOE + spoa-mirror** (native, complex) or **GoReplay** (external, simple)
 
 ## Troubleshooting
 
