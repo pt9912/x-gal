@@ -34,13 +34,27 @@ SPOE_DATA_T_IPV6 = 7
 SPOE_DATA_T_STR = 8
 SPOE_DATA_T_BIN = 9
 
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+import threading
+
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/health":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"healthy")
+        else:
+            self.send_response(404)
 
 class SPOEAgent:
     """SPOE agent for request mirroring with HAProxy"""
 
-    def __init__(self, mirror_url: str, port: int = 12345):
+    def __init__(self, mirror_url: str, port: int = 12345, health_port: int = 12346):
         self.mirror_url = mirror_url.rstrip("/")
         self.port = port
+        self.health_port = health_port
         self.connections = 0
 
     async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
@@ -607,17 +621,38 @@ class SPOEAgent:
         except Exception:
             pass  # Fire-and-forget, ignore all errors
 
+    def start_health_server(self):
+        # Startet den HTTP-Server in einem separaten Thread
+        server = HTTPServer(("0.0.0.0", self.health_port), HealthCheckHandler)
+        print("Healthcheck server listening on 0.0.0.0:12346", flush=True)
+        server.serve_forever()
+      
     async def run(self):
-        """Start SPOE agent server"""
-        server = await asyncio.start_server(self.handle_client, "0.0.0.0", self.port)
-
-        addr = server.sockets[0].getsockname()
+        # Startet den SPOE-Server (Port 12345)
+        spoa_server = await asyncio.start_server(self.handle_client, "0.0.0.0", self.port)
+        addr = spoa_server.sockets[0].getsockname()
         print(f"SPOE Mirror Agent listening on {addr[0]}:{addr[1]}", flush=True)
         print(f"Mirror target: {self.mirror_url}", flush=True)
         print("Ready to receive SPOE messages from HAProxy...", flush=True)
 
-        async with server:
-            await server.serve_forever()
+        # Startet den HTTP-Server in einem separaten Thread
+        health_thread = threading.Thread(target=self.start_health_server, daemon=True)
+        health_thread.start()
+
+        async with spoa_server:
+            await spoa_server.serve_forever()        
+            
+    # async def run(self):
+    #     """Start SPOE agent server"""
+    #     server = await asyncio.start_server(self.handle_client, "0.0.0.0", self.port)
+
+    #     addr = server.sockets[0].getsockname()
+    #     print(f"SPOE Mirror Agent listening on {addr[0]}:{addr[1]}", flush=True)
+    #     print(f"Mirror target: {self.mirror_url}", flush=True)
+    #     print("Ready to receive SPOE messages from HAProxy...", flush=True)
+
+    #     async with server:
+    #         await server.serve_forever()
 
 
 def main():
@@ -628,9 +663,14 @@ def main():
     parser.add_argument(
         "-u", "--url", required=True, help="Mirror target URL (e.g., http://shadow-backend:8080)"
     )
+    parser.add_argument(
+        "-e", "--health-port", type=int, default=12346, help="Health-Port to listen on (default: 12346)"
+    )
+    
+    
     args = parser.parse_args()
 
-    agent = SPOEAgent(mirror_url=args.url, port=args.port)
+    agent = SPOEAgent(mirror_url=args.url, port=args.port, health_port=args.health_port)
 
     try:
         asyncio.run(agent.run())
