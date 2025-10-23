@@ -56,16 +56,26 @@ Client Request ──────►│   API Gateway   │
 
 | Feature | Envoy | Nginx | APISIX | HAProxy | Kong | Traefik | Azure APIM | AWS API GW | GCP API GW |
 |---------|-------|-------|--------|---------|------|---------|------------|------------|------------|
-| **Request Mirroring** | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ |
-| **Native Support** | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| **Sample Percentage** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ |
-| **Custom Headers** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Multiple Mirrors** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | ⚠️ | ⚠️ |
+| **Request Mirroring** | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ |
+| **Native Support** | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| **Sample Percentage** | ✅ | ✅ | ✅ | ⚠️ | ✅ | ⚠️ | ✅ | ✅ | ✅ |
+| **Custom Headers** | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Multiple Mirrors** | ✅ | ✅ | ✅ | ⚠️ | ✅ | ⚠️ | ✅ | ⚠️ | ⚠️ |
+| **Fire-and-Forget** | ✅ | ✅ | ✅ | ⚠️ | ❌ | ⚠️ | ✅ | ⚠️ | ⚠️ |
 
 **Legende:**
 - ✅ Native Support (eingebautes Feature)
-- ⚠️ Workaround erforderlich (Plugin, Lambda, Custom Code)
+- ⚠️ Workaround erforderlich (Plugin, Lambda, Custom Code, External Tools)
 - ❌ Nicht unterstützt
+
+**Wichtiger Hinweis für HAProxy:**
+HAProxy unterstützt **kein natives async Request Mirroring**. Für Production Mirroring benötigt HAProxy externe Tools:
+- **GoReplay (gor)** - Empfohlen ([https://github.com/buger/goreplay](https://github.com/buger/goreplay))
+- **Teeproxy** - Request Duplikation ([https://github.com/chrissnell/teeproxy](https://github.com/chrissnell/teeproxy))
+- **SPOE (Stream Processing Offload Engine)** - HAProxy-native, komplex
+- **Lua Scripting** - Custom Implementation
+
+Siehe [HAProxy Mirroring Tests](../../tests/docker/haproxy-mirroring/README.md) für Details.
 
 ---
 
@@ -294,49 +304,133 @@ routes:
 
 ---
 
-### 4. HAProxy (✅ Native - HAProxy 2.4+)
+### 4. HAProxy (❌ Keine Native Unterstützung - Externe Tools erforderlich)
 
-**Mechanismus:** `http-request mirror` directive
+**⚠️ WICHTIG: HAProxy unterstützt KEIN natives async Request Mirroring!**
+
+HAProxy hat **keine** `http-request mirror` Direktive und keine eingebaute Funktion für fire-and-forget Request Mirroring. Für Production Mirroring benötigt HAProxy externe Tools.
+
+**Empfohlene Lösungen:**
+
+#### Option 1: GoReplay (gor) - **Empfohlen** ✅
+
+```bash
+# GoReplay neben HAProxy deployen
+docker run -d --name gor \
+  --network host \
+  goreplay/goreplay:latest \
+  --input-raw :8080 \
+  --output-http "http://shadow-api-v2.internal:8080" \
+  --output-http-track-response
+
+# Mit Sampling (50%)
+gor --input-raw :8080 \
+    --output-http "http://shadow-api-v2.internal:8080|50%"
+```
+
+**Vorteile:**
+- ✅ Production-ready, weit verbreitet
+- ✅ Einfache Integration
+- ✅ Sample percentage support
+- ✅ Request/Response tracking
+- ✅ Filter by path, header, etc.
+
+#### Option 2: Teeproxy
+
+```bash
+# Teeproxy als Proxy vor HAProxy
+teeproxy \
+  -l :8080 \
+  -a localhost:8081 \
+  -b http://shadow-api-v2.internal:8080
+```
+
+#### Option 3: SPOE (Stream Processing Offload Engine)
 
 ```haproxy
-# HAProxy Config (generiert von GAL)
-frontend my_frontend
+# haproxy.cfg
+global
+    stats socket /var/run/haproxy.sock mode 600 level admin
+
+backend spoe-mirror
+    mode tcp
+    server spoe1 127.0.0.1:12345
+
+frontend http_front
+    bind *:8080
+    filter spoe engine mirror config /etc/haproxy/spoe-mirror.conf
+    default_backend primary_backend
+```
+
+```
+# spoe-mirror.conf
+[mirror]
+spoe-agent mirror-agent
+    messages   mirror-request
+    option     async
+    timeout    processing 2s
+    use-backend spoe-mirror
+
+spoe-message mirror-request
+    args method=method path=path
+    event on-frontend-http-request
+```
+
+**Nachteile:** Komplex, benötigt externen SPOE Agent
+
+#### Option 4: Lua Scripting
+
+```haproxy
+# haproxy.cfg (requires HAProxy with Lua support)
+global
+    lua-load /etc/haproxy/mirror.lua
+
+frontend http_front
+    http-request lua.mirror-request
+```
+
+```lua
+-- mirror.lua
+core.register_action("mirror-request", { "http-req" }, function(txn)
+    -- Async HTTP request to shadow backend
+    -- Implementation depends on Lua HTTP client
+    -- NOT fire-and-forget by default!
+end)
+```
+
+**Nachteile:** Lua nicht fire-and-forget, blockiert Request
+
+**Features:**
+- ❌ Kein natives Request Mirroring
+- ⚠️ Sample percentage via externe Tools (gor, teeproxy)
+- ⚠️ Custom headers via externe Tools
+- ⚠️ Multiple mirrors via externe Tools
+- ⚠️ Fire-and-Forget nur mit externen Tools (gor, SPOE)
+
+**HAProxy Routing-Konfiguration (von GAL generiert):**
+
+```haproxy
+# HAProxy Config für Routing (kein Mirroring)
+frontend http_front
     bind *:8080
     mode http
 
-    # ACL für Sampling (50%)
-    acl mirror_path path_beg /api/users
-    acl mirror_sample rand(50)
+    acl is_api_users path_beg /api/users
+    use_backend api_backend if is_api_users
 
-    # Mirror Request
-    http-request mirror mirror_backend if mirror_path mirror_sample
+    default_backend api_backend
 
-    default_backend primary_backend
-
-backend primary_backend
+backend api_backend
     mode http
     server api1 api-v1.internal:8080 check
-
-backend mirror_backend
-    mode http
-    timeout connect 5s
-    timeout server 5s
-    http-request set-header X-Mirror "true"
-    http-request set-header X-Shadow-Version "v2"
-    server mirror1 shadow-api-v2.internal:8080 check
 ```
 
-**Features:**
-- ✅ Native `http-request mirror` directive (HAProxy 2.4+)
-- ✅ Sample percentage via `rand()` ACL
-- ✅ Custom headers via `http-request set-header`
-- ✅ Multiple mirrors via multiple mirror directives
+**GAL generiert HAProxy-Konfigurationen mit Routing, aber dokumentiert, dass externes Mirroring-Tool benötigt wird.**
 
-**HAProxy Version:** HAProxy 2.4+ (mirror directive support)
-
-**Ältere Versionen (HAProxy 2.3-):**
-- ⚠️ Lua Script erforderlich für Request Mirroring
-- Siehe: [HAProxy Lua Mirroring Guide](https://www.haproxy.com/documentation/hapee/latest/api/lua/)
+**Siehe auch:**
+- [HAProxy Mirroring E2E Tests](../../tests/docker/haproxy-mirroring/README.md) - Dokumentiert Limitation
+- [GoReplay GitHub](https://github.com/buger/goreplay) - Empfohlenes Tool
+- [Teeproxy GitHub](https://github.com/chrissnell/teeproxy) - Alternative Lösung
 
 ---
 
