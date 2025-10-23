@@ -13,9 +13,12 @@ services:
       - "10005:10000"  # Proxy port (external:internal)
       - "9998:9999"    # Stats port
     depends_on:
-      - spoa-mirror
-      - backend-primary
-      - backend-shadow
+      spoa-mirror:
+        condition: service_healthy
+      backend-primary:
+        condition: service_healthy
+      backend-shadow:
+        condition: service_healthy
     networks:
       - haproxy-spoe-network
     healthcheck:

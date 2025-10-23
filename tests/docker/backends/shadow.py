@@ -16,6 +16,9 @@ class ShadowHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         ShadowHandler.request_count += 1
+        # Log for E2E test verification
+        print(f"Received request: GET {self.path}")
+
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("X-Backend-Name", "shadow")
@@ -36,6 +39,9 @@ class ShadowHandler(BaseHTTPRequestHandler):
         body = self.rfile.read(content_length).decode() if content_length > 0 else ""
 
         ShadowHandler.request_count += 1
+        # Log for E2E test verification
+        print(f"Received request: POST {self.path}")
+
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("X-Backend-Name", "shadow")
