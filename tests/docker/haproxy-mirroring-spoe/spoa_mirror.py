@@ -36,6 +36,7 @@ SPOE_DATA_T_IPV6 = 7
 SPOE_DATA_T_STR = 8
 SPOE_DATA_T_BIN = 9
 
+
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health":
@@ -45,6 +46,7 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
             self.wfile.write(b"healthy")
         else:
             self.send_response(404)
+
 
 class SPOEAgent:
     """SPOE agent for request mirroring with HAProxy"""
@@ -624,7 +626,7 @@ class SPOEAgent:
         server = HTTPServer(("0.0.0.0", self.health_port), HealthCheckHandler)
         print("Healthcheck server listening on 0.0.0.0:12346", flush=True)
         server.serve_forever()
-      
+
     async def run(self):
         # Startet den SPOE-Server (Port 12345)
         spoa_server = await asyncio.start_server(self.handle_client, "0.0.0.0", self.port)
@@ -638,8 +640,8 @@ class SPOEAgent:
         health_thread.start()
 
         async with spoa_server:
-            await spoa_server.serve_forever()        
-            
+            await spoa_server.serve_forever()
+
     # async def run(self):
     #     """Start SPOE agent server"""
     #     server = await asyncio.start_server(self.handle_client, "0.0.0.0", self.port)
@@ -662,10 +664,13 @@ def main():
         "-u", "--url", required=True, help="Mirror target URL (e.g., http://shadow-backend:8080)"
     )
     parser.add_argument(
-        "-e", "--health-port", type=int, default=12346, help="Health-Port to listen on (default: 12346)"
+        "-e",
+        "--health-port",
+        type=int,
+        default=12346,
+        help="Health-Port to listen on (default: 12346)",
     )
-    
-    
+
     args = parser.parse_args()
 
     agent = SPOEAgent(mirror_url=args.url, port=args.port, health_port=args.health_port)

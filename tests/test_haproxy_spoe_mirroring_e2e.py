@@ -209,7 +209,9 @@ class TestHAProxySPOEMirroringE2E:
 
         # Capture timestamp before sending requests (use UTC for Docker logs)
         # Subtract 2 seconds to ensure we capture all logs
-        start_time = (datetime.now(timezone.utc) - timedelta(seconds=2)).strftime("%Y-%m-%dT%H:%M:%S")
+        start_time = (datetime.now(timezone.utc) - timedelta(seconds=2)).strftime(
+            "%Y-%m-%dT%H:%M:%S"
+        )
         print(f"  Test start time: {start_time}")
 
         # Send requests to /api/v1 (100% mirroring configured)
@@ -254,7 +256,9 @@ class TestHAProxySPOEMirroringE2E:
 
         # Capture timestamp before sending requests
         # Subtract 2 seconds to ensure we capture all logs
-        start_time = (datetime.now(timezone.utc) - timedelta(seconds=2)).strftime("%Y-%m-%dT%H:%M:%S")
+        start_time = (datetime.now(timezone.utc) - timedelta(seconds=2)).strftime(
+            "%Y-%m-%dT%H:%M:%S"
+        )
         print(f"  Test start time: {start_time}")
 
         # Send requests to /api/v2 (50% mirroring configured via rand(50))
@@ -297,7 +301,9 @@ class TestHAProxySPOEMirroringE2E:
 
         # Capture timestamp before sending requests
         # Subtract 2 seconds to ensure we capture all logs
-        start_time = (datetime.now(timezone.utc) - timedelta(seconds=2)).strftime("%Y-%m-%dT%H:%M:%S")
+        start_time = (datetime.now(timezone.utc) - timedelta(seconds=2)).strftime(
+            "%Y-%m-%dT%H:%M:%S"
+        )
         print(f"  Test start time: {start_time}")
 
         # Send requests to /api/v3 (no mirroring configured)
@@ -337,7 +343,9 @@ class TestHAProxySPOEMirroringE2E:
 
         # Capture timestamp before sending requests
         # Subtract 2 seconds to ensure we capture all logs
-        start_time = (datetime.now(timezone.utc) - timedelta(seconds=2)).strftime("%Y-%m-%dT%H:%M:%S")
+        start_time = (datetime.now(timezone.utc) - timedelta(seconds=2)).strftime(
+            "%Y-%m-%dT%H:%M:%S"
+        )
         print(f"  Test start time: {start_time}")
 
         # Send POST requests with body
@@ -479,7 +487,9 @@ class TestHAProxySPOEMirroringE2E:
 
         # Capture timestamp before sending requests
         # Subtract 2 seconds to ensure we capture all logs
-        start_time = (datetime.now(timezone.utc) - timedelta(seconds=2)).strftime("%Y-%m-%dT%H:%M:%S")
+        start_time = (datetime.now(timezone.utc) - timedelta(seconds=2)).strftime(
+            "%Y-%m-%dT%H:%M:%S"
+        )
         print(f"  Test start time: {start_time}")
 
         import concurrent.futures
