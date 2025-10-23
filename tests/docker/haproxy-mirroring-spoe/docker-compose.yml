@@ -26,17 +26,16 @@ services:
 
   # SPOA Mirror Agent - Handles async request mirroring
   spoa-mirror:
-    image: haproxytech/spoa-mirror:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.spoa-mirror
     container_name: spoa-mirror-agent
-    environment:
-      - MIRROR_URL=http://backend-shadow:8080
-      - LOG_LEVEL=info
     # Command: Listen on port 12345, mirror to shadow backend
-    command: ["-u", "http://backend-shadow:8080", "-p", "12345"]
+    command: ["-p", "12345", "-u", "http://backend-shadow:8080"]
     networks:
       - haproxy-spoe-network
     healthcheck:
-      test: ["CMD-SHELL", "netstat -an | grep 12345 || exit 1"]
+      test: ["CMD-SHELL", "nc -z localhost 12345 || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 3
