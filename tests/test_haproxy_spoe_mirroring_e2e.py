@@ -184,11 +184,6 @@ class TestHAProxySPOEMirroringE2E:
         print(f"\n✅ Received {len(primary_responses)} responses from primary backend")
         print(f"   Failed requests: {failed}")
 
-    @pytest.mark.xfail(
-        reason="SPOE protocol HELLO handshake not fully implemented in spoa_mirror.py. "
-        "HAProxy connects but closes immediately without sending requests. "
-        "Requires full SPOE protocol implementation with correct HELLO/ACK frames."
-    )
     def test_shadow_backend_receives_100_percent_mirrors(
         self, haproxy_spoe_setup, docker_compose_file
     ):
@@ -231,11 +226,6 @@ class TestHAProxySPOEMirroringE2E:
 
         print(f"\n✅ SPOE mirroring works! {mirrored_count}/{num_requests} requests mirrored")
 
-    @pytest.mark.xfail(
-        reason="SPOE protocol HELLO handshake not fully implemented in spoa_mirror.py. "
-        "HAProxy connects but closes immediately without sending requests. "
-        "Requires full SPOE protocol implementation with correct HELLO/ACK frames."
-    )
     def test_shadow_backend_receives_50_percent_sample(
         self, haproxy_spoe_setup, docker_compose_file
     ):
@@ -317,11 +307,6 @@ class TestHAProxySPOEMirroringE2E:
 
         print(f"\n✅ No mirroring baseline verified! 0/{num_requests} requests mirrored")
 
-    @pytest.mark.xfail(
-        reason="SPOE protocol HELLO handshake not fully implemented in spoa_mirror.py. "
-        "HAProxy connects but closes immediately without sending requests. "
-        "Requires full SPOE protocol implementation with correct HELLO/ACK frames."
-    )
     def test_post_request_body_mirroring(self, haproxy_spoe_setup, docker_compose_file):
         """Test that POST request bodies are mirrored correctly"""
         print("\n📝 Testing POST Request Body Mirroring to /api/v1...")
@@ -458,11 +443,6 @@ class TestHAProxySPOEMirroringE2E:
         except Exception as e:
             pytest.fail(f"Failed to check HAProxy stats: {e}")
 
-    @pytest.mark.xfail(
-        reason="SPOE protocol HELLO handshake not fully implemented in spoa_mirror.py. "
-        "HAProxy connects but closes immediately without sending requests. "
-        "Requires full SPOE protocol implementation with correct HELLO/ACK frames."
-    )
     def test_concurrent_mirroring(self, haproxy_spoe_setup, docker_compose_file):
         """Test that SPOE handles concurrent requests correctly"""
         print("\n🔀 Testing Concurrent Request Mirroring...")
