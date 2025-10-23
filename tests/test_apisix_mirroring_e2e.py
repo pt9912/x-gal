@@ -116,6 +116,7 @@ class TestAPISIXRequestMirroringE2E:
             headers = {"X-API-KEY": api_key, "Content-Type": "application/json"}
 
             # Deploy upstreams
+            print(f"  Deploying {len(apisix_config.get('upstreams', []))} upstreams...")
             for upstream in apisix_config.get("upstreams", []):
                 upstream_id = upstream["id"]
                 response = requests.put(
@@ -127,8 +128,11 @@ class TestAPISIXRequestMirroringE2E:
                 if response.status_code not in (200, 201):
                     print(f"⚠️  Failed to deploy upstream {upstream_id}: {response.status_code}")
                     print(f"  Response: {response.text}")
+                else:
+                    print(f"  ✅ Deployed upstream: {upstream_id}")
 
             # Deploy services
+            print(f"  Deploying {len(apisix_config.get('services', []))} services...")
             for service in apisix_config.get("services", []):
                 service_id = service["id"]
                 response = requests.put(
@@ -140,10 +144,14 @@ class TestAPISIXRequestMirroringE2E:
                 if response.status_code not in (200, 201):
                     print(f"⚠️  Failed to deploy service {service_id}: {response.status_code}")
                     print(f"  Response: {response.text}")
+                else:
+                    print(f"  ✅ Deployed service: {service_id}")
 
             # Deploy routes
+            print(f"  Deploying {len(apisix_config.get('routes', []))} routes...")
             for i, route in enumerate(apisix_config.get("routes", []), 1):
                 route_id = str(i)
+                route_uri = route.get("uri", "unknown")
                 response = requests.put(
                     f"{admin_url}/apisix/admin/routes/{route_id}",
                     json=route,
@@ -151,10 +159,12 @@ class TestAPISIXRequestMirroringE2E:
                     timeout=10,
                 )
                 if response.status_code not in (200, 201):
-                    print(f"⚠️  Failed to deploy route {route_id}: {response.status_code}")
+                    print(f"⚠️  Failed to deploy route {route_id} ({route_uri}): {response.status_code}")
                     print(f"  Response: {response.text}")
                 else:
-                    print(f"  ✅ Deployed route: {route.get('name', route_id)}")
+                    plugins = route.get("plugins", {})
+                    plugin_names = ", ".join(plugins.keys()) if plugins else "none"
+                    print(f"  ✅ Deployed route {route_id}: {route_uri} (plugins: {plugin_names})")
 
             print("✅ APISIX configuration deployed successfully!")
 
@@ -186,14 +196,23 @@ class TestAPISIXRequestMirroringE2E:
             try:
                 response = requests.get("http://localhost:10003/api/v1", timeout=5)
 
+                # Enhanced logging for debugging
+                if i < 3:  # Log first 3 requests in detail
+                    print(f"  [Request {i+1}] Status: {response.status_code}")
+                    print(f"  [Request {i+1}] Headers: {dict(response.headers)}")
+                    if response.status_code != 200:
+                        print(f"  [Request {i+1}] Body: {response.text[:200]}")
+
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
                     if backend == "primary":
                         primary_responses.append(response)
                     else:
-                        print(f"⚠️  Unexpected backend: {backend}")
+                        print(f"⚠️  Unexpected backend: {backend} (headers: {dict(response.headers)})")
                 else:
                     failed += 1
+                    if i < 5:  # Log first few non-200 responses
+                        print(f"❌ Non-200 response: {response.status_code} - {response.text[:200]}")
             except requests.exceptions.RequestException as e:
                 failed += 1
                 if i < 5:  # Only log first few failures

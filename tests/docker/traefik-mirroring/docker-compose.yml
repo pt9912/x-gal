@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Backend - Primary (production traffic)
   backend-primary:

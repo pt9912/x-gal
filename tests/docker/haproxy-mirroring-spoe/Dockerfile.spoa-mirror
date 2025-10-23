@@ -3,9 +3,11 @@
 
 FROM python:3.12-slim
 
-# Install netcat for health checks
+# Install netcat and net-tools for health checks
 RUN apt-get update && apt-get install -y \
     netcat-openbsd \
+    net-tools \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy SPOE mirror script

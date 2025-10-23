@@ -54,11 +54,25 @@ def cli(ctx, log_level):
 
 
 @cli.command()
-@click.option("--config", "-c", required=True, help="Configuration file path")
+@click.argument("provider_arg", required=False)
+@click.argument("config_arg", required=False)
+@click.option("--config", "-c", help="Configuration file path")
 @click.option("--provider", "-p", help="Provider name (overrides config)")
 @click.option("--output", "-o", help="Output file (default: stdout)")
-def generate(config, provider, output):
-    """Generate gateway configuration"""
+def generate(provider_arg, config_arg, config, provider, output):
+    """Generate gateway configuration
+
+    Supports two usage patterns:
+    1. gal generate --config <file> --provider <provider>
+    2. gal generate <provider> <config-file> --output <file>
+    """
+    # Support both positional and option-based arguments
+    if provider_arg and config_arg:
+        # Positional arguments: gal generate apisix config.yaml
+        provider = provider_arg
+        config = config_arg
+    elif not config:
+        raise click.UsageError("Missing configuration file. Use --config or provide as argument.")
     try:
         manager = Manager()
         manager.register_provider(EnvoyProvider())
