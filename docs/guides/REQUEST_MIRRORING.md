@@ -57,25 +57,29 @@ Client Request ──────►│   API Gateway   │
 | Feature | Envoy | Nginx | APISIX | HAProxy | Kong | Traefik | Azure APIM | AWS API GW | GCP API GW |
 |---------|-------|-------|--------|---------|------|---------|------------|------------|------------|
 | **Request Mirroring** | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ |
-| **Native Support** | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| **Sample Percentage** | ✅ | ✅ | ✅ | ⚠️ | ✅ | ⚠️ | ✅ | ✅ | ✅ |
-| **Custom Headers** | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Multiple Mirrors** | ✅ | ✅ | ✅ | ⚠️ | ✅ | ⚠️ | ✅ | ⚠️ | ⚠️ |
-| **Fire-and-Forget** | ✅ | ✅ | ✅ | ⚠️ | ❌ | ⚠️ | ✅ | ⚠️ | ⚠️ |
+| **Native Support** | ✅ | ✅ | ✅ | ⚠️ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| **Sample Percentage** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ |
+| **Custom Headers** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Multiple Mirrors** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | ⚠️ | ⚠️ |
+| **Fire-and-Forget** | ✅ | ✅ | ✅ | ✅ | ❌ | ⚠️ | ✅ | ⚠️ | ⚠️ |
+| **Setup Komplexität** | 🟢 | 🟢 | 🟢 | 🔴 | 🟡 | 🟡 | 🟢 | 🟡 | 🟡 |
 
 **Legende:**
 - ✅ Native Support (eingebautes Feature)
-- ⚠️ Workaround erforderlich (Plugin, Lambda, Custom Code, External Tools)
+- ⚠️ Workaround/Externe Tools erforderlich (Plugin, Lambda, SPOE Agent)
 - ❌ Nicht unterstützt
+- 🟢 Niedrige Komplexität | 🟡 Mittlere Komplexität | 🔴 Hohe Komplexität
 
 **Wichtiger Hinweis für HAProxy:**
-HAProxy unterstützt **kein natives async Request Mirroring**. Für Production Mirroring benötigt HAProxy externe Tools:
-- **GoReplay (gor)** - Empfohlen ([https://github.com/buger/goreplay](https://github.com/buger/goreplay))
-- **Teeproxy** - Request Duplikation ([https://github.com/chrissnell/teeproxy](https://github.com/chrissnell/teeproxy))
-- **SPOE (Stream Processing Offload Engine)** - HAProxy-native, komplex
-- **Lua Scripting** - Custom Implementation
+HAProxy unterstützt Request Mirroring über **SPOE (Stream Processing Offload Engine)** seit Version 2.0. Dies ist eine **native Funktion**, erfordert aber einen **externen SPOE Agent** (`spoa-mirror`).
 
-Siehe [HAProxy Mirroring Tests](../../tests/docker/haproxy-mirroring/README.md) für Details.
+**HAProxy Mirroring Lösungen (sortiert nach Komplexität):**
+1. **SPOE + spoa-mirror** - Native HAProxy (seit 2.0), komplex, production-ready
+2. **GoReplay (gor)** - Extern, einfach, empfohlen für Testing ([GitHub](https://github.com/buger/goreplay))
+3. **Teeproxy** - Extern, einfach, synchron ([GitHub](https://github.com/chrissnell/teeproxy))
+4. **Lua Scripting** - Custom, nicht fire-and-forget
+
+Siehe [HAProxy Mirroring Dokumentation](#4-haproxy-️-spoe-basiert---haproxy-20) und [E2E Tests](../../tests/docker/haproxy-mirroring/README.md) für Details.
 
 ---
 
@@ -304,18 +308,119 @@ routes:
 
 ---
 
-### 4. HAProxy (❌ Keine Native Unterstützung - Externe Tools erforderlich)
+### 4. HAProxy (⚠️ SPOE-basiert - HAProxy 2.0+)
 
-**⚠️ WICHTIG: HAProxy unterstützt KEIN natives async Request Mirroring!**
+**⚠️ WICHTIG: HAProxy unterstützt Request Mirroring über SPOE (Stream Processing Offload Engine)**
 
-HAProxy hat **keine** `http-request mirror` Direktive und keine eingebaute Funktion für fire-and-forget Request Mirroring. Für Production Mirroring benötigt HAProxy externe Tools.
+HAProxy hat **keine** einfache `http-request mirror` Direktive wie Nginx, sondern nutzt das **SPOE-Protokoll** (seit HAProxy 2.0) für Traffic Mirroring. Dies ist eine **native Funktion**, erfordert aber einen **externen SPOE Agent** (z.B. `spoa-mirror`).
 
-**Empfohlene Lösungen:**
+**Mechanismus:** SPOE (Stream Processing Offload Engine) + spoa-mirror Agent
 
-#### Option 1: GoReplay (gor) - **Empfohlen** ✅
+**Empfohlene Lösungen (sortiert nach Komplexität):**
+
+#### Option 1: SPOE + spoa-mirror - **Native HAProxy Lösung** (HAProxy 2.0+) ✅
+
+**SPOE (Stream Processing Offload Engine)** ist die **native HAProxy-Methode** für Request Mirroring seit Version 2.0.
+
+**Schritt 1: SPOE Agent (spoa-mirror) starten**
 
 ```bash
-# GoReplay neben HAProxy deployen
+# spoa-mirror Agent kompilieren (aus HAProxy contrib/)
+cd contrib/spoa_example
+make
+
+# spoa-mirror starten (lauscht auf Port 12345)
+./spoa-mirror -p 12345 -f /etc/haproxy/spoa-mirror.conf
+```
+
+**Schritt 2: HAProxy Konfiguration**
+
+```haproxy
+# haproxy.cfg
+global
+    # SPOE Config einbinden
+    log stdout format raw local0 info
+
+backend spoe-mirror
+    mode tcp
+    # SPOE Agent Verbindung
+    server spoe1 127.0.0.1:12345 check
+
+frontend http_front
+    bind *:8080
+    mode http
+
+    # SPOE Filter aktivieren für Request Mirroring
+    filter spoe engine mirror config /etc/haproxy/spoe-mirror.conf
+
+    # ACL für Sampling (50% der Requests)
+    acl mirror_sample rand(50)
+    http-request set-var(txn.mirror_enabled) bool(true) if mirror_sample
+
+    default_backend primary_backend
+
+backend primary_backend
+    mode http
+    server api1 api-v1.internal:8080 check
+```
+
+**Schritt 3: SPOE Konfiguration**
+
+```
+# /etc/haproxy/spoe-mirror.conf
+[mirror]
+spoe-agent mirror-agent
+    messages   mirror-request
+    option     async
+    option     send-frag-payload
+    timeout    hello      2s
+    timeout    idle       2m
+    timeout    processing 500ms
+    use-backend spoe-mirror
+    log        global
+
+spoe-message mirror-request
+    # Request Details an SPOE Agent senden
+    args method=method path=path headers=req.hdrs body=req.body
+    event on-frontend-http-request if { var(txn.mirror_enabled) -m bool }
+```
+
+**Schritt 4: spoa-mirror Agent Konfiguration**
+
+```ini
+# spoa-mirror.conf (für spoa-mirror binary)
+[mirror]
+# Shadow Backend URL
+mirror-url = http://shadow-api-v2.internal:8080
+
+# Custom Headers für gespiegelte Requests
+mirror-headers = X-Mirror: true, X-Shadow-Version: v2
+
+# Logging
+log-level = info
+```
+
+**Vorteile:**
+- ✅ **Native HAProxy-Lösung** (seit Version 2.0)
+- ✅ Fire-and-forget (asynchron, wartet nicht auf Response)
+- ✅ Sample percentage via `rand()` ACL
+- ✅ Custom headers via SPOE Agent Config
+- ✅ Production-ready in HAProxy Enterprise
+- ✅ Multiple mirrors möglich (mehrere SPOE Agents)
+
+**Nachteile:**
+- ⚠️ Komplex: Erfordert externen SPOE Agent (`spoa-mirror`)
+- ⚠️ Setup: Agent muss kompiliert und deployed werden
+- ⚠️ Monitoring: Zusätzlicher Prozess zu überwachen
+
+**HAProxy Version:** HAProxy 2.0+ (SPOE support)
+
+---
+
+#### Option 2: GoReplay (gor) - **Einfachste Alternative** ⭐
+
+```bash
+# GoReplay neben HAProxy deployen (keine HAProxy-Änderung nötig!)
 docker run -d --name gor \
   --network host \
   goreplay/goreplay:latest \
@@ -329,13 +434,18 @@ gor --input-raw :8080 \
 ```
 
 **Vorteile:**
+- ✅ **Einfachste Lösung** - keine HAProxy-Änderung nötig
 - ✅ Production-ready, weit verbreitet
-- ✅ Einfache Integration
 - ✅ Sample percentage support
 - ✅ Request/Response tracking
 - ✅ Filter by path, header, etc.
 
-#### Option 2: Teeproxy
+**Nachteile:**
+- ⚠️ Externe Dependency (nicht HAProxy-native)
+
+---
+
+#### Option 3: Teeproxy
 
 ```bash
 # Teeproxy als Proxy vor HAProxy
@@ -345,38 +455,9 @@ teeproxy \
   -b http://shadow-api-v2.internal:8080
 ```
 
-#### Option 3: SPOE (Stream Processing Offload Engine)
+**Nachteile:** Synchron, wartet auf beide Responses
 
-```haproxy
-# haproxy.cfg
-global
-    stats socket /var/run/haproxy.sock mode 600 level admin
-
-backend spoe-mirror
-    mode tcp
-    server spoe1 127.0.0.1:12345
-
-frontend http_front
-    bind *:8080
-    filter spoe engine mirror config /etc/haproxy/spoe-mirror.conf
-    default_backend primary_backend
-```
-
-```
-# spoe-mirror.conf
-[mirror]
-spoe-agent mirror-agent
-    messages   mirror-request
-    option     async
-    timeout    processing 2s
-    use-backend spoe-mirror
-
-spoe-message mirror-request
-    args method=method path=path
-    event on-frontend-http-request
-```
-
-**Nachteile:** Komplex, benötigt externen SPOE Agent
+---
 
 #### Option 4: Lua Scripting
 
@@ -400,12 +481,24 @@ end)
 
 **Nachteile:** Lua nicht fire-and-forget, blockiert Request
 
-**Features:**
-- ❌ Kein natives Request Mirroring
-- ⚠️ Sample percentage via externe Tools (gor, teeproxy)
-- ⚠️ Custom headers via externe Tools
-- ⚠️ Multiple mirrors via externe Tools
-- ⚠️ Fire-and-Forget nur mit externen Tools (gor, SPOE)
+---
+
+**HAProxy Request Mirroring Features Zusammenfassung:**
+
+| Feature | SPOE (Native) | GoReplay | Teeproxy | Lua |
+|---------|---------------|----------|----------|-----|
+| **Native HAProxy** | ✅ Ja (2.0+) | ❌ Nein | ❌ Nein | ⚠️ Ja, aber komplex |
+| **Fire-and-Forget** | ✅ Ja | ✅ Ja | ❌ Nein | ❌ Nein |
+| **Sample Percentage** | ✅ Ja (`rand()`) | ✅ Ja | ❌ Nein | ✅ Ja |
+| **Custom Headers** | ✅ Ja | ✅ Ja | ✅ Ja | ✅ Ja |
+| **Multiple Mirrors** | ✅ Ja | ✅ Ja | ⚠️ Limited | ✅ Ja |
+| **Setup Komplexität** | 🔴 Hoch | 🟢 Niedrig | 🟢 Niedrig | 🟡 Mittel |
+| **External Process** | ✅ SPOE Agent | ✅ gor | ✅ teeproxy | ❌ Nein |
+
+**Empfehlung:**
+- **Production HAProxy Setup:** SPOE + spoa-mirror (native, aber komplex)
+- **Schnelles Testing/Staging:** GoReplay (einfach, keine HAProxy-Änderung)
+- **Development:** Teeproxy (einfach, aber synchron)
 
 **HAProxy Routing-Konfiguration (von GAL generiert):**
 
