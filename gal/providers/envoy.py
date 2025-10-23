@@ -1051,7 +1051,9 @@ class EnvoyProvider(Provider):
 
             output.append("                    total_weight: 100")
 
-    def _generate_request_mirror_policies(self, service: Service, route: Route, output: list) -> None:
+    def _generate_request_mirror_policies(
+        self, service: Service, route: Route, output: list
+    ) -> None:
         """Generate Envoy request_mirror_policies for request mirroring/shadowing.
 
         Implements shadow traffic by duplicating requests to mirror targets while
@@ -1084,7 +1086,9 @@ class EnvoyProvider(Provider):
             if target.sample_percentage < 100.0:
                 output.append("                    runtime_fraction:")
                 output.append("                      default_value:")
-                output.append(f"                        numerator: {int(target.sample_percentage * 10000)}")
+                output.append(
+                    f"                        numerator: {int(target.sample_percentage * 10000)}"
+                )
                 output.append("                        denominator: MILLION")
 
             # Custom headers for mirror requests

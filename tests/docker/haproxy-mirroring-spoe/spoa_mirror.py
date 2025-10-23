@@ -14,9 +14,9 @@ import argparse
 import asyncio
 import struct
 import sys
-import urllib.request
 import urllib.error
-from typing import Dict, Any
+import urllib.request
+from typing import Any, Dict
 
 
 class SPOEAgent:
@@ -31,7 +31,7 @@ class SPOEAgent:
         """Handle SPOE client connection from HAProxy"""
         self.connections += 1
         client_id = self.connections
-        addr = writer.get_extra_info('peername')
+        addr = writer.get_extra_info("peername")
         print(f"[{client_id}] Connection from {addr}")
 
         try:
@@ -42,7 +42,7 @@ class SPOEAgent:
                     break
 
                 # Parse frame length
-                frame_length = struct.unpack('>I', header)[0]
+                frame_length = struct.unpack(">I", header)[0]
                 if frame_length == 0:
                     break
 
@@ -54,7 +54,7 @@ class SPOEAgent:
 
                 # Send ACK (simple empty frame for now)
                 # In production, parse message and send proper ACK
-                ack = struct.pack('>I', 0)
+                ack = struct.pack(">I", 0)
                 writer.write(ack)
                 await writer.drain()
 
@@ -74,7 +74,7 @@ class SPOEAgent:
 
         try:
             # Extract request data (simplified - assumes message contains method and URI)
-            message_str = data.decode('utf-8', errors='ignore')
+            message_str = data.decode("utf-8", errors="ignore")
 
             # Look for method and URI in message
             # Real SPOE uses binary format with typed arguments
@@ -86,7 +86,7 @@ class SPOEAgent:
                 idx = data.find(b"method")
                 if idx != -1:
                     # Next few bytes might contain the method
-                    snippet = data[idx:idx+20].decode('utf-8', errors='ignore')
+                    snippet = data[idx : idx + 20].decode("utf-8", errors="ignore")
                     if "GET" in snippet:
                         method = "GET"
                     elif "POST" in snippet:
@@ -100,7 +100,7 @@ class SPOEAgent:
                 # Try to extract URI
                 idx = max(data.find(b"uri"), data.find(b"path"))
                 if idx != -1:
-                    snippet = data[idx:idx+100].decode('utf-8', errors='ignore')
+                    snippet = data[idx : idx + 100].decode("utf-8", errors="ignore")
                     # Look for /api/ patterns
                     if "/api/" in snippet:
                         start = snippet.find("/api/")
@@ -110,7 +110,7 @@ class SPOEAgent:
                         if end != -1:
                             uri = snippet[start:end]
                         else:
-                            uri = snippet[start:start+20]
+                            uri = snippet[start : start + 20]
 
             # Mirror the request to shadow backend
             mirror_url = f"{self.mirror_url}{uri}"
@@ -146,11 +146,7 @@ class SPOEAgent:
 
     async def run(self):
         """Start SPOE agent server"""
-        server = await asyncio.start_server(
-            self.handle_client,
-            '0.0.0.0',
-            self.port
-        )
+        server = await asyncio.start_server(self.handle_client, "0.0.0.0", self.port)
 
         addr = server.sockets[0].getsockname()
         print(f"SPOE Mirror Agent listening on {addr[0]}:{addr[1]}")
@@ -162,11 +158,13 @@ class SPOEAgent:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='SPOE Mirror Agent')
-    parser.add_argument('-p', '--port', type=int, default=12345,
-                        help='Port to listen on (default: 12345)')
-    parser.add_argument('-u', '--url', required=True,
-                        help='Mirror target URL (e.g., http://shadow-backend:8080)')
+    parser = argparse.ArgumentParser(description="SPOE Mirror Agent")
+    parser.add_argument(
+        "-p", "--port", type=int, default=12345, help="Port to listen on (default: 12345)"
+    )
+    parser.add_argument(
+        "-u", "--url", required=True, help="Mirror target URL (e.g., http://shadow-backend:8080)"
+    )
     args = parser.parse_args()
 
     agent = SPOEAgent(mirror_url=args.url, port=args.port)
@@ -178,5 +176,5 @@ def main():
         sys.exit(0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

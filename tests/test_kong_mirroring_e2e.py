@@ -228,9 +228,7 @@ class TestKongRequestMirroringE2E:
         for i in range(num_requests):
             try:
                 payload = {"test": f"data_{i}", "index": i}
-                response = requests.post(
-                    "http://localhost:10003/api/v4", json=payload, timeout=5
-                )
+                response = requests.post("http://localhost:10003/api/v4", json=payload, timeout=5)
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
@@ -299,7 +297,9 @@ class TestKongRequestMirroringE2E:
             plugins = response.json()
             print(f"\n📊 Kong Plugins ({len(plugins.get('data', []))}):")
             for plugin in plugins.get("data", [])[:10]:
-                print(f"  - {plugin['name']} (service: {plugin.get('service', {}).get('name', 'N/A')})")
+                print(
+                    f"  - {plugin['name']} (service: {plugin.get('service', {}).get('name', 'N/A')})"
+                )
 
             print("\n✅ Kong Admin API is healthy and all services are configured!")
 
@@ -377,6 +377,7 @@ class TestKongRequestMirroringE2E:
         assert config_file.exists(), "kong-mirroring.yaml not found"
 
         import yaml
+
         with open(config_file) as f:
             config = yaml.safe_load(f)
 

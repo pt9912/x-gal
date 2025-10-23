@@ -10,7 +10,7 @@ Tests the MirroringConfig and MirrorTarget dataclasses including:
 
 import pytest
 
-from gal.config import Config, MirrorTarget, MirroringConfig, UpstreamTarget
+from gal.config import Config, MirroringConfig, MirrorTarget, UpstreamTarget
 
 
 class TestMirrorTarget:

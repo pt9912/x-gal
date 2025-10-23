@@ -505,11 +505,13 @@ class KongProvider(Provider):
                                 "config": {
                                     "mirror_host": f"http://{target.upstream.host}:{target.upstream.port}",
                                     "mirror_path": route.path_prefix,
-                                }
+                                },
                             }
 
                             if target.sample_percentage < 100.0:
-                                mirror_plugin["config"]["sample_rate"] = target.sample_percentage / 100.0
+                                mirror_plugin["config"]["sample_rate"] = (
+                                    target.sample_percentage / 100.0
+                                )
 
                             if target.headers:
                                 mirror_plugin["config"]["headers"] = target.headers
@@ -519,9 +521,13 @@ class KongProvider(Provider):
                         # Generate commented configuration for OpenSource
                         output.append("")
                         output.append("    # ====== REQUEST MIRRORING CONFIGURATION ======")
-                        output.append("    # Kong OpenSource does not have native mirroring support.")
+                        output.append(
+                            "    # Kong OpenSource does not have native mirroring support."
+                        )
                         output.append("    # Options:")
-                        output.append("    #   1. Kong Enterprise: Use 'request-mirror' plugin (set global.kong.version='Enterprise')")
+                        output.append(
+                            "    #   1. Kong Enterprise: Use 'request-mirror' plugin (set global.kong.version='Enterprise')"
+                        )
                         output.append("    #   2. Custom Lua Plugin: Implement mirroring logic")
                         output.append("    #   3. External Tool: gor, teeproxy, or Nginx")
                         output.append("    #")
@@ -530,10 +536,14 @@ class KongProvider(Provider):
                         for target in route.mirroring.targets:
                             output.append(f"    # - name: request-mirror  # Kong Enterprise only")
                             output.append("    #   config:")
-                            output.append(f"    #     mirror_host: http://{target.upstream.host}:{target.upstream.port}")
+                            output.append(
+                                f"    #     mirror_host: http://{target.upstream.host}:{target.upstream.port}"
+                            )
                             output.append(f"    #     mirror_path: {route.path_prefix}")
                             if target.sample_percentage < 100.0:
-                                output.append(f"    #     sample_rate: {target.sample_percentage / 100.0}")
+                                output.append(
+                                    f"    #     sample_rate: {target.sample_percentage / 100.0}"
+                                )
                             if target.headers:
                                 output.append("    #     headers:")
                                 for key, value in target.headers.items():

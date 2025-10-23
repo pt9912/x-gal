@@ -238,9 +238,7 @@ class TestHAProxyRequestMirroringE2E:
         for i in range(num_requests):
             try:
                 payload = {"test": f"data_{i}", "index": i}
-                response = requests.post(
-                    "http://localhost:10004/api/v1", json=payload, timeout=5
-                )
+                response = requests.post("http://localhost:10004/api/v1", json=payload, timeout=5)
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
@@ -349,7 +347,7 @@ class TestHAProxyRequestMirroringE2E:
 
                 pxname = fields[0]  # Proxy name (backend name)
                 svname = fields[1]  # Server name
-                stot = fields[7]    # Total sessions (requests)
+                stot = fields[7]  # Total sessions (requests)
 
                 # Look for our backends
                 if "backend" in pxname.lower() and svname == "BACKEND":
@@ -368,8 +366,7 @@ class TestHAProxyRequestMirroringE2E:
 
             # Count total requests across all non-health backends
             total_requests = sum(
-                count for name, count in backend_stats.items()
-                if "health" not in name.lower()
+                count for name, count in backend_stats.items() if "health" not in name.lower()
             )
 
             print(f"\n✅ Found backend statistics!")
@@ -424,7 +421,17 @@ class TestHAProxyRequestMirroringE2E:
 
         # Check HAProxy config syntax via docker exec
         result = subprocess.run(
-            ["docker", "compose", "exec", "-T", "haproxy", "haproxy", "-c", "-f", "/usr/local/etc/haproxy/haproxy.cfg"],
+            [
+                "docker",
+                "compose",
+                "exec",
+                "-T",
+                "haproxy",
+                "haproxy",
+                "-c",
+                "-f",
+                "/usr/local/etc/haproxy/haproxy.cfg",
+            ],
             cwd=compose_dir,
             capture_output=True,
             text=True,

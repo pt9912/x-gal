@@ -312,8 +312,12 @@ class HAProxyProvider(Provider):
                         if target.sample_percentage < 100.0:
                             # Sampling support via random percentage
                             sample_acl = f"{acl_name}_sample_{target.name}"
-                            output.append(f"    acl {sample_acl} rand({int(target.sample_percentage)})")
-                            output.append(f"    http-request mirror {mirror_backend} if {acl_name} {sample_acl}")
+                            output.append(
+                                f"    acl {sample_acl} rand({int(target.sample_percentage)})"
+                            )
+                            output.append(
+                                f"    http-request mirror {mirror_backend} if {acl_name} {sample_acl}"
+                            )
                         else:
                             output.append(f"    http-request mirror {mirror_backend} if {acl_name}")
 

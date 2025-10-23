@@ -49,7 +49,9 @@ class TestHAProxySPOEMirroringE2E:
     @pytest.fixture(scope="class")
     def docker_compose_file(self):
         """Path to Docker Compose file"""
-        return str(Path(__file__).parent / "docker" / "haproxy-mirroring-spoe" / "docker-compose.yml")
+        return str(
+            Path(__file__).parent / "docker" / "haproxy-mirroring-spoe" / "docker-compose.yml"
+        )
 
     @pytest.fixture(scope="class")
     def haproxy_spoe_setup(self, docker_compose_file):
@@ -104,7 +106,16 @@ class TestHAProxySPOEMirroringE2E:
         # Clear any startup logs from backends
         print("🧹 Clearing startup logs from backends...")
         subprocess.run(
-            ["docker", "compose", "exec", "-T", "backend-shadow", "sh", "-c", "echo '' > /tmp/clear"],
+            [
+                "docker",
+                "compose",
+                "exec",
+                "-T",
+                "backend-shadow",
+                "sh",
+                "-c",
+                "echo '' > /tmp/clear",
+            ],
             cwd=compose_dir,
             capture_output=True,
         )
@@ -173,7 +184,9 @@ class TestHAProxySPOEMirroringE2E:
         print(f"\n✅ Received {len(primary_responses)} responses from primary backend")
         print(f"   Failed requests: {failed}")
 
-    def test_shadow_backend_receives_100_percent_mirrors(self, haproxy_spoe_setup, docker_compose_file):
+    def test_shadow_backend_receives_100_percent_mirrors(
+        self, haproxy_spoe_setup, docker_compose_file
+    ):
         """Test that shadow backend receives 100% of mirrored requests for /api/v1"""
         print("\n🔍 Testing SPOE Mirroring: 100% to Shadow Backend (/api/v1)...")
 
@@ -208,13 +221,14 @@ class TestHAProxySPOEMirroringE2E:
 
         # Verify at least 90% were mirrored (allow for some SPOE processing delay)
         assert mirrored_count >= num_requests * 0.9, (
-            f"Expected at least {num_requests * 0.9} mirrored requests, "
-            f"got {mirrored_count}"
+            f"Expected at least {num_requests * 0.9} mirrored requests, " f"got {mirrored_count}"
         )
 
         print(f"\n✅ SPOE mirroring works! {mirrored_count}/{num_requests} requests mirrored")
 
-    def test_shadow_backend_receives_50_percent_sample(self, haproxy_spoe_setup, docker_compose_file):
+    def test_shadow_backend_receives_50_percent_sample(
+        self, haproxy_spoe_setup, docker_compose_file
+    ):
         """Test that shadow backend receives ~50% of sampled requests for /api/v2"""
         print("\n🎲 Testing SPOE Mirroring: 50% Sampling (/api/v2)...")
 
@@ -249,9 +263,9 @@ class TestHAProxySPOEMirroringE2E:
         print(f"  Expected: ~50% (±15% due to randomness)")
 
         # Verify ~50% were mirrored (allow 35%-65% range for randomness)
-        assert 35 <= mirrored_count <= 65, (
-            f"Expected ~50 mirrored requests (35-65), got {mirrored_count}"
-        )
+        assert (
+            35 <= mirrored_count <= 65
+        ), f"Expected ~50 mirrored requests (35-65), got {mirrored_count}"
 
         print(f"\n✅ SPOE sampling works! {mirrored_count}/{num_requests} requests mirrored (~50%)")
 
@@ -287,9 +301,9 @@ class TestHAProxySPOEMirroringE2E:
         print(f"  Requests mirrored to shadow: {mirrored_count}")
 
         # Verify NO requests were mirrored
-        assert mirrored_count == 0, (
-            f"Expected 0 mirrored requests for /api/v3, got {mirrored_count}"
-        )
+        assert (
+            mirrored_count == 0
+        ), f"Expected 0 mirrored requests for /api/v3, got {mirrored_count}"
 
         print(f"\n✅ No mirroring baseline verified! 0/{num_requests} requests mirrored")
 
@@ -309,11 +323,7 @@ class TestHAProxySPOEMirroringE2E:
         for i in range(num_requests):
             try:
                 payload = {"test": f"data_{i}", "index": i, "timestamp": time.time()}
-                response = requests.post(
-                    "http://localhost:10005/api/v1",
-                    json=payload,
-                    timeout=5
-                )
+                response = requests.post("http://localhost:10005/api/v1", json=payload, timeout=5)
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
@@ -481,9 +491,9 @@ class TestHAProxySPOEMirroringE2E:
         assert success_rate >= 90, f"Success rate too low: {success_rate}%"
 
         # At least 80% should be mirrored
-        assert mirrored_count >= num_concurrent * 0.8, (
-            f"Expected at least {num_concurrent * 0.8} mirrored, got {mirrored_count}"
-        )
+        assert (
+            mirrored_count >= num_concurrent * 0.8
+        ), f"Expected at least {num_concurrent * 0.8} mirrored, got {mirrored_count}"
 
     def test_spoe_mirroring_documentation(self, haproxy_spoe_setup):
         """Document SPOE mirroring setup and features"""

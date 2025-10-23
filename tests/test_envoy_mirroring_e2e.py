@@ -196,7 +196,9 @@ class TestEnvoyRequestMirroringE2E:
 
         print(f"\n✅ Received {len(primary_responses)} responses from primary backend")
         print(f"   Failed requests: {failed}")
-        print("   Note: ~50% of these should be mirrored to shadow (cannot verify without backend instrumentation)")
+        print(
+            "   Note: ~50% of these should be mirrored to shadow (cannot verify without backend instrumentation)"
+        )
 
     def test_no_mirroring_baseline(self, envoy_mirroring_setup):
         """Test that /api/v3 has no mirroring (baseline)"""
@@ -247,9 +249,7 @@ class TestEnvoyRequestMirroringE2E:
         for i in range(num_requests):
             try:
                 payload = {"test": f"data_{i}", "index": i}
-                response = requests.post(
-                    "http://localhost:10001/api/v1", json=payload, timeout=5
-                )
+                response = requests.post("http://localhost:10001/api/v1", json=payload, timeout=5)
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
@@ -304,9 +304,7 @@ class TestEnvoyRequestMirroringE2E:
                     print(f"  PRIMARY: {line.strip()}")
 
             # Check shadow cluster health
-            shadow_lines = [
-                line for line in clusters_text.split("\n") if "shadow_cluster" in line
-            ]
+            shadow_lines = [line for line in clusters_text.split("\n") if "shadow_cluster" in line]
             for line in shadow_lines[:10]:
                 if "health_flags" in line or "healthy" in line:
                     print(f"  SHADOW: {line.strip()}")
@@ -340,9 +338,7 @@ class TestEnvoyRequestMirroringE2E:
             print("\n📊 Envoy Request Mirror Stats:")
 
             # Look for mirror-related stats
-            mirror_lines = [
-                line for line in stats_text.split("\n") if "shadow_cluster" in line
-            ]
+            mirror_lines = [line for line in stats_text.split("\n") if "shadow_cluster" in line]
 
             relevant_stats = [
                 "upstream_rq_total",

@@ -132,7 +132,9 @@ class TestTraefikRequestMirroringE2E:
 
         print(f"\n✅ Received {len(primary_responses)} responses from primary backend")
         print(f"   Failed requests: {failed}")
-        print("   Note: 100% of these should be mirrored to shadow (cannot verify without backend instrumentation)")
+        print(
+            "   Note: 100% of these should be mirrored to shadow (cannot verify without backend instrumentation)"
+        )
 
     def test_50_percent_mirroring_sampling(self, traefik_mirroring_setup):
         """Test that ~50% of requests to /api/v2 are mirrored (sampling)"""
@@ -170,7 +172,9 @@ class TestTraefikRequestMirroringE2E:
 
         print(f"\n✅ Received {len(primary_responses)} responses from primary backend")
         print(f"   Failed requests: {failed}")
-        print("   Note: ~50% of these should be mirrored to shadow (cannot verify without backend instrumentation)")
+        print(
+            "   Note: ~50% of these should be mirrored to shadow (cannot verify without backend instrumentation)"
+        )
 
     def test_no_mirroring_baseline(self, traefik_mirroring_setup):
         """Test that /api/v3 has no mirroring (baseline)"""
@@ -221,9 +225,7 @@ class TestTraefikRequestMirroringE2E:
         for i in range(num_requests):
             try:
                 payload = {"test": f"data_{i}", "index": i}
-                response = requests.post(
-                    "http://localhost:10003/api/v1", json=payload, timeout=5
-                )
+                response = requests.post("http://localhost:10003/api/v1", json=payload, timeout=5)
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
@@ -276,8 +278,10 @@ class TestTraefikRequestMirroringE2E:
                 print(f"   Service names: {service_names[:5]}...")  # Print first 5
 
                 # Verify key services exist
-                assert any("primary" in name.lower() or "mirroring" in name.lower() for name in service_names), \
-                    "Primary or mirroring services not found"
+                assert any(
+                    "primary" in name.lower() or "mirroring" in name.lower()
+                    for name in service_names
+                ), "Primary or mirroring services not found"
 
                 print("✅ Traefik services are configured!")
             else:
@@ -307,8 +311,12 @@ class TestTraefikRequestMirroringE2E:
             if response.status_code == 200:
                 overview = response.json()
                 print(f"\n📊 Traefik Overview:")
-                print(f"   HTTP Routers: {overview.get('http', {}).get('routers', {}).get('total', 'N/A')}")
-                print(f"   HTTP Services: {overview.get('http', {}).get('services', {}).get('total', 'N/A')}")
+                print(
+                    f"   HTTP Routers: {overview.get('http', {}).get('routers', {}).get('total', 'N/A')}"
+                )
+                print(
+                    f"   HTTP Services: {overview.get('http', {}).get('services', {}).get('total', 'N/A')}"
+                )
                 print("✅ Traefik metrics are available!")
             else:
                 print(f"⚠️  Traefik metrics returned status {response.status_code}")

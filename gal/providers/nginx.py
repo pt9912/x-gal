@@ -697,7 +697,9 @@ class NginxProvider(Provider):
         if headers.response_add or headers.response_set:
             output.append("")
 
-    def _generate_request_mirroring(self, service: Service, route: Route, output: List[str]) -> None:
+    def _generate_request_mirroring(
+        self, service: Service, route: Route, output: List[str]
+    ) -> None:
         """Generate Nginx mirror directives for request mirroring/shadowing.
 
         Implements shadow traffic by duplicating requests to mirror targets while
@@ -734,10 +736,14 @@ class NginxProvider(Provider):
 
             # Sampling support via split_clients
             if target.sample_percentage < 100.0:
-                output.append(f"            # Mirror to {target.name} ({target.sample_percentage}% sampled)")
+                output.append(
+                    f"            # Mirror to {target.name} ({target.sample_percentage}% sampled)"
+                )
                 output.append(f"            set_random $mirror_{i}_rand 0 100;")
                 output.append(f"            set $mirror_{i}_enable 0;")
-                output.append(f"            if ($mirror_{i}_rand < {int(target.sample_percentage)}) {{")
+                output.append(
+                    f"            if ($mirror_{i}_rand < {int(target.sample_percentage)}) {{"
+                )
                 output.append(f"                set $mirror_{i}_enable 1;")
                 output.append("            }")
                 output.append(f"            if ($mirror_{i}_enable = 1) {{")
@@ -772,7 +778,9 @@ class NginxProvider(Provider):
             output.append(f"        # Mirror location for {target.name}")
             output.append(f"        location = {mirror_uri} {{")
             output.append("            internal;")
-            output.append(f"            proxy_pass http://{target.upstream.host}:{target.upstream.port}{route.path_prefix};")
+            output.append(
+                f"            proxy_pass http://{target.upstream.host}:{target.upstream.port}{route.path_prefix};"
+            )
             output.append("            proxy_http_version 1.1;")
             output.append('            proxy_set_header Connection "";')
 

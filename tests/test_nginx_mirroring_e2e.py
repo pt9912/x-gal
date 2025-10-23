@@ -170,10 +170,7 @@ class TestNginxRequestMirroringE2E:
 
         print(f"\n✅ Received {len(primary_responses)} responses from primary backend")
         print(f"   Failed requests: {failed}")
-        print(
-            "   Note: ~50% of these should be mirrored to shadow "
-            "(split_clients directive)"
-        )
+        print("   Note: ~50% of these should be mirrored to shadow " "(split_clients directive)")
 
     def test_no_mirroring_baseline(self, nginx_mirroring_setup):
         """Test that /api/v3 has no mirroring (baseline)"""
@@ -224,9 +221,7 @@ class TestNginxRequestMirroringE2E:
         for i in range(num_requests):
             try:
                 payload = {"test": f"data_{i}", "index": i}
-                response = requests.post(
-                    "http://localhost:10002/api/v1", json=payload, timeout=5
-                )
+                response = requests.post("http://localhost:10002/api/v1", json=payload, timeout=5)
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
