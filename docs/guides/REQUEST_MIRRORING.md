@@ -79,7 +79,7 @@ HAProxy unterstützt Request Mirroring über **SPOE (Stream Processing Offload E
 3. **Teeproxy** - Extern, einfach, synchron ([GitHub](https://github.com/chrissnell/teeproxy))
 4. **Lua Scripting** - Custom, nicht fire-and-forget
 
-Siehe [HAProxy Mirroring Dokumentation](#4-haproxy-️-spoe-basiert---haproxy-20) und [E2E Tests](../../tests/docker/haproxy-mirroring/README.md) für Details.
+Siehe [HAProxy Mirroring Dokumentation](#4-haproxy-️-spoe-basiert---haproxy-20) für Details.
 
 ---
 
@@ -591,7 +591,6 @@ backend api_backend
 **GAL generiert HAProxy-Konfigurationen mit Routing, aber dokumentiert, dass externes Mirroring-Tool benötigt wird.**
 
 **Siehe auch:**
-- [HAProxy Mirroring E2E Tests](../../tests/docker/haproxy-mirroring/README.md) - Dokumentiert Limitation
 - [GoReplay GitHub](https://github.com/buger/goreplay) - Empfohlenes Tool
 - [Teeproxy GitHub](https://github.com/chrissnell/teeproxy) - Alternative Lösung
 
