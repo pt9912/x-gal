@@ -1,9 +1,9 @@
 ---
-name: Release Manager
+name: release-automation
 description: Automatisiert den vollständigen Release-Prozess für x-gal (GAL - Gateway Abstraction Layer). Nutze diesen Skill, wenn der Nutzer einen neuen Release/Version erstellen möchte oder Begriffe wie "release", "version bump", "neue Version" erwähnt.
 ---
 
-# Release Manager Skill
+# Release Automation Skill
 
 ## Zweck
 
