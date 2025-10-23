@@ -1,0 +1,32 @@
+apisix:
+  node_listen: 9080
+  enable_admin: true
+  enable_admin_cors: true
+
+  admin_key:
+    - name: admin
+      key: edd1c9f034335f136f87ad84b625c8f1
+      role: admin
+
+deployment:
+  role: traditional
+  role_traditional:
+    config_provider: etcd
+
+  etcd:
+    host:
+      - "http://etcd:2379"
+    prefix: /apisix
+    timeout: 30
+
+nginx_config:
+  error_log: /dev/stderr
+  error_log_level: warn
+  http:
+    access_log: /dev/stdout
+
+plugin_attr:
+  prometheus:
+    export_addr:
+      ip: "0.0.0.0"
+      port: 9091
