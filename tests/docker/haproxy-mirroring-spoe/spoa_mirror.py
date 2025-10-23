@@ -10,8 +10,10 @@ import argparse
 import asyncio
 import struct
 import sys
+import threading
 import urllib.error
 import urllib.request
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Tuple
 
 # SPOE Frame Types
@@ -33,10 +35,6 @@ SPOE_DATA_T_IPV4 = 6
 SPOE_DATA_T_IPV6 = 7
 SPOE_DATA_T_STR = 8
 SPOE_DATA_T_BIN = 9
-
-from http.server import BaseHTTPRequestHandler, HTTPServer
-
-import threading
 
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
