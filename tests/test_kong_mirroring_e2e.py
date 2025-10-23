@@ -373,8 +373,8 @@ class TestKongRequestMirroringE2E:
         compose_dir = Path(__file__).parent / "docker" / "kong-mirroring"
 
         # Check if kong.yaml is readable
-        config_file = compose_dir / "kong-mirroring.yaml"
-        assert config_file.exists(), "kong-mirroring.yaml not found"
+        config_file = compose_dir / "kong-mirroring-nginx.yaml"
+        assert config_file.exists(), "kong-mirroring-nginx.yaml not found"
 
         import yaml
 
