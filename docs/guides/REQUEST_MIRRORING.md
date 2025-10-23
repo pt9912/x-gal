@@ -56,13 +56,13 @@ Client Request ──────►│   API Gateway   │
 
 | Feature | Envoy | Nginx | APISIX | HAProxy | Kong | Traefik | Azure APIM | AWS API GW | GCP API GW |
 |---------|-------|-------|--------|---------|------|---------|------------|------------|------------|
-| **Request Mirroring** | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ |
-| **Native Support** | ✅ | ✅ | ✅ | ⚠️ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| **Sample Percentage** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ |
+| **Request Mirroring** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | ⚠️ | ⚠️ |
+| **Native Support** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ |
+| **Sample Percentage** | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ✅ |
 | **Custom Headers** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Multiple Mirrors** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | ⚠️ | ⚠️ |
-| **Fire-and-Forget** | ✅ | ✅ | ✅ | ✅ | ❌ | ⚠️ | ✅ | ⚠️ | ⚠️ |
-| **Setup Komplexität** | 🟢 | 🟢 | 🟢 | 🔴 | 🟡 | 🟡 | 🟢 | 🟡 | 🟡 |
+| **Fire-and-Forget** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | ⚠️ | ⚠️ |
+| **Setup Komplexität** | 🟢 | 🟢 | 🟢 | 🟡 | 🟢 | 🟡 | 🟢 | 🟡 | 🟡 |
 
 **Legende:**
 - ✅ Native Support (eingebautes Feature)
@@ -597,70 +597,84 @@ backend api_backend
 
 ---
 
-### 5. Kong (⚠️ Partial - Plugin/Workaround)
+### 5. Kong (✅ Nginx Mirror Module - OpenSource)
 
-**Mechanismus:** `request-transformer` + `post-function` oder Enterprise Plugin
+**Mechanismus:** `ngx_http_mirror_module` (via KONG_NGINX_PROXY_INCLUDE)
 
-**Kong Open Source Workaround:**
+Kong basiert auf **Nginx/OpenResty**, daher nutzen wir das native **ngx_http_mirror_module**.
 
+**Methode 1: Nginx Mirror Module** - ⭐ **Empfohlen für Kong OpenSource**
+
+```nginx
+# nginx-template.conf (injected via KONG_NGINX_PROXY_INCLUDE)
+location /api/users {
+    mirror /mirror-users;
+    mirror_request_body on;
+    proxy_pass http://api-v1.internal:8080;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+
+location = /mirror-users {
+    internal;
+    proxy_pass http://shadow-api-v2.internal:8080/api/users;
+    proxy_set_header X-Mirror "true";
+    proxy_set_header X-Shadow-Version "v2";
+}
+```
+
+**Docker/Kubernetes Deployment:**
 ```yaml
-# Kong Declarative Config (generiert von GAL)
+kong:
+  image: kong:3.4
+  environment:
+    KONG_NGINX_PROXY_INCLUDE: /usr/local/kong/custom/nginx-template.conf
+  volumes:
+    - ./nginx-template.conf:/usr/local/kong/custom/nginx-template.conf:ro
+```
+
+**Kong Declarative Config:**
+```yaml
+# kong.yaml - Minimal routes definition
 services:
   - name: api_service
     url: http://api-v1.internal:8080
-
-routes:
-  - name: api_users_route
-    paths:
-      - /api/users
-    service: api_service
-
-plugins:
-  # Option 1: post-function Plugin (Lua)
-  - name: post-function
-    route: api_users_route
-    config:
-      access:
-        - |
-          -- Mirror request to shadow backend
-          local http = require "resty.http"
-          local httpc = http.new()
-
-          -- Sample 50% of requests
-          if math.random() < 0.5 then
-            httpc:request_uri("http://shadow-api-v2.internal:8080" .. kong.request.get_path(), {
-              method = kong.request.get_method(),
-              body = kong.request.get_raw_body(),
-              headers = {
-                ["X-Mirror"] = "true",
-                ["X-Shadow-Version"] = "v2"
-              }
-            })
-          end
+    routes:
+      - name: api_users_route
+        paths: [/api/users]
+        strip_path: false
 ```
 
-**Kong Enterprise:**
+**Methode 2: Kong Enterprise Plugin** (Enterprise only)
+
 ```yaml
 plugins:
-  # Option 2: request-transformer-advanced (Enterprise)
-  - name: request-transformer-advanced
+  - name: request-mirror  # Enterprise only
+    route: api_users_route
     config:
-      add:
-        headers:
-          - "X-Mirror: true"
-      mirror:
-        enabled: true
-        upstream_url: "http://shadow-api-v2.internal:8080"
-        sample_percentage: 50
+      mirror_host: http://shadow-api-v2.internal:8080
+      mirror_path: /api/users
+      sample_rate: 1.0
+      headers:
+        X-Mirror: "true"
+        X-Shadow-Version: "v2"
 ```
 
 **Features:**
-- ⚠️ Open Source: Lua Scripting erforderlich
-- ✅ Enterprise: Native plugin support
-- ✅ Sample percentage via Lua `math.random()` oder Enterprise config
-- ✅ Custom headers supported
+- ✅ **Nginx Mirror Module** - Native Nginx-Funktionalität (keine Plugins!)
+- ✅ **OpenSource-kompatibel** - Funktioniert mit Kong Gateway OpenSource
+- ✅ **Asynchronous** - Fire-and-forget, blockiert nicht primäre Response
+- ✅ **Custom Headers** - Beliebige Header auf Mirror-Requests
+- ✅ **Production-Ready** - Battle-tested Nginx mirror module
+- ⚠️ **Sampling** - 50% Sampling erfordert `split_clients` in `http` block
+- ⚠️ **Enterprise Plugin** - Einfachere Konfiguration, aber Lizenz benötigt
 
-**Kong Version:** Kong 2.0+
+**E2E Tests:**
+- ✅ `tests/test_kong_mirroring_e2e.py` - 8 Tests, alle bestanden
+- ✅ `tests/docker/kong-mirroring/` - Vollständiges Docker Setup
+
+**Kong Version:** Kong 3.0+
 
 ---
 

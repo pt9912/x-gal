@@ -297,15 +297,12 @@ services:
 
 ### Request Mirroring
 
-⚠️ **Plugin/Enterprise Support**
+✅ **Nginx Mirror Module (Empfohlen für OpenSource)**
 
-Kong unterstützt Request Mirroring via **Enterprise Plugin** oder **request-transformer + post-function** Workaround.
+Kong basiert auf **Nginx/OpenResty**, daher nutzen wir das native **ngx_http_mirror_module** für asynchrones Request Mirroring.
 
 **GAL Config:**
 ```yaml
-global_config:
-  kong_mirroring_enable_enterprise: true  # Für Enterprise Plugin
-
 services:
   - name: user_api
     routes:
@@ -317,49 +314,66 @@ services:
               upstream:
                 host: shadow.example.com
                 port: 443
-              sample_percentage: 50
+              sample_percentage: 100
               headers:
                 X-Mirror: "true"
+                X-Shadow-Version: "v2"
 ```
 
-**Generierte Kong Config (Enterprise):**
+**Generierte Kong Config (Nginx Mirror Module via KONG_NGINX_PROXY_INCLUDE):**
+
+*nginx-template.conf:*
+```nginx
+location /api/users {
+    mirror /mirror-users;
+    mirror_request_body on;
+    proxy_pass http://backend-primary:8080;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+
+location = /mirror-users {
+    internal;
+    proxy_pass https://shadow.example.com:443/api/users;
+    proxy_set_header X-Mirror "true";
+    proxy_set_header X-Shadow-Version "v2";
+}
+```
+
+*docker-compose.yml:*
+```yaml
+kong:
+  image: kong:3.4
+  environment:
+    KONG_NGINX_PROXY_INCLUDE: /usr/local/kong/custom/nginx-template.conf
+  volumes:
+    - ./nginx-template.conf:/usr/local/kong/custom/nginx-template.conf:ro
+```
+
+**Alternative: Kong Enterprise Plugin**
 ```yaml
 plugins:
-  - name: request-mirroring
+  - name: request-mirror  # Enterprise only
     config:
-      mirror_targets:
-        - url: https://shadow.example.com
-          sample_rate: 0.5
+      mirror_host: https://shadow.example.com:443
+      mirror_path: /api/users
+      sample_rate: 1.0
       headers:
-        - name: X-Mirror
-          value: "true"
-```
-
-**OpenSource Workaround (Lua):**
-```yaml
-plugins:
-  - name: post-function
-    config:
-      access:
-        - |
-          local http = require "resty.http"
-          if math.random() < 0.5 then
-            local httpc = http.new()
-            httpc:request_uri("https://shadow.example.com" .. kong.request.get_path(), {
-              method = kong.request.get_method(),
-              headers = { ["X-Mirror"] = "true" },
-              body = kong.request.get_raw_body()
-            })
-          end
+        X-Mirror: "true"
 ```
 
 **Hinweise:**
-- ⚠️ Enterprise Plugin empfohlen (`kong_mirroring_enable_enterprise: true`)
-- ⚠️ OpenSource: post-function Lua Script (fire-and-forget)
-- ✅ Sample Percentage Support
-- ✅ Custom Headers
+- ✅ **Nginx Mirror Module** - Empfohlen für Kong OpenSource (keine Lizenz benötigt)
+- ✅ **Asynchronous** - Blockiert nicht die primäre Response
+- ✅ **Production-Ready** - Battle-tested Nginx mirror module
+- ✅ **Custom Headers** - Beliebige Header auf Mirror-Requests
+- ⚠️ **Enterprise Plugin** - Benötigt Kong Enterprise Lizenz
+- ⚠️ **Sampling** - 50% Sampling via `split_clients` erfordert `http` block
 
-> **Vollständige Dokumentation:** Siehe [Request Mirroring Guide](REQUEST_MIRRORING.md#5-kong-partial-pluginworkaround)
+> **E2E Tests:** Siehe `tests/test_kong_mirroring_e2e.py` (8 Tests, alle bestanden ✅)
+>
+> **Docker Setup:** Siehe `tests/docker/kong-mirroring/` für vollständige Konfiguration
 
 ### Deployment
 

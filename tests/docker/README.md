@@ -22,11 +22,11 @@ Diese Tests verwenden Docker Compose, um vollständige Gateway-Umgebungen zu sta
 | Provider | Status | Test Suite | Methode |
 |----------|--------|------------|---------|
 | **Envoy** | ✅ Getestet | 6 E2E Tests | request_mirror_policies |
-| **Nginx** | 📋 Geplant | - | mirror directive |
-| **Kong** | 📋 Geplant | - | request-transformer plugin |
-| **APISIX** | 📋 Geplant | - | proxy-mirror plugin |
+| **Nginx** | ✅ Getestet | 8 E2E Tests | mirror directive + split_clients |
+| **Kong** | ✅ Getestet | 8 E2E Tests | ngx_http_mirror_module (KONG_NGINX_PROXY_INCLUDE) |
+| **APISIX** | ✅ Getestet | 8 E2E Tests | proxy-mirror plugin |
 | **Traefik** | 📋 Geplant | - | mirroring service |
-| **HAProxy** | ⚠️ Nicht nativ | - | workaround via Lua |
+| **HAProxy** | ✅ Getestet | 8 E2E Tests | SPOE (Stream Processing Offload Engine) |
 
 ## 🏗️ Architektur
 

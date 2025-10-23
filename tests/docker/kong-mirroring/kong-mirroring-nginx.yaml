@@ -1,0 +1,34 @@
+_format_version: "3.0"
+
+# Kong Declarative Configuration for Request Mirroring
+# Feature 6: Request Mirroring / Traffic Shadowing
+#
+# This configuration uses Nginx mirror module (Kong is based on Nginx)
+# via KONG_NGINX_PROXY_INCLUDE to inject custom Nginx directives.
+#
+# The actual mirroring logic is defined in nginx-template.conf.
+# These routes ensure Kong knows about the paths, then Nginx template
+# overrides them with mirror directives.
+
+services:
+  # Service for primary backend
+  - name: primary_backend
+    url: http://backend-primary:8080
+    protocol: http
+    routes:
+      - name: route_v1
+        paths:
+          - /api/v1
+        strip_path: false
+      - name: route_v2
+        paths:
+          - /api/v2
+        strip_path: false
+      - name: route_v3
+        paths:
+          - /api/v3
+        strip_path: false
+      - name: route_v4
+        paths:
+          - /api/v4
+        strip_path: false
