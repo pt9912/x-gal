@@ -1,0 +1,76 @@
+# GAL Configuration for Request Mirroring Tests
+# Feature 6: Request Mirroring / Traffic Shadowing
+# Provider: Nginx
+
+version: "1.0"
+provider: gal
+
+global:
+  host: 0.0.0.0
+  port: 10000
+
+services:
+  # Service 1: Full Mirroring (100% sampling)
+  - name: api_v1_mirroring
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: backend-primary
+          port: 8080
+    routes:
+      - path_prefix: /api/v1
+        methods: [GET, POST, PUT, DELETE]
+        mirroring:
+          enabled: true
+          mirror_request_body: true
+          mirror_headers: true
+          targets:
+            - name: shadow-v1
+              upstream:
+                host: backend-shadow
+                port: 8080
+              sample_percentage: 100.0
+              timeout: "5s"
+              headers:
+                X-Mirror: "true"
+                X-Shadow-Version: "v1"
+
+  # Service 2: Partial Mirroring (50% sampling)
+  - name: api_v2_mirroring
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: backend-primary
+          port: 8080
+    routes:
+      - path_prefix: /api/v2
+        methods: [GET, POST]
+        mirroring:
+          enabled: true
+          mirror_request_body: true
+          mirror_headers: true
+          targets:
+            - name: shadow-v2
+              upstream:
+                host: backend-shadow
+                port: 8080
+              sample_percentage: 50.0
+              timeout: "5s"
+              headers:
+                X-Mirror: "true"
+                X-Shadow-Version: "v2"
+
+  # Service 3: No Mirroring (baseline)
+  - name: api_v3_no_mirroring
+    type: rest
+    protocol: http
+    upstream:
+      targets:
+        - host: backend-primary
+          port: 8080
+    routes:
+      - path_prefix: /api/v3
+        methods: [GET, POST]
+        # No mirroring configured - baseline for comparison
