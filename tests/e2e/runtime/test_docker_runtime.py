@@ -28,7 +28,7 @@ class TestEnvoyTrafficSplitRuntime:
     def docker_compose_file(self):
         """Path to Docker Compose file"""
         return str(
-            Path(__file__).parent
+            Path(__file__).parent.parent
             / "docker"
             / "providers"
             / "envoy"
@@ -188,7 +188,7 @@ class TestNginxTrafficSplitRuntime:
     def docker_compose_file(self):
         """Path to Docker Compose file"""
         return str(
-            Path(__file__).parent
+            Path(__file__).parent.parent
             / "docker"
             / "providers"
             / "nginx"
@@ -312,7 +312,7 @@ class TestKongTrafficSplitRuntime:
     def docker_compose_file(self):
         """Path to Docker Compose file"""
         return str(
-            Path(__file__).parent / "docker" / "providers" / "kong" / "basic" / "docker-compose.yml"
+            Path(__file__).parent.parent / "docker" / "providers" / "kong" / "basic" / "docker-compose.yml"
         )
 
     @pytest.fixture(scope="class")
@@ -431,7 +431,7 @@ class TestHAProxyTrafficSplitRuntime:
     def docker_compose_file(self):
         """Path to Docker Compose file"""
         return str(
-            Path(__file__).parent
+            Path(__file__).parent.parent
             / "docker"
             / "providers"
             / "haproxy"
@@ -534,7 +534,7 @@ class TestTraefikTrafficSplitRuntime:
     def docker_compose_file(self):
         """Path to Docker Compose file"""
         return str(
-            Path(__file__).parent
+            Path(__file__).parent.parent
             / "docker"
             / "providers"
             / "traefik"
@@ -637,7 +637,7 @@ class TestAPISIXTrafficSplitRuntime:
     def docker_compose_file(self):
         """Path to Docker Compose file"""
         return str(
-            Path(__file__).parent
+            Path(__file__).parent.parent
             / "docker"
             / "providers"
             / "apisix"

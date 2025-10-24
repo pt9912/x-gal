@@ -4,7 +4,7 @@ services:
   # Backend - Stable (90% traffic)
   backend-stable:
     build:
-      context: ../backends
+      context: ../../../backends
       dockerfile: Dockerfile
     command: ["python", "-u", "/app/stable.py"]
     environment:
@@ -20,7 +20,7 @@ services:
   # Backend - Canary (10% traffic)
   backend-canary:
     build:
-      context: ../backends
+      context: ../../../backends
       dockerfile: Dockerfile
     command: ["python", "-u", "/app/canary.py"]
     environment:
