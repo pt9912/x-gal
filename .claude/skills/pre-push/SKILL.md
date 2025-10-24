@@ -79,6 +79,7 @@ pytest -v --tb=short --ignore=tests/test_docker_runtime.py
 - Fehler → **NICHT PUSHEN!** Behebe die Tests zuerst
 
 ### Schritt 6: E2E Tests
+Führe alle E2E-Tests aus (Dauern über 5 Minuten):
 ```bash
 pytest tests/e2e/ -v -s
 ```
