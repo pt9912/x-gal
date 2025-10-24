@@ -2272,7 +2272,9 @@ class EnvoyProvider(Provider):
                 virtual_hosts = route_config.get("virtual_hosts", [])
 
                 for vhost in virtual_hosts:
-                    routes = vhost.get("routes", [])
+                    routes = vhost.get("routes")
+                    if routes is None:
+                        continue
 
                     for route in routes:
                         match = route.get("match", {})
