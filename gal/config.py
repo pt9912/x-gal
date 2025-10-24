@@ -1884,6 +1884,68 @@ class QueryParamMatchRule:
 
 
 @dataclass
+class JWTFilterConfig:
+    """JWT Authentication Filter configuration for Envoy.
+
+    Configures JWT token validation and claim extraction for advanced routing.
+
+    Attributes:
+        enabled: Whether JWT filter is enabled
+        issuer: JWT token issuer (iss claim)
+        audience: JWT token audience (aud claim)
+        jwks_uri: JWKS endpoint URL for key discovery
+        jwks_cluster: Cluster name for JWKS fetching
+        payload_in_metadata: Metadata key to store JWT payload
+        forward_payload_header: Header name to forward JWT payload
+
+    Example:
+        >>> jwt_config = JWTFilterConfig(
+        ...     enabled=True,
+        ...     issuer="https://jwks-service",
+        ...     audience="x-gal-test",
+        ...     jwks_uri="http://jwks-service:8080/.well-known/jwks.json",
+        ...     jwks_cluster="jwks_cluster"
+        ... )
+    """
+
+    enabled: bool = False
+    issuer: str = ""
+    audience: str = ""
+    jwks_uri: str = ""
+    jwks_cluster: str = "jwks_cluster"
+    payload_in_metadata: str = "jwt_payload"
+    forward_payload_header: str = "X-JWT-Payload"
+
+
+@dataclass
+class GeoIPFilterConfig:
+    """GeoIP Filter configuration for Envoy ext_authz.
+
+    Configures GeoIP lookup service for geographic routing.
+
+    Attributes:
+        enabled: Whether GeoIP filter is enabled
+        geoip_service_uri: GeoIP service URI (HTTP or gRPC)
+        geoip_cluster: Cluster name for GeoIP service
+        timeout_ms: Timeout for GeoIP lookup in milliseconds
+        failure_mode_allow: Allow traffic if GeoIP service fails
+
+    Example:
+        >>> geoip_config = GeoIPFilterConfig(
+        ...     enabled=True,
+        ...     geoip_service_uri="http://geoip-service:8080/check",
+        ...     geoip_cluster="geoip_service"
+        ... )
+    """
+
+    enabled: bool = False
+    geoip_service_uri: str = ""
+    geoip_cluster: str = "geoip_service"
+    timeout_ms: int = 500
+    failure_mode_allow: bool = True
+
+
+@dataclass
 class AdvancedRoutingTarget:
     """Target backend for advanced routing.
 
@@ -1961,6 +2023,10 @@ class AdvancedRoutingConfig:
     query_param_rules: List[QueryParamMatchRule] = field(default_factory=list)
     fallback_target: Optional[str] = None
     evaluation_strategy: str = "first_match"  # "first_match", "all_match"
+
+    # Filter configurations (optional - auto-enabled if rules exist)
+    jwt_filter: Optional[JWTFilterConfig] = None
+    geoip_filter: Optional[GeoIPFilterConfig] = None
 
     def __post_init__(self):
         """Validate advanced routing configuration."""
@@ -2287,6 +2353,32 @@ class Config:
                         )
                         query_param_rules.append(query_rule)
 
+                    # Parse JWT filter config (optional)
+                    jwt_filter = None
+                    if "jwt_filter" in ar_data:
+                        jwt_filter_data = ar_data["jwt_filter"]
+                        jwt_filter = JWTFilterConfig(
+                            enabled=jwt_filter_data.get("enabled", False),
+                            issuer=jwt_filter_data.get("issuer", ""),
+                            audience=jwt_filter_data.get("audience", ""),
+                            jwks_uri=jwt_filter_data.get("jwks_uri", ""),
+                            jwks_cluster=jwt_filter_data.get("jwks_cluster", "jwks_cluster"),
+                            payload_in_metadata=jwt_filter_data.get("payload_in_metadata", "jwt_payload"),
+                            forward_payload_header=jwt_filter_data.get("forward_payload_header", "X-JWT-Payload"),
+                        )
+
+                    # Parse GeoIP filter config (optional)
+                    geoip_filter = None
+                    if "geoip_filter" in ar_data:
+                        geoip_filter_data = ar_data["geoip_filter"]
+                        geoip_filter = GeoIPFilterConfig(
+                            enabled=geoip_filter_data.get("enabled", False),
+                            geoip_service_uri=geoip_filter_data.get("geoip_service_uri", ""),
+                            geoip_cluster=geoip_filter_data.get("geoip_cluster", "geoip_service"),
+                            timeout_ms=geoip_filter_data.get("timeout_ms", 500),
+                            failure_mode_allow=geoip_filter_data.get("failure_mode_allow", True),
+                        )
+
                     advanced_routing = AdvancedRoutingConfig(
                         enabled=ar_data.get("enabled", True),
                         header_rules=header_rules,
@@ -2295,6 +2387,8 @@ class Config:
                         query_param_rules=query_param_rules,
                         fallback_target=ar_data.get("fallback_target"),
                         evaluation_strategy=ar_data.get("evaluation_strategy", "first_match"),
+                        jwt_filter=jwt_filter,
+                        geoip_filter=geoip_filter,
                     )
 
                 # Parse advanced routing targets

@@ -7,7 +7,7 @@ for HTTP/2, gRPC, and Lua-based request transformations.
 
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 import yaml
@@ -20,9 +20,11 @@ from ..config import (
     Config,
     GlobalConfig,
     GeoMatchRule,
+    GeoIPFilterConfig,
     GrpcTransformation,
     HealthCheckConfig,
     JWTClaimMatchRule,
+    JWTFilterConfig,
     LoadBalancerConfig,
     MirroringConfig,
     PassiveHealthCheck,
@@ -36,6 +38,13 @@ from ..config import (
 )
 from ..proto_manager import ProtoManager
 from ..provider import Provider
+from .envoy_advanced_routing_filters import (
+    generate_jwt_authn_filter,
+    generate_geoip_ext_authz_filter,
+    generate_lua_filter_for_advanced_routing,
+    generate_jwks_cluster,
+    generate_geoip_cluster,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -511,6 +520,63 @@ class EnvoyProvider(Provider):
 
                 output.append("                end")
 
+        # Add Advanced Routing filters (JWT + GeoIP) if any route has advanced routing
+        has_advanced_routing = any(
+            route.advanced_routing and route.advanced_routing.enabled
+            for service in config.services
+            for route in service.routes
+        )
+        if has_advanced_routing:
+            # Collect JWT and GeoIP filter configs
+            jwt_filter_config = None
+            geoip_filter_config = None
+
+            for service in config.services:
+                for route in service.routes:
+                    if route.advanced_routing and route.advanced_routing.enabled:
+                        ar_config = route.advanced_routing
+
+                        # JWT Filter - check both rules AND explicit config
+                        if ar_config.jwt_filter and ar_config.jwt_filter.enabled:
+                            jwt_filter_config = ar_config.jwt_filter
+                        elif ar_config.jwt_claim_rules and not jwt_filter_config:
+                            # Auto-enable JWT filter if JWT rules exist but no config provided
+                            logger.warning("JWT claim rules found but no jwt_filter config - skipping JWT filter")
+
+                        # GeoIP Filter - check both rules AND explicit config
+                        if ar_config.geoip_filter and ar_config.geoip_filter.enabled:
+                            geoip_filter_config = ar_config.geoip_filter
+                        elif ar_config.geo_rules and not geoip_filter_config:
+                            logger.warning("Geo rules found but no geoip_filter config - skipping GeoIP filter")
+
+            # Generate JWT Authentication filter
+            if jwt_filter_config and jwt_filter_config.enabled:
+                generate_jwt_authn_filter(jwt_filter_config, output)
+
+            # Generate GeoIP External Authorization filter
+            if geoip_filter_config and geoip_filter_config.enabled:
+                generate_geoip_ext_authz_filter(geoip_filter_config, output)
+
+            # Generate Lua filter for JWT claim and GeoIP metadata extraction
+            # Collect all JWT and Geo rules
+            all_jwt_rules = []
+            all_geo_rules = []
+            for service in config.services:
+                for route in service.routes:
+                    if route.advanced_routing and route.advanced_routing.enabled:
+                        all_jwt_rules.extend(route.advanced_routing.jwt_claim_rules)
+                        all_geo_rules.extend(route.advanced_routing.geo_rules)
+
+            # Generate Lua filter if rules exist OR if filters are explicitly configured
+            if ((all_jwt_rules or all_geo_rules) and jwt_filter_config) or (jwt_filter_config or geoip_filter_config):
+                # Use empty lists if no rules but filters are configured
+                generate_lua_filter_for_advanced_routing(
+                    all_jwt_rules,
+                    all_geo_rules,
+                    jwt_filter_config or JWTFilterConfig(enabled=False),
+                    output
+                )
+
         # Add rate limiting filter if any route has rate limiting enabled
         has_rate_limits = any(
             route.rate_limit and route.rate_limit.enabled
@@ -917,6 +983,29 @@ class EnvoyProvider(Provider):
                         )
                         output.append("        sni: " + jwks_host)
                     output.append("")
+
+        # Add Advanced Routing filter clusters (JWKS and GeoIP)
+        if has_advanced_routing:
+            jwt_filter_config = None
+            geoip_filter_config = None
+
+            for service in config.services:
+                for route in service.routes:
+                    if route.advanced_routing and route.advanced_routing.enabled:
+                        if route.advanced_routing.jwt_filter:
+                            jwt_filter_config = route.advanced_routing.jwt_filter
+                        if route.advanced_routing.geoip_filter:
+                            geoip_filter_config = route.advanced_routing.geoip_filter
+
+            # Generate JWKS cluster for JWT filter
+            if jwt_filter_config and jwt_filter_config.enabled:
+                generate_jwks_cluster(jwt_filter_config, output)
+                output.append("")
+
+            # Generate GeoIP cluster for GeoIP filter
+            if geoip_filter_config and geoip_filter_config.enabled:
+                generate_geoip_cluster(geoip_filter_config, output)
+                output.append("")
 
         # Admin
         output.append("admin:")
@@ -2174,6 +2263,11 @@ class EnvoyProvider(Provider):
                     continue
 
                 typed_config = filter_config.get("typed_config", {})
+
+                # Parse HTTP filters (JWT, GeoIP, Lua)
+                http_filters = typed_config.get("http_filters", [])
+                jwt_config, geoip_config = self._parse_http_filters(http_filters)
+
                 route_config = typed_config.get("route_config", {})
                 virtual_hosts = route_config.get("virtual_hosts", [])
 
@@ -2194,6 +2288,129 @@ class EnvoyProvider(Provider):
 
                             # Create GAL route
                             gal_route = Route(path_prefix=path_prefix)
+
+                            # If JWT or GeoIP filters are present, attach them to the route
+                            if jwt_config or geoip_config:
+                                # Create basic AdvancedRoutingConfig
+                                # (We detect actual routing rules from route configs separately)
+                                adv_routing = AdvancedRoutingConfig(
+                                    enabled=True,
+                                    evaluation_strategy="first_match",
+                                    header_rules=[],
+                                    query_param_rules=[],
+                                    jwt_claim_rules=[],
+                                    geo_rules=[],
+                                    jwt_filter=jwt_config,
+                                    geoip_filter=geoip_config
+                                )
+                                gal_route.advanced_routing = adv_routing
+
                             service.routes.append(gal_route)
 
                             logger.debug(f"Mapped route {path_prefix} → service {service.name}")
+
+    def _parse_http_filters(self, http_filters: List[dict]) -> Tuple[Optional[JWTFilterConfig], Optional[GeoIPFilterConfig]]:
+        """Parse JWT and GeoIP filters from http_filters list.
+
+        Args:
+            http_filters: List of Envoy HTTP filter configurations
+
+        Returns:
+            Tuple of (JWTFilterConfig, GeoIPFilterConfig) or (None, None)
+        """
+        jwt_config = None
+        geoip_config = None
+
+        for filter_dict in http_filters:
+            filter_name = filter_dict.get('name', '')
+
+            # Parse JWT Authentication filter
+            if filter_name == 'envoy.filters.http.jwt_authn':
+                jwt_config = self._parse_jwt_filter(filter_dict)
+                logger.debug(f"Parsed JWT filter: issuer={jwt_config.issuer if jwt_config else 'none'}")
+
+            # Parse GeoIP External Authorization filter
+            elif filter_name == 'envoy.filters.http.ext_authz':
+                geoip_config = self._parse_geoip_filter(filter_dict)
+                logger.debug(f"Parsed GeoIP filter: service={geoip_config.geoip_service_uri if geoip_config else 'none'}")
+
+        return jwt_config, geoip_config
+
+    def _parse_jwt_filter(self, filter_dict: dict) -> Optional[JWTFilterConfig]:
+        """Parse JWT Authentication filter configuration.
+
+        Args:
+            filter_dict: Envoy jwt_authn filter configuration
+
+        Returns:
+            JWTFilterConfig object or None
+        """
+        typed_config = filter_dict.get('typed_config', {})
+        providers = typed_config.get('providers', {})
+
+        if not providers:
+            return None
+
+        # Get first provider (usually 'jwt_provider')
+        provider_name = list(providers.keys())[0]
+        provider_config = providers[provider_name]
+
+        # Extract configuration
+        issuer = provider_config.get('issuer', '')
+        audiences = provider_config.get('audiences', [])
+        audience = audiences[0] if audiences else ''
+
+        # Extract JWKS URI
+        remote_jwks = provider_config.get('remote_jwks', {})
+        http_uri = remote_jwks.get('http_uri', {})
+        jwks_uri = http_uri.get('uri', '')
+        jwks_cluster = http_uri.get('cluster', 'jwks_cluster')
+
+        # Extract metadata configuration
+        payload_in_metadata = provider_config.get('payload_in_metadata', 'jwt_payload')
+        forward_payload_header = provider_config.get('forward_payload_header', '')
+
+        return JWTFilterConfig(
+            enabled=True,
+            issuer=issuer,
+            audience=audience,
+            jwks_uri=jwks_uri,
+            jwks_cluster=jwks_cluster,
+            payload_in_metadata=payload_in_metadata,
+            forward_payload_header=forward_payload_header
+        )
+
+    def _parse_geoip_filter(self, filter_dict: dict) -> Optional[GeoIPFilterConfig]:
+        """Parse GeoIP External Authorization filter configuration.
+
+        Args:
+            filter_dict: Envoy ext_authz filter configuration
+
+        Returns:
+            GeoIPFilterConfig object or None
+        """
+        typed_config = filter_dict.get('typed_config', {})
+        http_service = typed_config.get('http_service', {})
+
+        if not http_service:
+            return None
+
+        # Extract GeoIP service URI
+        server_uri = http_service.get('server_uri', {})
+        geoip_service_uri = server_uri.get('uri', '')
+        geoip_cluster = server_uri.get('cluster', 'geoip_service')
+
+        # Extract timeout
+        timeout_str = server_uri.get('timeout', '0.5s')
+        timeout_ms = int(float(timeout_str.rstrip('s')) * 1000)
+
+        # Extract failure mode
+        failure_mode_allow = typed_config.get('failure_mode_allow', True)
+
+        return GeoIPFilterConfig(
+            enabled=True,
+            geoip_service_uri=geoip_service_uri,
+            geoip_cluster=geoip_cluster,
+            timeout_ms=timeout_ms,
+            failure_mode_allow=failure_mode_allow
+        )
