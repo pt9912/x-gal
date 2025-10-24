@@ -35,7 +35,7 @@ class TestNginxRequestMirroringE2E:
     def docker_compose_file(self):
         """Path to Docker Compose file"""
         return str(
-            Path(__file__).parent
+            Path(__file__).parent.parent
             / "docker"
             / "providers"
             / "nginx"
@@ -350,7 +350,7 @@ class TestNginxRequestMirroringE2E:
         """Verify Nginx configuration is correct"""
         print("\n🔍 Verifying Nginx Configuration...")
 
-        compose_dir = Path(__file__).parent / "docker" / "providers" / "nginx" / "mirroring"
+        compose_dir = Path(__file__).parent.parent / "docker" / "providers" / "nginx" / "mirroring"
 
         # Check Nginx config syntax
         result = subprocess.run(

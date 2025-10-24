@@ -54,7 +54,7 @@ class TestHAProxyRequestMirroringE2E:
     def docker_compose_file(self):
         """Path to Docker Compose file"""
         return str(
-            Path(__file__).parent
+            Path(__file__).parent.parent
             / "docker"
             / "providers"
             / "haproxy"
@@ -424,7 +424,7 @@ class TestHAProxyRequestMirroringE2E:
         """Verify HAProxy configuration is loaded correctly"""
         print("\n🔍 Verifying HAProxy Configuration...")
 
-        compose_dir = Path(__file__).parent / "docker" / "providers" / "haproxy" / "mirroring"
+        compose_dir = Path(__file__).parent.parent / "docker" / "providers" / "haproxy" / "mirroring"
 
         # Check HAProxy config syntax via docker exec
         result = subprocess.run(

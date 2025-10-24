@@ -51,7 +51,7 @@ class TestHAProxySPOEMirroringE2E:
     def docker_compose_file(self):
         """Path to Docker Compose file"""
         return str(
-            Path(__file__).parent
+            Path(__file__).parent.parent
             / "docker"
             / "providers"
             / "haproxy"

@@ -59,7 +59,7 @@ services:
   # Primary Backend - Production traffic
   backend-primary:
     build:
-      context: ../backends
+      context: ../../../backends
       dockerfile: Dockerfile
     command: ["python", "-u", "/app/primary.py"]
     container_name: backend-primary-spoe
@@ -82,7 +82,7 @@ services:
   # Shadow Backend - Mirrored traffic (fire-and-forget)
   backend-shadow:
     build:
-      context: ../backends
+      context: ../../../backends
       dockerfile: Dockerfile
     command: ["python", "-u", "/app/shadow.py"]
     container_name: backend-shadow-spoe

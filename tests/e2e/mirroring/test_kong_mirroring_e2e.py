@@ -41,7 +41,7 @@ class TestKongRequestMirroringE2E:
     def docker_compose_file(self):
         """Path to Docker Compose file"""
         return str(
-            Path(__file__).parent
+            Path(__file__).parent.parent
             / "docker"
             / "providers"
             / "kong"
@@ -377,7 +377,7 @@ class TestKongRequestMirroringE2E:
         """Verify Kong declarative config is valid"""
         print("\n🔍 Verifying Kong Declarative Configuration...")
 
-        compose_dir = Path(__file__).parent / "docker" / "providers" / "kong" / "mirroring"
+        compose_dir = Path(__file__).parent.parent / "docker" / "providers" / "kong" / "mirroring"
 
         # Check if kong.yaml is readable
         config_file = compose_dir / "kong-mirroring-nginx.yaml"

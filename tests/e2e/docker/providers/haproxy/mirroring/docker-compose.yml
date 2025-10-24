@@ -4,7 +4,7 @@ services:
   # Backend - Primary (production traffic)
   backend-primary:
     build:
-      context: ../backends
+      context: ../../../backends
       dockerfile: Dockerfile
     command: ["python", "-u", "/app/primary.py"]
     environment:
@@ -20,7 +20,7 @@ services:
   # Backend - Shadow (mirrored traffic)
   backend-shadow:
     build:
-      context: ../backends
+      context: ../../../backends
       dockerfile: Dockerfile
     command: ["python", "-u", "/app/shadow.py"]
     environment:
