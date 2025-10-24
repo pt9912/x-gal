@@ -27,7 +27,7 @@ class TestEnvoyTrafficSplitRuntime:
     @pytest.fixture(scope="class")
     def docker_compose_file(self):
         """Path to Docker Compose file"""
-        return str(Path(__file__).parent / "docker" / "envoy" / "docker-compose.yml")
+        return str(Path(__file__).parent / "docker" / "providers" / "envoy" / "basic" / "docker-compose.yml")
 
     @pytest.fixture(scope="class")
     def envoy_setup(self, docker_compose_file):
@@ -180,7 +180,7 @@ class TestNginxTrafficSplitRuntime:
     @pytest.fixture(scope="class")
     def docker_compose_file(self):
         """Path to Docker Compose file"""
-        return str(Path(__file__).parent / "docker" / "nginx" / "docker-compose.yml")
+        return str(Path(__file__).parent / "docker" / "providers" / "nginx" / "basic" / "docker-compose.yml")
 
     @pytest.fixture(scope="class")
     def nginx_setup(self, docker_compose_file):
@@ -297,7 +297,7 @@ class TestKongTrafficSplitRuntime:
     @pytest.fixture(scope="class")
     def docker_compose_file(self):
         """Path to Docker Compose file"""
-        return str(Path(__file__).parent / "docker" / "kong" / "docker-compose.yml")
+        return str(Path(__file__).parent / "docker" / "providers" / "kong" / "basic" / "docker-compose.yml")
 
     @pytest.fixture(scope="class")
     def kong_setup(self, docker_compose_file):
@@ -414,7 +414,7 @@ class TestHAProxyTrafficSplitRuntime:
     @pytest.fixture(scope="class")
     def docker_compose_file(self):
         """Path to Docker Compose file"""
-        return str(Path(__file__).parent / "docker" / "haproxy" / "docker-compose.yml")
+        return str(Path(__file__).parent / "docker" / "providers" / "haproxy" / "basic" / "docker-compose.yml")
 
     @pytest.fixture(scope="class")
     def haproxy_setup(self, docker_compose_file):
@@ -510,7 +510,7 @@ class TestTraefikTrafficSplitRuntime:
     @pytest.fixture(scope="class")
     def docker_compose_file(self):
         """Path to Docker Compose file"""
-        return str(Path(__file__).parent / "docker" / "traefik" / "docker-compose.yml")
+        return str(Path(__file__).parent / "docker" / "providers" / "traefik" / "basic" / "docker-compose.yml")
 
     @pytest.fixture(scope="class")
     def traefik_setup(self, docker_compose_file):
@@ -606,7 +606,7 @@ class TestAPISIXTrafficSplitRuntime:
     @pytest.fixture(scope="class")
     def docker_compose_file(self):
         """Path to Docker Compose file"""
-        return str(Path(__file__).parent / "docker" / "apisix" / "docker-compose.yml")
+        return str(Path(__file__).parent / "docker" / "providers" / "apisix" / "basic" / "docker-compose.yml")
 
     @pytest.fixture(scope="class")
     def apisix_setup(self, docker_compose_file):

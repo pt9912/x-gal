@@ -1,0 +1,116 @@
+version: '3.8'
+
+services:
+  # Envoy Gateway
+  envoy:
+    image: envoyproxy/envoy:v1.31-latest
+    container_name: envoy-advanced-routing
+    ports:
+      - "8080:8080"
+      - "9901:9901"  # Admin interface
+    volumes:
+      - ./envoy.yaml:/etc/envoy/envoy.yaml:ro
+    command: ["envoy", "-c", "/etc/envoy/envoy.yaml", "-l", "info"]
+    networks:
+      - routing-network
+    depends_on:
+      - backend-v1
+      - backend-v2
+      - backend-admin
+      - backend-eu
+      - backend-beta
+      - backend-mobile
+
+  # Backend v1 (Default/Fallback)
+  backend-v1:
+    build:
+      context: ../../backends
+      dockerfile: Dockerfile
+    container_name: backend-v1
+    environment:
+      - BACKEND_NAME=backend-v1
+      - BACKEND_VERSION=v1
+      - BACKEND_TYPE=standard
+      - BACKEND_REGION=us
+    command: ["python", "advanced_backend.py"]
+    networks:
+      - routing-network
+
+  # Backend v2
+  backend-v2:
+    build:
+      context: ../../backends
+      dockerfile: Dockerfile
+    container_name: backend-v2
+    environment:
+      - BACKEND_NAME=backend-v2
+      - BACKEND_VERSION=v2
+      - BACKEND_TYPE=standard
+      - BACKEND_REGION=us
+    command: ["python", "advanced_backend.py"]
+    networks:
+      - routing-network
+
+  # Admin Backend
+  backend-admin:
+    build:
+      context: ../../backends
+      dockerfile: Dockerfile
+    container_name: backend-admin
+    environment:
+      - BACKEND_NAME=backend-admin
+      - BACKEND_VERSION=v1
+      - BACKEND_TYPE=admin
+      - BACKEND_REGION=us
+    command: ["python", "advanced_backend.py"]
+    networks:
+      - routing-network
+
+  # EU Backend
+  backend-eu:
+    build:
+      context: ../../backends
+      dockerfile: Dockerfile
+    container_name: backend-eu
+    environment:
+      - BACKEND_NAME=backend-eu
+      - BACKEND_VERSION=v1
+      - BACKEND_TYPE=standard
+      - BACKEND_REGION=eu
+    command: ["python", "advanced_backend.py"]
+    networks:
+      - routing-network
+
+  # Beta Backend
+  backend-beta:
+    build:
+      context: ../../backends
+      dockerfile: Dockerfile
+    container_name: backend-beta
+    environment:
+      - BACKEND_NAME=backend-beta
+      - BACKEND_VERSION=beta
+      - BACKEND_TYPE=experimental
+      - BACKEND_REGION=us
+    command: ["python", "advanced_backend.py"]
+    networks:
+      - routing-network
+
+  # Mobile Backend
+  backend-mobile:
+    build:
+      context: ../../backends
+      dockerfile: Dockerfile
+    container_name: backend-mobile
+    environment:
+      - BACKEND_NAME=backend-mobile
+      - BACKEND_VERSION=v1
+      - BACKEND_TYPE=mobile
+      - BACKEND_REGION=us
+    command: ["python", "advanced_backend.py"]
+    networks:
+      - routing-network
+
+networks:
+  routing-network:
+    driver: bridge

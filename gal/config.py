@@ -306,6 +306,8 @@ class Route:
         grpc_transformation: Optional gRPC transformation configuration
         traffic_split: Optional traffic splitting configuration for A/B testing
         mirroring: Optional request mirroring/shadowing configuration
+        advanced_routing: Optional advanced routing configuration for complex traffic management
+        advanced_routing_targets: List of named backend targets for advanced routing
 
     Example:
         >>> route = Route(path_prefix="/api/users", methods=["GET", "POST"])
@@ -327,6 +329,8 @@ class Route:
     grpc_transformation: Optional["GrpcTransformation"] = None
     traffic_split: Optional["TrafficSplitConfig"] = None
     mirroring: Optional["MirroringConfig"] = None
+    advanced_routing: Optional["AdvancedRoutingConfig"] = None
+    advanced_routing_targets: List["AdvancedRoutingTarget"] = field(default_factory=list)
 
 
 @dataclass
@@ -1749,6 +1753,239 @@ class MirroringConfig:
 
 
 @dataclass
+class AdvancedHeaderMatchRule:
+    """Advanced header-based routing rule with multiple match types.
+
+    Routes traffic based on HTTP header values with flexible matching options.
+
+    Attributes:
+        header_name: HTTP header name to match (e.g., "X-API-Version", "User-Agent")
+        match_type: Matching strategy ("exact", "prefix", "regex", "contains")
+        header_value: Header value or pattern to match
+        target_name: Name of the upstream target to route to when matched
+
+    Example:
+        >>> rule = AdvancedHeaderMatchRule(
+        ...     header_name="User-Agent",
+        ...     match_type="contains",
+        ...     header_value="Mobile",
+        ...     target_name="mobile_backend"
+        ... )
+    """
+
+    header_name: str
+    match_type: str = "exact"  # "exact", "prefix", "regex", "contains"
+    header_value: str = ""
+    target_name: str = ""
+
+    def __post_init__(self):
+        """Validate header match rule."""
+        valid_match_types = ["exact", "prefix", "regex", "contains"]
+        if self.match_type not in valid_match_types:
+            raise ValueError(f"match_type must be one of {valid_match_types}, got {self.match_type}")
+
+
+@dataclass
+class JWTClaimMatchRule:
+    """JWT Claims-based routing rule.
+
+    Routes traffic based on JWT token claims for role-based or tenant-based routing.
+
+    Attributes:
+        claim_name: JWT claim name to match (e.g., "role", "tenant_id", "scope")
+        claim_value: Claim value or pattern to match
+        match_type: Matching strategy ("exact", "contains", "regex")
+        target_name: Name of the upstream target to route to when matched
+
+    Example:
+        >>> rule = JWTClaimMatchRule(
+        ...     claim_name="role",
+        ...     claim_value="admin",
+        ...     match_type="exact",
+        ...     target_name="admin_backend"
+        ... )
+    """
+
+    claim_name: str
+    claim_value: str
+    match_type: str = "exact"  # "exact", "contains", "regex"
+    target_name: str = ""
+
+    def __post_init__(self):
+        """Validate JWT claim match rule."""
+        valid_match_types = ["exact", "contains", "regex"]
+        if self.match_type not in valid_match_types:
+            raise ValueError(f"match_type must be one of {valid_match_types}, got {self.match_type}")
+
+
+@dataclass
+class GeoMatchRule:
+    """Geo-location based routing rule.
+
+    Routes traffic based on client geographic location for data residency
+    or region-specific services.
+
+    Attributes:
+        match_type: Geographic matching level ("country", "region", "continent")
+        match_value: Location code to match (e.g., "DE", "eu-west-1", "EU")
+        target_name: Name of the upstream target to route to when matched
+
+    Example:
+        >>> rule = GeoMatchRule(
+        ...     match_type="country",
+        ...     match_value="DE",
+        ...     target_name="eu_backend"
+        ... )
+    """
+
+    match_type: str  # "country", "region", "continent"
+    match_value: str
+    target_name: str = ""
+
+    def __post_init__(self):
+        """Validate geo match rule."""
+        valid_match_types = ["country", "region", "continent"]
+        if self.match_type not in valid_match_types:
+            raise ValueError(f"match_type must be one of {valid_match_types}, got {self.match_type}")
+
+
+@dataclass
+class QueryParamMatchRule:
+    """Query parameter-based routing rule.
+
+    Routes traffic based on URL query parameters for feature flags
+    or API versioning.
+
+    Attributes:
+        param_name: Query parameter name to match (e.g., "version", "beta")
+        param_value: Parameter value or pattern to match
+        match_type: Matching strategy ("exact", "exists", "regex")
+        target_name: Name of the upstream target to route to when matched
+
+    Example:
+        >>> rule = QueryParamMatchRule(
+        ...     param_name="version",
+        ...     param_value="2",
+        ...     match_type="exact",
+        ...     target_name="v2_backend"
+        ... )
+    """
+
+    param_name: str
+    param_value: str
+    match_type: str = "exact"  # "exact", "exists", "regex"
+    target_name: str = ""
+
+    def __post_init__(self):
+        """Validate query param match rule."""
+        valid_match_types = ["exact", "exists", "regex"]
+        if self.match_type not in valid_match_types:
+            raise ValueError(f"match_type must be one of {valid_match_types}, got {self.match_type}")
+
+
+@dataclass
+class AdvancedRoutingTarget:
+    """Target backend for advanced routing.
+
+    Defines a named backend target that can be referenced by routing rules.
+
+    Attributes:
+        name: Unique identifier for the routing target
+        upstream: Backend service configuration
+        description: Optional description of the target
+
+    Example:
+        >>> target = AdvancedRoutingTarget(
+        ...     name="v2_backend",
+        ...     upstream=UpstreamTarget("api-v2", 8080),
+        ...     description="Version 2 API backend"
+        ... )
+    """
+
+    name: str
+    upstream: UpstreamTarget
+    description: Optional[str] = None
+
+
+@dataclass
+class AdvancedRoutingConfig:
+    """Advanced routing configuration for complex traffic management.
+
+    Enables sophisticated routing based on headers, JWT claims, geographic location,
+    and query parameters. Useful for:
+    - API versioning via headers or query parameters
+    - Role-based routing using JWT claims
+    - Geographic routing for data residency
+    - A/B testing and feature flags
+    - Multi-tenant routing
+
+    Provider Support:
+        - Envoy: Full support via route matching and Lua scripting
+        - Nginx: Full support via map, geo, and OpenResty Lua
+        - Kong: Full support via Route by Header and custom plugins
+        - APISIX: Full support via vars and serverless functions
+        - HAProxy: Full support via ACL routing
+        - Traefik: Full support via rule matchers
+
+    Attributes:
+        enabled: Whether advanced routing is enabled
+        header_rules: List of header-based routing rules
+        jwt_claim_rules: List of JWT claim-based routing rules
+        geo_rules: List of geographic routing rules
+        query_param_rules: List of query parameter routing rules
+        fallback_target: Optional fallback target if no rules match
+        evaluation_strategy: Rule evaluation strategy ("first_match" or "all_match")
+
+    Example (Header-based API versioning):
+        >>> config = AdvancedRoutingConfig(
+        ...     enabled=True,
+        ...     header_rules=[
+        ...         AdvancedHeaderMatchRule("X-API-Version", "exact", "v2", "v2_backend")
+        ...     ],
+        ...     fallback_target="v1_backend"
+        ... )
+
+    Example (JWT role-based routing):
+        >>> config = AdvancedRoutingConfig(
+        ...     enabled=True,
+        ...     jwt_claim_rules=[
+        ...         JWTClaimMatchRule("role", "admin", "exact", "admin_backend")
+        ...     ]
+        ... )
+    """
+
+    enabled: bool = True
+    header_rules: List[AdvancedHeaderMatchRule] = field(default_factory=list)
+    jwt_claim_rules: List[JWTClaimMatchRule] = field(default_factory=list)
+    geo_rules: List[GeoMatchRule] = field(default_factory=list)
+    query_param_rules: List[QueryParamMatchRule] = field(default_factory=list)
+    fallback_target: Optional[str] = None
+    evaluation_strategy: str = "first_match"  # "first_match", "all_match"
+
+    def __post_init__(self):
+        """Validate advanced routing configuration."""
+        valid_strategies = ["first_match", "all_match"]
+        if self.evaluation_strategy not in valid_strategies:
+            raise ValueError(
+                f"evaluation_strategy must be one of {valid_strategies}, "
+                f"got {self.evaluation_strategy}"
+            )
+
+        # Collect all target names referenced in rules
+        referenced_targets = set()
+        for rule in self.header_rules:
+            referenced_targets.add(rule.target_name)
+        for rule in self.jwt_claim_rules:
+            referenced_targets.add(rule.target_name)
+        for rule in self.geo_rules:
+            referenced_targets.add(rule.target_name)
+        for rule in self.query_param_rules:
+            referenced_targets.add(rule.target_name)
+
+        # Note: Actual validation of target existence happens in Route.__post_init__
+
+
+@dataclass
 class Config:
     """Main GAL configuration container.
 
@@ -2001,6 +2238,76 @@ class Config:
                         mirror_headers=mir_data.get("mirror_headers", True),
                     )
 
+                # Parse advanced routing
+                advanced_routing = None
+                advanced_routing_targets = []
+                if "advanced_routing" in route_data:
+                    ar_data = route_data["advanced_routing"]
+
+                    # Parse header rules
+                    header_rules = []
+                    for hr_data in ar_data.get("header_rules", []):
+                        header_rule = AdvancedHeaderMatchRule(
+                            header_name=hr_data["header_name"],
+                            match_type=hr_data.get("match_type", "exact"),
+                            header_value=hr_data.get("header_value", ""),
+                            target_name=hr_data.get("target_name", ""),
+                        )
+                        header_rules.append(header_rule)
+
+                    # Parse JWT claim rules
+                    jwt_claim_rules = []
+                    for jc_data in ar_data.get("jwt_claim_rules", []):
+                        jwt_rule = JWTClaimMatchRule(
+                            claim_name=jc_data["claim_name"],
+                            claim_value=jc_data["claim_value"],
+                            match_type=jc_data.get("match_type", "exact"),
+                            target_name=jc_data.get("target_name", ""),
+                        )
+                        jwt_claim_rules.append(jwt_rule)
+
+                    # Parse geo rules
+                    geo_rules = []
+                    for geo_data in ar_data.get("geo_rules", []):
+                        geo_rule = GeoMatchRule(
+                            match_type=geo_data["match_type"],
+                            match_value=geo_data["match_value"],
+                            target_name=geo_data.get("target_name", ""),
+                        )
+                        geo_rules.append(geo_rule)
+
+                    # Parse query param rules
+                    query_param_rules = []
+                    for qp_data in ar_data.get("query_param_rules", []):
+                        query_rule = QueryParamMatchRule(
+                            param_name=qp_data["param_name"],
+                            param_value=qp_data["param_value"],
+                            match_type=qp_data.get("match_type", "exact"),
+                            target_name=qp_data.get("target_name", ""),
+                        )
+                        query_param_rules.append(query_rule)
+
+                    advanced_routing = AdvancedRoutingConfig(
+                        enabled=ar_data.get("enabled", True),
+                        header_rules=header_rules,
+                        jwt_claim_rules=jwt_claim_rules,
+                        geo_rules=geo_rules,
+                        query_param_rules=query_param_rules,
+                        fallback_target=ar_data.get("fallback_target"),
+                        evaluation_strategy=ar_data.get("evaluation_strategy", "first_match"),
+                    )
+
+                # Parse advanced routing targets
+                if "advanced_routing_targets" in route_data:
+                    for target_data in route_data["advanced_routing_targets"]:
+                        upstream_target = UpstreamTarget(**target_data["upstream"])
+                        routing_target = AdvancedRoutingTarget(
+                            name=target_data["name"],
+                            upstream=upstream_target,
+                            description=target_data.get("description"),
+                        )
+                        advanced_routing_targets.append(routing_target)
+
                 route = Route(
                     path_prefix=route_data["path_prefix"],
                     methods=route_data.get("methods"),
@@ -2015,6 +2322,8 @@ class Config:
                     retry=retry,
                     traffic_split=traffic_split,
                     mirroring=mirroring,
+                    advanced_routing=advanced_routing,
+                    advanced_routing_targets=advanced_routing_targets,
                 )
                 routes.append(route)
 

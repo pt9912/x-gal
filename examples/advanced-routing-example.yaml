@@ -1,0 +1,173 @@
+version: "1.0"
+provider: envoy  # Works with: envoy, nginx, kong, apisix, traefik, haproxy
+
+# Global configuration
+global:
+  host: 0.0.0.0
+  port: 8080
+
+# Services configuration
+services:
+  - name: api_gateway
+    type: http
+    protocol: http
+
+    # Default upstream (fallback)
+    upstream:
+      host: api-v1-backend
+      port: 8080
+
+    routes:
+      - path_prefix: /api
+        methods: ["GET", "POST", "PUT", "DELETE"]
+
+        # Advanced Routing Targets
+        advanced_routing_targets:
+          - name: v2_backend
+            upstream:
+              host: api-v2-backend
+              port: 8080
+            description: "Version 2 API backend"
+
+          - name: admin_backend
+            upstream:
+              host: api-admin-backend
+              port: 8080
+            description: "Admin API with extended permissions"
+
+          - name: eu_backend
+            upstream:
+              host: api-eu-backend
+              port: 8080
+            description: "EU region backend for GDPR compliance"
+
+          - name: beta_backend
+            upstream:
+              host: api-beta-backend
+              port: 8080
+            description: "Beta features backend"
+
+          - name: mobile_backend
+            upstream:
+              host: api-mobile-backend
+              port: 8080
+            description: "Optimized mobile API backend"
+
+          - name: tenant_acme_backend
+            upstream:
+              host: api-tenant-acme
+              port: 8080
+            description: "Dedicated backend for ACME Corp tenant"
+
+        # Advanced Routing Configuration
+        advanced_routing:
+          enabled: true
+          evaluation_strategy: first_match  # or "all_match" for multiple conditions
+
+          # Header-based Routing Rules
+          header_rules:
+            # API Version routing
+            - header_name: X-API-Version
+              match_type: exact
+              header_value: "v2"
+              target_name: v2_backend
+
+            # User-Agent based routing
+            - header_name: User-Agent
+              match_type: contains
+              header_value: "Mobile"
+              target_name: mobile_backend
+
+            # Beta feature flag
+            - header_name: X-Beta-Features
+              match_type: exact
+              header_value: "true"
+              target_name: beta_backend
+
+            # Regex pattern matching
+            - header_name: X-Client-Version
+              match_type: regex
+              header_value: "^(2|3)\\..*"  # Matches version 2.x or 3.x
+              target_name: v2_backend
+
+            # Prefix matching
+            - header_name: X-Service-Name
+              match_type: prefix
+              header_value: "admin-"
+              target_name: admin_backend
+
+          # JWT Claims-based Routing Rules
+          jwt_claim_rules:
+            # Role-based routing
+            - claim_name: role
+              claim_value: "admin"
+              match_type: exact
+              target_name: admin_backend
+
+            # Tenant-specific routing
+            - claim_name: tenant_id
+              claim_value: "acme-corp"
+              match_type: exact
+              target_name: tenant_acme_backend
+
+            # Scope-based routing
+            - claim_name: scope
+              claim_value: "write:admin"
+              match_type: contains
+              target_name: admin_backend
+
+            # Beta access via JWT
+            - claim_name: features
+              claim_value: "beta"
+              match_type: contains
+              target_name: beta_backend
+
+          # Geographic-based Routing Rules
+          geo_rules:
+            # Country-based routing
+            - match_type: country
+              match_value: "DE"
+              target_name: eu_backend
+
+            - match_type: country
+              match_value: "FR"
+              target_name: eu_backend
+
+            # Region-based routing
+            - match_type: region
+              match_value: "eu-west-1"
+              target_name: eu_backend
+
+            # Continent-based routing
+            - match_type: continent
+              match_value: "EU"
+              target_name: eu_backend
+
+          # Query Parameter-based Routing Rules
+          query_param_rules:
+            # Version parameter
+            - param_name: version
+              param_value: "2"
+              match_type: exact
+              target_name: v2_backend
+
+            # Beta flag parameter
+            - param_name: beta
+              param_value: "true"
+              match_type: exact
+              target_name: beta_backend
+
+            # Check if parameter exists (any value)
+            - param_name: admin
+              param_value: ""
+              match_type: exists
+              target_name: admin_backend
+
+            # Regex pattern for version
+            - param_name: api_version
+              param_value: "^v[2-9]$"
+              match_type: regex
+              target_name: v2_backend
+
+          # Fallback target when no rules match
+          fallback_target: v1_backend  # Uses default upstream if not specified
