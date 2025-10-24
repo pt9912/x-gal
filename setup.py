@@ -79,6 +79,7 @@ setup(
             "black>=24.0.0",
             "flake8>=7.0.0",
             "isort>=5.13.0",
+            "cryptography>=41.0.0",  # For JWT key generation in E2E tests
         ],
     },
     entry_points={
