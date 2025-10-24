@@ -35,11 +35,11 @@ gal-cli.py generate --config <datei> [--provider <provider>] [--output <datei>]
 
 **Optionen:**
 
-| Option | Kurzform | Beschreibung | Erforderlich |
-|--------|----------|--------------|--------------|
-| `--config` | `-c` | Pfad zur YAML-Konfigurationsdatei | Ja |
-| `--provider` | `-p` | Provider-Name (überschreibt Config) | Nein |
-| `--output` | `-o` | Ausgabedatei (Standard: stdout) | Nein |
+| Option       | Kurzform | Beschreibung                        | Erforderlich |
+| ------------ | -------- | ----------------------------------- | ------------ |
+| `--config`   | `-c`     | Pfad zur YAML-Konfigurationsdatei   | Ja           |
+| `--provider` | `-p`     | Provider-Name (überschreibt Config) | Nein         |
+| `--output`   | `-o`     | Ausgabedatei (Standard: stdout)     | Nein         |
 
 **Unterstützte Provider:**
 - `envoy` - Envoy Proxy
@@ -82,9 +82,9 @@ gal-cli.py validate --config <datei>
 
 **Optionen:**
 
-| Option | Kurzform | Beschreibung | Erforderlich |
-|--------|----------|--------------|--------------|
-| `--config` | `-c` | Pfad zur YAML-Konfigurationsdatei | Ja |
+| Option     | Kurzform | Beschreibung                      | Erforderlich |
+| ---------- | -------- | --------------------------------- | ------------ |
+| `--config` | `-c`     | Pfad zur YAML-Konfigurationsdatei | Ja           |
 
 **Beispiele:**
 
@@ -120,10 +120,10 @@ gal-cli.py generate-all --config <datei> [--output-dir <verzeichnis>]
 
 **Optionen:**
 
-| Option | Kurzform | Beschreibung | Erforderlich | Standard |
-|--------|----------|--------------|--------------|----------|
-| `--config` | `-c` | Pfad zur YAML-Konfigurationsdatei | Ja | - |
-| `--output-dir` | `-o` | Ausgabeverzeichnis | Nein | `generated` |
+| Option         | Kurzform | Beschreibung                      | Erforderlich | Standard    |
+| -------------- | -------- | --------------------------------- | ------------ | ----------- |
+| `--config`     | `-c`     | Pfad zur YAML-Konfigurationsdatei | Ja           | -           |
+| `--output-dir` | `-o`     | Ausgabeverzeichnis                | Nein         | `generated` |
 
 **Beispiele:**
 
@@ -167,9 +167,9 @@ gal-cli.py info --config <datei>
 
 **Optionen:**
 
-| Option | Kurzform | Beschreibung | Erforderlich |
-|--------|----------|--------------|--------------|
-| `--config` | `-c` | Pfad zur YAML-Konfigurationsdatei | Ja |
+| Option     | Kurzform | Beschreibung                      | Erforderlich |
+| ---------- | -------- | --------------------------------- | ------------ |
+| `--config` | `-c`     | Pfad zur YAML-Konfigurationsdatei | Ja           |
 
 **Beispiele:**
 
@@ -288,23 +288,23 @@ docker run --rm \
 
 ```bash
 # Standard-Generierung (Envoy)
-docker-compose up gal-generate
+docker compose up gal-generate
 
 # Für spezifischen Provider
-PROVIDER=kong docker-compose up gal-generate
+PROVIDER=kong docker compose up gal-generate
 
 # Alle Provider generieren
-docker-compose up gal-generate-all
+docker compose up gal-generate-all
 ```
 
 ## Fehlerbehandlung
 
 ### Exit-Codes
 
-| Code | Bedeutung |
-|------|-----------|
-| 0 | Erfolg |
-| 1 | Fehler (Validierung fehlgeschlagen, Datei nicht gefunden, etc.) |
+| Code | Bedeutung                                                       |
+| ---- | --------------------------------------------------------------- |
+| 0    | Erfolg                                                          |
+| 1    | Fehler (Validierung fehlgeschlagen, Datei nicht gefunden, etc.) |
 
 ### Häufige Fehler
 

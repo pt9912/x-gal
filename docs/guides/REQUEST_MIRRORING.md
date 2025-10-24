@@ -54,15 +54,15 @@ Client Request ──────►│   API Gateway   │
 
 ### Provider-Unterstützung
 
-| Feature | Envoy | Nginx | APISIX | HAProxy | Kong | Traefik | Azure APIM | AWS API GW | GCP API GW |
-|---------|-------|-------|--------|---------|------|---------|------------|------------|------------|
-| **Request Mirroring** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
-| **Native Support** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| **Sample Percentage** | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ |
-| **Custom Headers** | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ |
-| **Multiple Mirrors** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
-| **Fire-and-Forget** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
-| **Setup Komplexität** | 🟢 | 🟢 | 🟢 | 🟡 | 🟢 | 🟢 | 🟢 | 🟡 | 🟡 |
+| Feature               | Envoy | Nginx | APISIX | HAProxy | Kong | Traefik | Azure APIM | AWS API GW | GCP API GW |
+| --------------------- | ----- | ----- | ------ | ------- | ---- | ------- | ---------- | ---------- | ---------- |
+| **Request Mirroring** | ✅     | ✅     | ✅      | ✅       | ✅    | ✅       | ✅          | ⚠️          | ⚠️          |
+| **Native Support**    | ✅     | ✅     | ✅      | ✅       | ✅    | ✅       | ✅          | ❌          | ❌          |
+| **Sample Percentage** | ✅     | ✅     | ✅      | ✅       | ⚠️    | ✅       | ✅          | ✅          | ✅          |
+| **Custom Headers**    | ✅     | ✅     | ✅      | ✅       | ✅    | ⚠️       | ✅          | ✅          | ✅          |
+| **Multiple Mirrors**  | ✅     | ✅     | ✅      | ✅       | ✅    | ✅       | ✅          | ⚠️          | ⚠️          |
+| **Fire-and-Forget**   | ✅     | ✅     | ✅      | ✅       | ✅    | ✅       | ✅          | ⚠️          | ⚠️          |
+| **Setup Komplexität** | 🟢     | 🟢     | 🟢      | 🟡       | 🟢    | 🟢       | 🟢          | 🟡          | 🟡          |
 
 **Legende:**
 - ✅ Native Support (eingebautes Feature)
@@ -159,22 +159,22 @@ mirroring:
 
 ### Parameter-Referenz
 
-| Parameter | Typ | Default | Beschreibung |
-|-----------|-----|---------|--------------|
-| `enabled` | boolean | false | Request Mirroring aktivieren |
-| `mirror_request_body` | boolean | true | Request Body an Shadow Backend senden |
-| `mirror_headers` | boolean | true | Request Headers an Shadow Backend senden |
-| `targets` | list | [] | Liste der Shadow Backend Targets |
+| Parameter             | Typ     | Default | Beschreibung                             |
+| --------------------- | ------- | ------- | ---------------------------------------- |
+| `enabled`             | boolean | false   | Request Mirroring aktivieren             |
+| `mirror_request_body` | boolean | true    | Request Body an Shadow Backend senden    |
+| `mirror_headers`      | boolean | true    | Request Headers an Shadow Backend senden |
+| `targets`             | list    | []      | Liste der Shadow Backend Targets         |
 
 ### MirrorTarget
 
-| Parameter | Typ | Default | Beschreibung |
-|-----------|-----|---------|--------------|
-| `name` | string | *required* | Eindeutiger Name für Shadow Target |
-| `upstream` | object | *required* | Backend-Konfiguration (host, port) |
-| `sample_percentage` | float | 100.0 | Prozent der Requests (0-100) |
-| `timeout` | string | "5s" | Timeout für Shadow Requests |
-| `headers` | dict | {} | Custom Headers für Shadow Backend |
+| Parameter           | Typ    | Default    | Beschreibung                       |
+| ------------------- | ------ | ---------- | ---------------------------------- |
+| `name`              | string | *required* | Eindeutiger Name für Shadow Target |
+| `upstream`          | object | *required* | Backend-Konfiguration (host, port) |
+| `sample_percentage` | float  | 100.0      | Prozent der Requests (0-100)       |
+| `timeout`           | string | "5s"       | Timeout für Shadow Requests        |
+| `headers`           | dict   | {}         | Custom Headers für Shadow Backend  |
 
 ---
 
@@ -555,15 +555,15 @@ end)
 
 **HAProxy Request Mirroring Features Zusammenfassung:**
 
-| Feature | SPOE (Native) | GoReplay | Teeproxy | Lua |
-|---------|---------------|----------|----------|-----|
-| **Native HAProxy** | ✅ Ja (2.0+) | ❌ Nein | ❌ Nein | ⚠️ Ja, aber komplex |
-| **Fire-and-Forget** | ✅ Ja | ✅ Ja | ❌ Nein | ❌ Nein |
-| **Sample Percentage** | ✅ Ja (`rand()`) | ✅ Ja | ❌ Nein | ✅ Ja |
-| **Custom Headers** | ✅ Ja | ✅ Ja | ✅ Ja | ✅ Ja |
-| **Multiple Mirrors** | ✅ Ja | ✅ Ja | ⚠️ Limited | ✅ Ja |
-| **Setup Komplexität** | 🔴 Hoch | 🟢 Niedrig | 🟢 Niedrig | 🟡 Mittel |
-| **External Process** | ✅ SPOE Agent | ✅ gor | ✅ teeproxy | ❌ Nein |
+| Feature               | SPOE (Native)   | GoReplay  | Teeproxy   | Lua                |
+| --------------------- | --------------- | --------- | ---------- | ------------------ |
+| **Native HAProxy**    | ✅ Ja (2.0+)     | ❌ Nein    | ❌ Nein     | ⚠️ Ja, aber komplex |
+| **Fire-and-Forget**   | ✅ Ja            | ✅ Ja      | ❌ Nein     | ❌ Nein             |
+| **Sample Percentage** | ✅ Ja (`rand()`) | ✅ Ja      | ❌ Nein     | ✅ Ja               |
+| **Custom Headers**    | ✅ Ja            | ✅ Ja      | ✅ Ja       | ✅ Ja               |
+| **Multiple Mirrors**  | ✅ Ja            | ✅ Ja      | ⚠️ Limited  | ✅ Ja               |
+| **Setup Komplexität** | 🔴 Hoch          | 🟢 Niedrig | 🟢 Niedrig  | 🟡 Mittel           |
+| **External Process**  | ✅ SPOE Agent    | ✅ gor     | ✅ teeproxy | ❌ Nein             |
 
 **Empfehlung:**
 - **Production HAProxy Setup:** SPOE + spoa-mirror (native, aber komplex)
@@ -1083,13 +1083,13 @@ def collect_data():
 
 **Empfohlene Werte:**
 
-| Use Case | Sample % | Begründung |
-|----------|----------|------------|
-| **Canary Start** | 1-5% | Minimales Risiko, erste Fehler finden |
-| **Performance Testing** | 25-50% | Repräsentative Last, nicht zu teuer |
-| **Full Production Test** | 100% | Finale Validation vor Rollout |
-| **Data Collection** | 5-10% | Genug Daten, nicht zu viele Kosten |
-| **Bug Detection** | 50-100% | Maximale Coverage für Fehler |
+| Use Case                 | Sample % | Begründung                            |
+| ------------------------ | -------- | ------------------------------------- |
+| **Canary Start**         | 1-5%     | Minimales Risiko, erste Fehler finden |
+| **Performance Testing**  | 25-50%   | Repräsentative Last, nicht zu teuer   |
+| **Full Production Test** | 100%     | Finale Validation vor Rollout         |
+| **Data Collection**      | 5-10%    | Genug Daten, nicht zu viele Kosten    |
+| **Bug Detection**        | 50-100%  | Maximale Coverage für Fehler          |
 
 ### 2. Shadow Backend Monitoring
 
@@ -1169,11 +1169,11 @@ def handle_error(error):
 
 **Cloud Provider berechnen Shadow Requests:**
 
-| Provider | Kosten | Hinweise |
-|----------|--------|----------|
-| **AWS Lambda@Edge** | $0.60 / 1M requests | Zusätzlich zu API Gateway |
-| **GCP Cloud Functions** | $0.40 / 1M invocations | Zusätzlich zu API Gateway |
-| **Azure APIM** | Inkludiert | Keine zusätzlichen Kosten für `send-request` |
+| Provider                | Kosten                 | Hinweise                                     |
+| ----------------------- | ---------------------- | -------------------------------------------- |
+| **AWS Lambda@Edge**     | $0.60 / 1M requests    | Zusätzlich zu API Gateway                    |
+| **GCP Cloud Functions** | $0.40 / 1M invocations | Zusätzlich zu API Gateway                    |
+| **Azure APIM**          | Inkludiert             | Keine zusätzlichen Kosten für `send-request` |
 
 **Empfehlung:** Sample Percentage reduzieren (z.B. 10% statt 100%), um Kosten zu sparen.
 
@@ -1215,16 +1215,16 @@ services:
 
 ```bash
 # Gateway starten
-docker-compose up -d
+docker compose up -d
 
 # Request senden
 curl http://localhost:8080/api/users
 
 # Primary Backend Logs
-docker-compose logs primary-backend
+docker compose logs primary-backend
 
 # Shadow Backend Logs
-docker-compose logs shadow-backend
+docker compose logs shadow-backend
 ```
 
 ### 2. Sample Percentage validieren
@@ -1268,7 +1268,7 @@ Sample Percentage: 50.30%
 curl -v http://localhost:8080/api/users 2>&1 | grep -i 'x-mirror'
 
 # Shadow Backend Request prüfen
-docker-compose exec shadow-backend cat /var/log/requests.log | grep 'X-Mirror'
+docker compose exec shadow-backend cat /var/log/requests.log | grep 'X-Mirror'
 ```
 
 **Expected Output:**

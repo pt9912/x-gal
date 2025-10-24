@@ -367,7 +367,7 @@ services:
 python gal-cli.py generate -c my-gateway.yaml -o generated/envoy.yaml
 
 # 2. Services starten
-docker-compose up -d
+docker compose up -d
 
 # 3. Testen
 curl http://localhost:10000/hello
@@ -575,14 +575,14 @@ curl --retry 5 --retry-delay 2 http://gateway.example.com/health
 
 ### Häufige Fehler
 
-| Fehler | Ursache | Lösung |
-|--------|---------|--------|
-| `Provider not registered` | Unbekannter Provider-Name | Nutze einen der unterstützten Provider: `nginx`, `envoy`, `kong`, `apisix`, `traefik`, `haproxy`, `azure_apim`, `gcp_apigateway`, `aws_apigateway` |
-| `Port must be specified` | `port: 0` in Global-Config | Setze einen gültigen Port (z.B. `port: 8080`) in der Global-Sektion |
-| `No such file or directory` | Config-Datei nicht gefunden | Prüfe den Pfad zur Config-Datei mit `ls -la config.yaml` |
-| `Invalid YAML syntax` | YAML-Syntax-Fehler | Validiere YAML-Syntax mit einem Online-Tool oder `yamllint config.yaml` |
-| `Field 'upstream' is required` | Pflichtfeld fehlt | Füge alle Pflichtfelder hinzu (siehe [Konfigurationsreferenz](../api/CONFIGURATION.md)) |
-| `Docker permission denied` | Fehlende Docker-Berechtigungen | Führe `sudo usermod -aG docker $USER` aus und melde dich neu an |
+| Fehler                         | Ursache                        | Lösung                                                                                                                                             |
+| ------------------------------ | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Provider not registered`      | Unbekannter Provider-Name      | Nutze einen der unterstützten Provider: `nginx`, `envoy`, `kong`, `apisix`, `traefik`, `haproxy`, `azure_apim`, `gcp_apigateway`, `aws_apigateway` |
+| `Port must be specified`       | `port: 0` in Global-Config     | Setze einen gültigen Port (z.B. `port: 8080`) in der Global-Sektion                                                                                |
+| `No such file or directory`    | Config-Datei nicht gefunden    | Prüfe den Pfad zur Config-Datei mit `ls -la config.yaml`                                                                                           |
+| `Invalid YAML syntax`          | YAML-Syntax-Fehler             | Validiere YAML-Syntax mit einem Online-Tool oder `yamllint config.yaml`                                                                            |
+| `Field 'upstream' is required` | Pflichtfeld fehlt              | Füge alle Pflichtfelder hinzu (siehe [Konfigurationsreferenz](../api/CONFIGURATION.md))                                                            |
+| `Docker permission denied`     | Fehlende Docker-Berechtigungen | Führe `sudo usermod -aG docker $USER` aus und melde dich neu an                                                                                    |
 
 ### Detailliertes Debugging
 

@@ -66,7 +66,7 @@ gal generate -c config.yaml -p aws_apigateway
 
     ---
 
-    Container-basierte Workflows mit docker-compose Integration.
+    Container-basierte Workflows mit docker compose Integration.
 
 - :material-robot: **CI/CD-freundlich**
 
@@ -104,17 +104,17 @@ gal generate -c config.yaml -p aws_apigateway
 
 ## Unterstützte Provider
 
-| Provider | Status | Output-Format | Transformations | Import/Export | Deployment |
-|----------|--------|---------------|-----------------|---------------|------------|
-| [Nginx](guides/NGINX.md) | :white_check_mark: | nginx.conf | Lua/njs | :white_check_mark: / :white_check_mark: | Self-Hosted |
-| [Envoy](guides/ENVOY.md) | :white_check_mark: | YAML | Lua Filters | :white_check_mark: / :white_check_mark: | Self-Hosted |
-| [Kong](guides/KONG.md) | :white_check_mark: | YAML | Plugins | :white_check_mark: / :white_check_mark: | Self-Hosted |
-| [APISIX](guides/APISIX.md) | :white_check_mark: | JSON/YAML | Lua Serverless | :white_check_mark: / :white_check_mark: | Self-Hosted |
-| [Traefik](guides/TRAEFIK.md) | :white_check_mark: | YAML/TOML | Middleware | :white_check_mark: / :white_check_mark: | Self-Hosted |
-| [HAProxy](guides/HAPROXY.md) | :white_check_mark: | haproxy.cfg | Lua | :warning: / :white_check_mark: | Self-Hosted |
-| **[Azure APIM](guides/AZURE_APIM.md)** | :white_check_mark: | **ARM/JSON** | **Policy XML** | :white_check_mark: / :white_check_mark: | **Azure Cloud** |
-| **[GCP API Gateway](guides/GCP_APIGATEWAY.md)** | :white_check_mark: | **OpenAPI 2.0** | **Backend** | :white_check_mark: / :white_check_mark: | **Google Cloud** |
-| **[AWS API Gateway](guides/AWS_APIGATEWAY.md)** | :white_check_mark: | **OpenAPI 3.0** | **VTL** | :white_check_mark: / :white_check_mark: | **AWS Cloud** |
+| Provider                                        | Status             | Output-Format   | Transformations | Import/Export                           | Deployment       |
+| ----------------------------------------------- | ------------------ | --------------- | --------------- | --------------------------------------- | ---------------- |
+| [Nginx](guides/NGINX.md)                        | :white_check_mark: | nginx.conf      | Lua/njs         | :white_check_mark: / :white_check_mark: | Self-Hosted      |
+| [Envoy](guides/ENVOY.md)                        | :white_check_mark: | YAML            | Lua Filters     | :white_check_mark: / :white_check_mark: | Self-Hosted      |
+| [Kong](guides/KONG.md)                          | :white_check_mark: | YAML            | Plugins         | :white_check_mark: / :white_check_mark: | Self-Hosted      |
+| [APISIX](guides/APISIX.md)                      | :white_check_mark: | JSON/YAML       | Lua Serverless  | :white_check_mark: / :white_check_mark: | Self-Hosted      |
+| [Traefik](guides/TRAEFIK.md)                    | :white_check_mark: | YAML/TOML       | Middleware      | :white_check_mark: / :white_check_mark: | Self-Hosted      |
+| [HAProxy](guides/HAPROXY.md)                    | :white_check_mark: | haproxy.cfg     | Lua             | :warning: / :white_check_mark:          | Self-Hosted      |
+| **[Azure APIM](guides/AZURE_APIM.md)**          | :white_check_mark: | **ARM/JSON**    | **Policy XML**  | :white_check_mark: / :white_check_mark: | **Azure Cloud**  |
+| **[GCP API Gateway](guides/GCP_APIGATEWAY.md)** | :white_check_mark: | **OpenAPI 2.0** | **Backend**     | :white_check_mark: / :white_check_mark: | **Google Cloud** |
+| **[AWS API Gateway](guides/AWS_APIGATEWAY.md)** | :white_check_mark: | **OpenAPI 3.0** | **VTL**         | :white_check_mark: / :white_check_mark: | **AWS Cloud**    |
 
 **Import-Hinweise:**
 - **Azure APIM:** Import erfolgt über OpenAPI 3.0 Export (`az apim api export`). ARM Templates werden nicht geparst. Policies müssen manuell in GAL konfiguriert werden. Siehe [Azure APIM Import Guide](import/azure-apim.md).
@@ -187,7 +187,7 @@ Technische Details und Design:
 === "DevOps"
 
     1. [Provider-Vergleich](guides/PROVIDERS.md#provider-vergleich) - Welcher Provider passt?
-    2. [Docker-Integration](guides/QUICKSTART.md#docker-compose-integration) - Container-Deployment
+    2. [Docker-Integration](guides/QUICKSTART.md#docker compose-integration) - Container-Deployment
     3. [CI/CD-Integration](guides/QUICKSTART.md#use-case-3-cicd-integration) - Automation
 
 ---
