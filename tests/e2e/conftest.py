@@ -27,10 +27,7 @@ def generate_test_keys():
     generate_script = keygen_dir / "generate_local.py"
     if generate_script.exists():
         result = subprocess.run(
-            ["python3", str(generate_script)],
-            cwd=str(keygen_dir),
-            capture_output=True,
-            text=True
+            ["python3", str(generate_script)], cwd=str(keygen_dir), capture_output=True, text=True
         )
 
         if result.returncode == 0:
