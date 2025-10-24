@@ -1,0 +1,185 @@
+version: '3.8'
+
+services:
+  # Envoy Gateway with Advanced Routing
+  envoy:
+    image: envoyproxy/envoy:v1.31-latest
+    container_name: envoy-advanced-routing
+    ports:
+      - "8080:8080"
+      - "9901:9901"  # Admin interface
+    volumes:
+      - ./envoy-improved.yaml:/etc/envoy/envoy.yaml:ro
+    command: ["envoy", "-c", "/etc/envoy/envoy.yaml", "-l", "info"]
+    networks:
+      - routing-network
+    depends_on:
+      - backend-v1
+      - backend-v2
+      - backend-admin
+      - backend-eu
+      - backend-beta
+      - backend-mobile
+      - jwks-service
+      - geoip-service
+
+  # JWKS Service (JWT Key Set for Token Validation)
+  jwks-service:
+    build:
+      context: ../../../backends
+      dockerfile: Dockerfile
+    container_name: jwks-service
+    environment:
+      - SERVICE_NAME=jwks-service
+      - SERVICE_TYPE=jwks
+    command: ["python", "jwks_service.py"]
+    networks:
+      - routing-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/.well-known/jwks.json"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # GeoIP Service (Mock gRPC service for geo-based routing)
+  geoip-service:
+    build:
+      context: ../../../backends
+      dockerfile: Dockerfile
+    container_name: geoip-service
+    environment:
+      - SERVICE_NAME=geoip-service
+      - SERVICE_TYPE=geoip
+      - PORT=9090
+    command: ["python", "geoip.py"]
+    networks:
+      - routing-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Backend v1 (Default/Fallback)
+  backend-v1:
+    build:
+      context: ../../../backends
+      dockerfile: Dockerfile
+    container_name: backend-v1
+    environment:
+      - BACKEND_NAME=backend-v1
+      - BACKEND_VERSION=v1
+      - BACKEND_TYPE=standard
+      - BACKEND_REGION=us
+    command: ["python", "advanced_backend.py"]
+    networks:
+      - routing-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Backend v2
+  backend-v2:
+    build:
+      context: ../../../backends
+      dockerfile: Dockerfile
+    container_name: backend-v2
+    environment:
+      - BACKEND_NAME=backend-v2
+      - BACKEND_VERSION=v2
+      - BACKEND_TYPE=standard
+      - BACKEND_REGION=us
+    command: ["python", "advanced_backend.py"]
+    networks:
+      - routing-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Admin Backend
+  backend-admin:
+    build:
+      context: ../../../backends
+      dockerfile: Dockerfile
+    container_name: backend-admin
+    environment:
+      - BACKEND_NAME=backend-admin
+      - BACKEND_VERSION=v1
+      - BACKEND_TYPE=admin
+      - BACKEND_REGION=us
+    command: ["python", "advanced_backend.py"]
+    networks:
+      - routing-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # EU Backend
+  backend-eu:
+    build:
+      context: ../../../backends
+      dockerfile: Dockerfile
+    container_name: backend-eu
+    environment:
+      - BACKEND_NAME=backend-eu
+      - BACKEND_VERSION=v1
+      - BACKEND_TYPE=standard
+      - BACKEND_REGION=eu
+    command: ["python", "advanced_backend.py"]
+    networks:
+      - routing-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Beta Backend
+  backend-beta:
+    build:
+      context: ../../../backends
+      dockerfile: Dockerfile
+    container_name: backend-beta
+    environment:
+      - BACKEND_NAME=backend-beta
+      - BACKEND_VERSION=beta
+      - BACKEND_TYPE=experimental
+      - BACKEND_REGION=us
+    command: ["python", "advanced_backend.py"]
+    networks:
+      - routing-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Mobile Backend
+  backend-mobile:
+    build:
+      context: ../../../backends
+      dockerfile: Dockerfile
+    container_name: backend-mobile
+    environment:
+      - BACKEND_NAME=backend-mobile
+      - BACKEND_VERSION=v1
+      - BACKEND_TYPE=mobile
+      - BACKEND_REGION=us
+    command: ["python", "advanced_backend.py"]
+    networks:
+      - routing-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  routing-network:
+    driver: bridge

@@ -45,6 +45,9 @@ docker/
         ├── mirroring/
         ├── mirroring-spoe/  # Spezielle SPOE Implementation
         └── advanced-routing/ # (Bereit für Implementation)
+├── E2E_TEST_BEST_PRACTICES.md # Best Practices Dokumentation
+└── README.md                   # Diese Datei
+
 ```
 
 ## 🎯 Features
@@ -76,25 +79,25 @@ docker/
 
 ## 📊 Provider Feature Matrix
 
-| Provider | Basic | Mirroring | Advanced Routing | Traffic Split | Status |
-|----------|-------|-----------|------------------|---------------|--------|
-| **Envoy**    | ✅ | ✅ | ✅ | ✅ | Vollständig |
-| **Nginx**    | ✅ | ✅ | 🚧 | ✅ | In Arbeit |
-| **Kong**     | ✅ | ✅ | 🚧 | ✅ | In Arbeit |
-| **APISIX**   | ✅ | ✅ | 🚧 | ✅ | In Arbeit |
-| **Traefik**  | ✅ | ✅ | 🚧 | ✅ | In Arbeit |
-| **HAProxy**  | ✅ | ✅ (SPOE) | 🚧 | ✅ | In Arbeit |
+| Provider    | Basic | Mirroring | Advanced Routing | Traffic Split | Status      |
+| ----------- | ----- | --------- | ---------------- | ------------- | ----------- |
+| **Envoy**   | ✅     | ✅         | ✅                | ✅             | Vollständig |
+| **Nginx**   | ✅     | ✅         | 🚧                | ✅             | In Arbeit   |
+| **Kong**    | ✅     | ✅         | 🚧                | ✅             | In Arbeit   |
+| **APISIX**  | ✅     | ✅         | 🚧                | ✅             | In Arbeit   |
+| **Traefik** | ✅     | ✅         | 🚧                | ✅             | In Arbeit   |
+| **HAProxy** | ✅     | ✅ (SPOE)  | 🚧                | ✅             | In Arbeit   |
 
 ## 🐳 Docker Setup
 
 ### Port-Konventionen
 
-| Service | Port Range | Beispiele |
-|---------|------------|-----------|
-| Gateway | 8080-8089  | 8080 (Default) |
-| Admin   | 9900-9910  | 9901 (Envoy), 8001 (Kong) |
-| Backends | 8090-8099 | 8090, 8091 |
-| Metrics | 9090-9099  | 9090 (Prometheus) |
+| Service  | Port Range | Beispiele                 |
+| -------- | ---------- | ------------------------- |
+| Gateway  | 8080-8089  | 8080 (Default)            |
+| Admin    | 9900-9910  | 9901 (Envoy), 8001 (Kong) |
+| Backends | 8090-8099  | 8090, 8091                |
+| Metrics  | 9090-9099  | 9090 (Prometheus)         |
 
 ### Gemeinsame Backend-Services
 
@@ -181,13 +184,13 @@ docker-compose logs -f [service]
 
 ### Provider Admin Interfaces
 
-| Provider | Admin URL | Features |
-|----------|-----------|----------|
-| Envoy | http://localhost:9901 | /clusters, /stats, /config_dump |
-| Kong | http://localhost:8001 | /status, /routes, /services |
-| APISIX | http://localhost:9080 | /apisix/admin |
-| Traefik | http://localhost:8080 | Dashboard |
-| HAProxy | http://localhost:8404 | /stats |
+| Provider | Admin URL             | Features                        |
+| -------- | --------------------- | ------------------------------- |
+| Envoy    | http://localhost:9901 | /clusters, /stats, /config_dump |
+| Kong     | http://localhost:8001 | /status, /routes, /services     |
+| APISIX   | http://localhost:9080 | /apisix/admin                   |
+| Traefik  | http://localhost:8080 | Dashboard                       |
+| HAProxy  | http://localhost:8404 | /stats                          |
 
 ### Log Analysis
 
@@ -204,14 +207,14 @@ docker-compose logs -f [service]
 
 ### Latency Targets
 
-| Provider | P50 | P95 | P99 | Memory |
-|----------|-----|-----|-----|---------|
-| Envoy    | <5ms | <10ms | <15ms | ~50MB |
-| Nginx    | <3ms | <7ms | <10ms | ~20MB |
+| Provider | P50   | P95   | P99   | Memory |
+| -------- | ----- | ----- | ----- | ------ |
+| Envoy    | <5ms  | <10ms | <15ms | ~50MB  |
+| Nginx    | <3ms  | <7ms  | <10ms | ~20MB  |
 | Kong     | <10ms | <20ms | <30ms | ~100MB |
-| APISIX   | <7ms | <15ms | <20ms | ~80MB |
-| Traefik  | <8ms | <15ms | <25ms | ~60MB |
-| HAProxy  | <2ms | <5ms | <8ms | ~15MB |
+| APISIX   | <7ms  | <15ms | <20ms | ~80MB  |
+| Traefik  | <8ms  | <15ms | <25ms | ~60MB  |
+| HAProxy  | <2ms  | <5ms  | <8ms  | ~15MB  |
 
 ## 🚀 Neue Features hinzufügen
 

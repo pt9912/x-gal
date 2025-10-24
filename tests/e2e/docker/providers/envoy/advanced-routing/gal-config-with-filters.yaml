@@ -1,0 +1,133 @@
+version: "1.0"
+provider: envoy
+
+# Global configuration
+global:
+  host: 0.0.0.0
+  port: 8080
+
+# Services configuration
+services:
+  - name: api_service
+    type: http
+    protocol: http
+
+    # Default upstream (v1 backend)
+    upstream:
+      host: backend-v1
+      port: 8080
+
+    routes:
+      - path_prefix: /api
+        methods: ["GET", "POST", "PUT", "DELETE"]
+
+        # Advanced Routing Targets
+        advanced_routing_targets:
+          - name: v2_backend
+            upstream:
+              host: backend-v2
+              port: 8080
+            description: "Version 2 API backend"
+
+          - name: admin_backend
+            upstream:
+              host: backend-admin
+              port: 8080
+            description: "Admin API with extended permissions"
+
+          - name: eu_backend
+            upstream:
+              host: backend-eu
+              port: 8080
+            description: "EU region backend for GDPR compliance"
+
+          - name: beta_backend
+            upstream:
+              host: backend-beta
+              port: 8080
+            description: "Beta features backend"
+
+          - name: mobile_backend
+            upstream:
+              host: backend-mobile
+              port: 8080
+            description: "Optimized mobile API backend"
+
+        # Advanced Routing Configuration
+        advanced_routing:
+          enabled: true
+          evaluation_strategy: first_match
+
+          # Header-based Routing Rules
+          header_rules:
+            # API Version routing
+            - header_name: X-API-Version
+              match_type: exact
+              header_value: "v2"
+              target_name: v2_backend
+
+            # User-Agent based routing for mobile
+            - header_name: User-Agent
+              match_type: contains
+              header_value: "Mobile"
+              target_name: mobile_backend
+
+            # Beta feature flag
+            - header_name: X-Beta-Features
+              match_type: exact
+              header_value: "enabled"
+              target_name: beta_backend
+
+          # Query Parameter-based Routing Rules
+          query_param_rules:
+            # Version parameter
+            - param_name: version
+              param_value: "2"
+              match_type: exact
+              target_name: v2_backend
+
+            # Beta flag parameter
+            - param_name: beta
+              param_value: "true"
+              match_type: exact
+              target_name: beta_backend
+
+            # Admin access parameter
+            - param_name: admin
+              param_value: ""
+              match_type: exists
+              target_name: admin_backend
+
+          # JWT claim-based rules
+          jwt_claim_rules:
+            - claim_name: role
+              claim_value: "admin"
+              match_type: exact
+              target_name: admin_backend
+
+          # Geo-based rules
+          geo_rules:
+            - match_type: country
+              match_value: "DE"
+              target_name: eu_backend
+
+          # JWT Filter Configuration
+          jwt_filter:
+            enabled: true
+            issuer: "https://jwks-service"
+            audience: "x-gal-test"
+            jwks_uri: "http://jwks-service:8080/.well-known/jwks.json"
+            jwks_cluster: "jwks_cluster"
+            payload_in_metadata: "jwt_payload"
+            forward_payload_header: "X-JWT-Payload"
+
+          # GeoIP Filter Configuration
+          geoip_filter:
+            enabled: true
+            geoip_service_uri: "http://geoip-service:8080/check"
+            geoip_cluster: "geoip_service"
+            timeout_ms: 500
+            failure_mode_allow: true
+
+          # Fallback to v1 backend when no rules match
+          fallback_target: v1_backend

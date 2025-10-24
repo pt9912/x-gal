@@ -22,7 +22,6 @@ tests/
 │   └── docker/                 # Docker Compose Setups
 │
 ├── pytest.ini                  # pytest Konfiguration
-├── E2E_TEST_BEST_PRACTICES.md # Best Practices Dokumentation
 └── README.md                   # Diese Datei
 ```
 
