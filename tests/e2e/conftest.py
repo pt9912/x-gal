@@ -10,6 +10,37 @@ from pathlib import Path
 import pytest
 
 
+@pytest.fixture(scope="session", autouse=True)
+def generate_test_keys():
+    """Generate JWT keys and tokens before running any tests."""
+    keygen_dir = Path(__file__).parent / "docker" / "tools" / "keygen"
+    keys_dir = keygen_dir / "keys"
+
+    # Skip if keys already exist (generated manually)
+    if keys_dir.exists() and (keys_dir / "private_key.pem").exists():
+        print(f"\n🔑 Using existing JWT keys from {keys_dir}")
+        return
+
+    print(f"\n🔑 Generating JWT keys and tokens for E2E tests...")
+
+    # Run generate_local.py to create keys at runtime
+    generate_script = keygen_dir / "generate_local.py"
+    if generate_script.exists():
+        result = subprocess.run(
+            ["python3", str(generate_script)],
+            cwd=str(keygen_dir),
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode == 0:
+            print("✅ JWT keys and tokens generated successfully")
+        else:
+            print(f"⚠️ Warning: Failed to generate JWT keys: {result.stderr}")
+    else:
+        print(f"⚠️ Warning: generate_local.py not found at {generate_script}")
+
+
 @pytest.fixture(scope="session")
 def docker_cleanup():
     """Ensure all test containers are cleaned up after test session."""

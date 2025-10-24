@@ -54,6 +54,17 @@ coverage.xml
 # E2E Test logs
 test_logs_*.txt
 
+# E2E Test private keys and secrets (generated at runtime)
+tests/e2e/docker/tools/keygen/keys/*
+!tests/e2e/docker/tools/keygen/keys/README.md
+*.pem
+*.key
+*_rsa
+id_rsa
+*.p12
+*.pfx
+*.jwt
+
 # Translations
 *.mo
 *.pot
