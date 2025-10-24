@@ -6,14 +6,15 @@ Tests header-based, query parameter-based, and fallback routing
 using Docker Compose setup with multiple backend instances.
 """
 
-import time
-import requests
-import pytest
-import subprocess
-import os
 import json
+import os
+import subprocess
 import sys
+import time
 from pathlib import Path
+
+import pytest
+import requests
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -61,7 +62,7 @@ class TestEnvoyAdvancedRouting(BaseE2ETest):
                     f"http://localhost:{cls.SERVICE_PORT}/api",
                     headers=headers,
                     params=params,
-                    timeout=1
+                    timeout=1,
                 )
                 if response.status_code != 200:
                     return False
@@ -82,10 +83,7 @@ class TestEnvoyAdvancedRouting(BaseE2ETest):
 
     def test_header_routing_api_version(self):
         """Test routing based on X-API-Version header."""
-        response = self.make_request(
-            "/api",
-            headers={"X-API-Version": "v2"}
-        )
+        response = self.make_request("/api", headers={"X-API-Version": "v2"})
         self.assert_response(response, 200)
 
         data = response.json()
@@ -96,8 +94,7 @@ class TestEnvoyAdvancedRouting(BaseE2ETest):
     def test_header_routing_mobile_user_agent(self):
         """Test routing based on User-Agent containing 'Mobile'."""
         response = self.make_request(
-            "/api",
-            headers={"User-Agent": "Mozilla/5.0 (iPhone; Mobile Safari)"}
+            "/api", headers={"User-Agent": "Mozilla/5.0 (iPhone; Mobile Safari)"}
         )
         self.assert_response(response, 200)
 
@@ -108,10 +105,7 @@ class TestEnvoyAdvancedRouting(BaseE2ETest):
 
     def test_header_routing_beta_features(self):
         """Test routing based on X-Beta-Features header."""
-        response = self.make_request(
-            "/api",
-            headers={"X-Beta-Features": "enabled"}
-        )
+        response = self.make_request("/api", headers={"X-Beta-Features": "enabled"})
         self.assert_response(response, 200)
 
         data = response.json()
@@ -121,10 +115,7 @@ class TestEnvoyAdvancedRouting(BaseE2ETest):
 
     def test_header_routing_admin_access(self):
         """Test routing based on X-Admin-Access header."""
-        response = self.make_request(
-            "/api",
-            headers={"X-Admin-Access": "true"}
-        )
+        response = self.make_request("/api", headers={"X-Admin-Access": "true"})
         self.assert_response(response, 200)
 
         data = response.json()
@@ -134,10 +125,7 @@ class TestEnvoyAdvancedRouting(BaseE2ETest):
 
     def test_header_routing_eu_region(self):
         """Test routing based on X-Region header."""
-        response = self.make_request(
-            "/api",
-            headers={"X-Region": "EU"}
-        )
+        response = self.make_request("/api", headers={"X-Region": "EU"})
         self.assert_response(response, 200)
 
         data = response.json()
@@ -177,10 +165,7 @@ class TestEnvoyAdvancedRouting(BaseE2ETest):
 
     def test_priority_header_over_query(self):
         """Test that header rules have priority over query params."""
-        response = self.make_request(
-            "/api?version=2",
-            headers={"X-Beta-Features": "enabled"}
-        )
+        response = self.make_request("/api?version=2", headers={"X-Beta-Features": "enabled"})
         self.assert_response(response, 200)
 
         data = response.json()
@@ -191,10 +176,7 @@ class TestEnvoyAdvancedRouting(BaseE2ETest):
     def test_post_request_routing(self):
         """Test that POST requests are also routed correctly."""
         response = self.make_request(
-            "/api",
-            method="POST",
-            headers={"X-API-Version": "v2"},
-            json_data={"test": "data"}
+            "/api", method="POST", headers={"X-API-Version": "v2"}, json_data={"test": "data"}
         )
         self.assert_response(response, 200)
 
@@ -210,7 +192,7 @@ class TestEnvoyAdvancedRouting(BaseE2ETest):
             headers={
                 "X-API-Version": "v2",
                 "X-Admin-Access": "true",  # This should be ignored
-            }
+            },
         )
         self.assert_response(response, 200)
 
@@ -222,8 +204,7 @@ class TestEnvoyAdvancedRouting(BaseE2ETest):
     def test_fallback_with_unknown_header_value(self):
         """Test fallback when header exists but value doesn't match."""
         response = self.make_request(
-            "/api",
-            headers={"X-API-Version": "v3"}  # v3 is not configured
+            "/api", headers={"X-API-Version": "v3"}  # v3 is not configured
         )
         self.assert_response(response, 200)
 
@@ -264,7 +245,8 @@ class TestEnvoyAdvancedRouting(BaseE2ETest):
 
         # Look for route configuration
         route_configs = [
-            c for c in config["configs"]
+            c
+            for c in config["configs"]
             if c.get("@type") == "type.googleapis.com/envoy.admin.v3.RoutesConfigDump"
         ]
 
@@ -282,11 +264,7 @@ class TestEnvoyAdvancedRouting(BaseE2ETest):
         ]
 
         for name, headers, params in test_requests:
-            response = self.make_request(
-                "/api",
-                headers=headers,
-                params=params
-            )
+            response = self.make_request("/api", headers=headers, params=params)
             assert response.status_code == 200
 
         # Give logs time to flush
@@ -301,7 +279,7 @@ class TestEnvoyAdvancedRouting(BaseE2ETest):
             # Check that the backend received requests
             # New log format: [2025-10-24 12:38:22.132] [backend-v1:v1] "GET /api HTTP/1.1" 200 -
             if backend == "backend-v1":
-                assert '"GET' in logs or '"POST' in logs or '200' in logs
+                assert '"GET' in logs or '"POST' in logs or "200" in logs
                 print(f"✓ {backend} logs show activity ({logs.count('GET')} GET requests)")
 
     @pytest.mark.slow
@@ -329,7 +307,7 @@ class TestEnvoyAdvancedRouting(BaseE2ETest):
             if "api_service" in line and "upstream_rq_total" in line:
                 # Extract cluster name and count
                 if "{" in line and "}" in line:
-                    cluster_info = line[line.index("{"):line.index("}")+1]
+                    cluster_info = line[line.index("{") : line.index("}") + 1]
                     count = line.split()[-1]
                     if float(count) > 0:
                         print(f"  Cluster requests: {cluster_info} = {count}")
@@ -361,11 +339,7 @@ class TestEnvoyAdvancedRouting(BaseE2ETest):
         """Test routing under concurrent load."""
         print("\n🔀 Testing Concurrent Routing")
 
-        results = self.run_concurrent_requests(
-            num_requests=100,
-            num_workers=10,
-            path="/api"
-        )
+        results = self.run_concurrent_requests(num_requests=100, num_workers=10, path="/api")
 
         success_rate = (results["success"] / 100) * 100
         print(f"Success rate: {success_rate:.1f}%")

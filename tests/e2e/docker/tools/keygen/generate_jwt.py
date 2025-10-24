@@ -4,53 +4,44 @@ Generate a valid JWT token for testing Envoy JWT authentication.
 Uses the private key from private_key.pem to sign the token.
 """
 
-import json
-import time
 import base64
+import json
 import sys
-from cryptography.hazmat.primitives import serialization, hashes
-from cryptography.hazmat.primitives.asymmetric import padding
+import time
+
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding
 
 
 def base64url_encode(data):
     """Encode data as base64url (without padding)"""
     if isinstance(data, str):
-        data = data.encode('utf-8')
-    return base64.urlsafe_b64encode(data).rstrip(b'=').decode('utf-8')
+        data = data.encode("utf-8")
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("utf-8")
 
 
 def generate_jwt(private_key_path, payload, kid="test-key"):
     """Generate a JWT token signed with RS256"""
 
     # Load private key
-    with open(private_key_path, 'rb') as f:
+    with open(private_key_path, "rb") as f:
         private_key = serialization.load_pem_private_key(
-            f.read(),
-            password=None,
-            backend=default_backend()
+            f.read(), password=None, backend=default_backend()
         )
 
     # JWT Header
-    header = {
-        "alg": "RS256",
-        "typ": "JWT",
-        "kid": kid
-    }
+    header = {"alg": "RS256", "typ": "JWT", "kid": kid}
 
     # Encode header and payload
-    header_b64 = base64url_encode(json.dumps(header, separators=(',', ':')))
-    payload_b64 = base64url_encode(json.dumps(payload, separators=(',', ':')))
+    header_b64 = base64url_encode(json.dumps(header, separators=(",", ":")))
+    payload_b64 = base64url_encode(json.dumps(payload, separators=(",", ":")))
 
     # Create message to sign
-    message = f"{header_b64}.{payload_b64}".encode('utf-8')
+    message = f"{header_b64}.{payload_b64}".encode("utf-8")
 
     # Sign with RSA-SHA256
-    signature = private_key.sign(
-        message,
-        padding.PKCS1v15(),
-        hashes.SHA256()
-    )
+    signature = private_key.sign(message, padding.PKCS1v15(), hashes.SHA256())
 
     # Encode signature
     signature_b64 = base64url_encode(signature)
@@ -68,7 +59,7 @@ def main():
 
     # Check if private key exists
     try:
-        with open(private_key_path, 'rb') as f:
+        with open(private_key_path, "rb") as f:
             pass
     except FileNotFoundError:
         print(f"ERROR: Private key not found at {private_key_path}")
@@ -86,7 +77,7 @@ def main():
         "aud": "x-gal-test",
         "iss": "https://jwks-service",
         "iat": now,
-        "exp": now + 3600  # Valid for 1 hour
+        "exp": now + 3600,  # Valid for 1 hour
     }
 
     # JWT Payload 2: Regular User
@@ -97,7 +88,7 @@ def main():
         "aud": "x-gal-test",
         "iss": "https://jwks-service",
         "iat": now,
-        "exp": now + 3600
+        "exp": now + 3600,
     }
 
     # JWT Payload 3: Beta User
@@ -109,7 +100,7 @@ def main():
         "aud": "x-gal-test",
         "iss": "https://jwks-service",
         "iat": now,
-        "exp": now + 3600
+        "exp": now + 3600,
     }
 
     # Generate tokens
@@ -158,20 +149,15 @@ def main():
 
     # Create a summary file
     with open("/app/tokens_summary.json", "w") as f:
-        json.dump({
-            "admin": {
-                "token": admin_token,
-                "payload": admin_payload
+        json.dump(
+            {
+                "admin": {"token": admin_token, "payload": admin_payload},
+                "user": {"token": user_token, "payload": user_payload},
+                "beta": {"token": beta_token, "payload": beta_payload},
             },
-            "user": {
-                "token": user_token,
-                "payload": user_payload
-            },
-            "beta": {
-                "token": beta_token,
-                "payload": beta_payload
-            }
-        }, f, indent=2)
+            f,
+            indent=2,
+        )
 
     print("\nAll tokens also saved to: /app/tokens_summary.json")
 

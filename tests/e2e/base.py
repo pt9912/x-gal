@@ -9,14 +9,15 @@ Note: Uses 'docker compose' (Docker Compose V2 plugin) instead of the legacy
       'docker-compose' standalone binary.
 """
 
+import json
+import os
 import subprocess
 import time
-import os
-import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-import requests
+
 import pytest
+import requests
 
 
 class BaseE2ETest:
@@ -81,7 +82,7 @@ class BaseE2ETest:
         result = subprocess.run(
             ["docker", "compose", "-f", cls.COMPOSE_FILE, "down", "-v"],
             capture_output=True,
-            text=True
+            text=True,
         )
         if result.returncode != 0 and "no configuration file provided" not in result.stderr.lower():
             print(f"  Warning during cleanup: {result.stderr}")
@@ -95,7 +96,7 @@ class BaseE2ETest:
         result = subprocess.run(
             ["docker", "compose", "-f", cls.COMPOSE_FILE, "up", "-d", "--build"],
             capture_output=True,
-            text=True
+            text=True,
         )
 
         if result.returncode != 0:
@@ -111,8 +112,7 @@ class BaseE2ETest:
         """Stop Docker Compose containers."""
         print("\n🛑 Stopping Docker Compose Environment...")
         subprocess.run(
-            ["docker", "compose", "-f", cls.COMPOSE_FILE, "down", "-v"],
-            capture_output=True
+            ["docker", "compose", "-f", cls.COMPOSE_FILE, "down", "-v"], capture_output=True
         )
         print("✅ Containers stopped")
 
@@ -122,13 +122,12 @@ class BaseE2ETest:
         print("\n⚠️ Emergency cleanup after setup failure...")
         try:
             subprocess.run(
-                ["docker", "compose", "-f", cls.COMPOSE_FILE, "logs", "--tail=50"],
-                cwd=cls.test_dir
+                ["docker", "compose", "-f", cls.COMPOSE_FILE, "logs", "--tail=50"], cwd=cls.test_dir
             )
             subprocess.run(
                 ["docker", "compose", "-f", cls.COMPOSE_FILE, "down", "-v"],
                 cwd=cls.test_dir,
-                capture_output=True
+                capture_output=True,
             )
         except:
             pass
@@ -147,7 +146,7 @@ class BaseE2ETest:
                 print("✅ All services are ready!")
 
                 # Additional stabilization time
-                if hasattr(cls, 'STABILIZATION_TIME'):
+                if hasattr(cls, "STABILIZATION_TIME"):
                     print(f"  Waiting {cls.STABILIZATION_TIME}s for stabilization...")
                     time.sleep(cls.STABILIZATION_TIME)
 
@@ -164,18 +163,14 @@ class BaseE2ETest:
         try:
             # Check main service
             response = requests.get(
-                f"http://localhost:{cls.SERVICE_PORT}{cls.HEALTH_ENDPOINT}",
-                timeout=2
+                f"http://localhost:{cls.SERVICE_PORT}{cls.HEALTH_ENDPOINT}", timeout=2
             )
             if response.status_code != 200:
                 return False
 
             # Check admin interface if configured
             if cls.ADMIN_PORT:
-                admin_response = requests.get(
-                    f"http://localhost:{cls.ADMIN_PORT}/ready",
-                    timeout=2
-                )
+                admin_response = requests.get(f"http://localhost:{cls.ADMIN_PORT}/ready", timeout=2)
                 if admin_response.status_code != 200:
                     return False
 
@@ -198,12 +193,12 @@ class BaseE2ETest:
         result = subprocess.run(
             ["docker", "compose", "-f", cls.COMPOSE_FILE, "ps", "--format", "table"],
             capture_output=True,
-            text=True
+            text=True,
         )
 
         if result.returncode == 0:
             print("  📊 Container Status:")
-            lines = result.stdout.split('\n')
+            lines = result.stdout.split("\n")
             for line in lines[:8]:  # Show first few containers
                 if line.strip():
                     # Truncate long lines
@@ -219,9 +214,7 @@ class BaseE2ETest:
         subprocess.run(["docker", "compose", "-f", cls.COMPOSE_FILE, "ps"])
 
         print("\n📜 Recent Logs:")
-        subprocess.run(
-            ["docker", "compose", "-f", cls.COMPOSE_FILE, "logs", "--tail=30"]
-        )
+        subprocess.run(["docker", "compose", "-f", cls.COMPOSE_FILE, "logs", "--tail=30"])
 
         raise TimeoutError("Services did not become ready in time")
 
@@ -236,7 +229,7 @@ class BaseE2ETest:
         logs_result = subprocess.run(
             ["docker", "compose", "-f", cls.COMPOSE_FILE, "logs", "--no-color"],
             capture_output=True,
-            text=True
+            text=True,
         )
 
         with open(log_file, "w") as f:
@@ -277,7 +270,7 @@ class BaseE2ETest:
         """Get logs from a service since test start."""
         cmd = ["docker", "compose", "-f", self.COMPOSE_FILE, "logs", service]
 
-        if hasattr(self, 'test_start_time'):
+        if hasattr(self, "test_start_time"):
             cmd.extend(["--since", self.test_start_time])
 
         result = subprocess.run(
@@ -290,7 +283,7 @@ class BaseE2ETest:
         logs = result.stdout
 
         if grep_pattern:
-            logs = '\n'.join(line for line in logs.split('\n') if grep_pattern in line)
+            logs = "\n".join(line for line in logs.split("\n") if grep_pattern in line)
 
         return logs
 
@@ -303,7 +296,7 @@ class BaseE2ETest:
                 ["docker", "compose", "-f", self.COMPOSE_FILE, "logs", service],
                 cwd=self.test_dir,
                 capture_output=True,
-                text=True
+                text=True,
             )
             logs = result.stdout
 
@@ -312,13 +305,11 @@ class BaseE2ETest:
     def get_container_stats(self):
         """Get Docker container statistics."""
         result = subprocess.run(
-            ["docker", "stats", "--no-stream", "--format", "json"],
-            capture_output=True,
-            text=True
+            ["docker", "stats", "--no-stream", "--format", "json"], capture_output=True, text=True
         )
 
         stats = []
-        for line in result.stdout.strip().split('\n'):
+        for line in result.stdout.strip().split("\n"):
             if line:
                 stats.append(json.loads(line))
 
@@ -341,8 +332,9 @@ class BaseE2ETest:
 
     def assert_response(self, response, expected_status=200, expected_json=None):
         """Assert response status and optionally JSON content."""
-        assert response.status_code == expected_status, \
-            f"Expected status {expected_status}, got {response.status_code}. Response: {response.text}"
+        assert (
+            response.status_code == expected_status
+        ), f"Expected status {expected_status}, got {response.status_code}. Response: {response.text}"
 
         if expected_json:
             actual = response.json()
@@ -375,7 +367,7 @@ class BaseE2ETest:
             "max": latencies[-1],
             "p50": latencies[len(latencies) // 2],
             "p95": latencies[int(len(latencies) * 0.95)],
-            "p99": latencies[int(len(latencies) * 0.99)] if len(latencies) > 100 else latencies[-1]
+            "p99": latencies[int(len(latencies) * 0.99)] if len(latencies) > 100 else latencies[-1],
         }
 
     def run_concurrent_requests(self, num_requests=100, num_workers=10, path="/"):

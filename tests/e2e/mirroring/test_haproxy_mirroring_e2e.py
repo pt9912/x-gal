@@ -53,7 +53,14 @@ class TestHAProxyRequestMirroringE2E:
     @pytest.fixture(scope="class")
     def docker_compose_file(self):
         """Path to Docker Compose file"""
-        return str(Path(__file__).parent / "docker" / "providers" / "haproxy" / "mirroring" / "docker-compose.yml")
+        return str(
+            Path(__file__).parent
+            / "docker"
+            / "providers"
+            / "haproxy"
+            / "mirroring"
+            / "docker-compose.yml"
+        )
 
     @pytest.fixture(scope="class")
     def haproxy_mirroring_setup(self, docker_compose_file):

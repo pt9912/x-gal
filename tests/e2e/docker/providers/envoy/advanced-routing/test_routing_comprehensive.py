@@ -4,16 +4,18 @@ Comprehensive test suite for Envoy Advanced Routing.
 Tests all routing scenarios: Header, Query, JWT, GeoIP, and Fallback.
 """
 
-import requests
 import json
 import time
-from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 from enum import Enum
+from typing import Dict, List, Optional, Tuple
+
+import requests
 
 
 class RoutingType(Enum):
     """Types of routing rules"""
+
     HEADER = "header"
     QUERY = "query"
     JWT = "jwt"
@@ -25,6 +27,7 @@ class RoutingType(Enum):
 @dataclass
 class TestCase:
     """Test case definition"""
+
     name: str
     routing_type: RoutingType
     url: str
@@ -40,6 +43,7 @@ class TestCase:
 @dataclass
 class TestResult:
     """Test result"""
+
     test_case: TestCase
     passed: bool
     actual_backend: str
@@ -51,7 +55,9 @@ class TestResult:
 class EnvoyRoutingTester:
     """Test runner for Envoy routing scenarios"""
 
-    def __init__(self, envoy_url: str = "http://localhost:8080", admin_url: str = "http://localhost:9901"):
+    def __init__(
+        self, envoy_url: str = "http://localhost:8080", admin_url: str = "http://localhost:9901"
+    ):
         self.envoy_url = envoy_url
         self.admin_url = admin_url
         self.results: List[TestResult] = []
@@ -69,11 +75,7 @@ class EnvoyRoutingTester:
         """Run a single test case"""
         try:
             start_time = time.time()
-            response = requests.get(
-                test_case.url,
-                headers=test_case.headers,
-                timeout=10
-            )
+            response = requests.get(test_case.url, headers=test_case.headers, timeout=10)
             response_time_ms = (time.time() - start_time) * 1000
 
             # Extract backend name from response
@@ -83,7 +85,9 @@ class EnvoyRoutingTester:
                 if isinstance(response_json.get("backend"), dict):
                     actual_backend = response_json["backend"].get("name", "unknown")
                 else:
-                    actual_backend = response_json.get("backend_name", response_json.get("backend", "unknown"))
+                    actual_backend = response_json.get(
+                        "backend_name", response_json.get("backend", "unknown")
+                    )
             except json.JSONDecodeError:
                 actual_backend = "unknown"
 
@@ -98,15 +102,12 @@ class EnvoyRoutingTester:
                 passed=passed,
                 actual_backend=actual_backend,
                 routing_rule=routing_rule,
-                response_time_ms=response_time_ms
+                response_time_ms=response_time_ms,
             )
 
         except Exception as e:
             return TestResult(
-                test_case=test_case,
-                passed=False,
-                actual_backend="error",
-                error=str(e)
+                test_case=test_case, passed=False, actual_backend="error", error=str(e)
             )
 
     def run_all_tests(self) -> Tuple[int, int]:
@@ -180,7 +181,7 @@ class EnvoyRoutingTester:
                 url=f"{self.envoy_url}/api/test",
                 expected_backend="backend-v2",
                 headers={"X-API-Version": "v2"},
-                description="Route to v2 backend based on API version header"
+                description="Route to v2 backend based on API version header",
             ),
             TestCase(
                 name="Header: User-Agent contains Mobile",
@@ -188,7 +189,7 @@ class EnvoyRoutingTester:
                 url=f"{self.envoy_url}/api/test",
                 expected_backend="backend-mobile",
                 headers={"User-Agent": "Mozilla/5.0 (Mobile; Android)"},
-                description="Route to mobile backend for mobile user agents"
+                description="Route to mobile backend for mobile user agents",
             ),
             TestCase(
                 name="Header: X-Beta-Features=enabled",
@@ -196,32 +197,30 @@ class EnvoyRoutingTester:
                 url=f"{self.envoy_url}/api/test",
                 expected_backend="backend-beta",
                 headers={"X-Beta-Features": "enabled"},
-                description="Route to beta backend when beta features are enabled"
+                description="Route to beta backend when beta features are enabled",
             ),
-
             # Query Parameter Routing
             TestCase(
                 name="Query: version=2",
                 routing_type=RoutingType.QUERY,
                 url=f"{self.envoy_url}/api/test?version=2",
                 expected_backend="backend-v2",
-                description="Route to v2 backend via query parameter"
+                description="Route to v2 backend via query parameter",
             ),
             TestCase(
                 name="Query: beta=true",
                 routing_type=RoutingType.QUERY,
                 url=f"{self.envoy_url}/api/test?beta=true",
                 expected_backend="backend-beta",
-                description="Route to beta backend via query parameter"
+                description="Route to beta backend via query parameter",
             ),
             TestCase(
                 name="Query: admin present",
                 routing_type=RoutingType.QUERY,
                 url=f"{self.envoy_url}/api/test?admin",
                 expected_backend="backend-admin",
-                description="Route to admin backend when admin param is present"
+                description="Route to admin backend when admin param is present",
             ),
-
             # JWT-based Routing (requires valid JWT token)
             # Token generated by: tests/e2e/docker/tools/keygen/generate_local.py
             TestCase(
@@ -232,9 +231,8 @@ class EnvoyRoutingTester:
                 headers={
                     "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InRlc3Qta2V5In0.eyJzdWIiOiJ0ZXN0LWFkbWluLXVzZXIiLCJuYW1lIjoiQWRtaW4gVXNlciIsInJvbGUiOiJhZG1pbiIsImF1ZCI6IngtZ2FsLXRlc3QiLCJpc3MiOiJodHRwczovL2p3a3Mtc2VydmljZSIsImlhdCI6MTc2MTMwNjgyOCwiZXhwIjoxNzYxMzQyODI4fQ.UDww6Ma71OOLLeQdq4I3hfdlG5g1fsXfEAA_nl_qAWI-_Jt6uPe2_TNy_7tYOQLhW5sNj4LXlCAgKtfgImqRHv2hM6R_iKOCQ9bErjbIDOMoo_hs-LUKwOQwwVvR2aFIwp6a4BJbfZCBXPqpQ_RAalQ8i3lyQE1OdhVcQaWRtHIfx3JlRC0YK79oT_hxZ43uy-p2ZAWgTePhWE7RR4CO-suxjh9NJHryjIvjchHVdOLcMaPQcohfYBg92blfJmnnM306V6PP7HOWMebU-6fCY3Grh8W-Jpr92OpUS0J7O3TGZa2A8Pr_i6wDfj5E3n1tcS3Fm1hl6QmUwagowZi-gg"
                 },
-                description="Route to admin backend based on JWT role claim"
+                description="Route to admin backend based on JWT role claim",
             ),
-
             # GeoIP-based Routing
             TestCase(
                 name="GeoIP: country=DE (German IP)",
@@ -242,29 +240,24 @@ class EnvoyRoutingTester:
                 url=f"{self.envoy_url}/api/eu/test",
                 expected_backend="backend-eu",
                 headers={"X-Forwarded-For": "192.168.1.1"},
-                description="Route to EU backend for German IP addresses"
+                description="Route to EU backend for German IP addresses",
             ),
-
             # Fallback Routing
             TestCase(
                 name="Fallback: no rules match",
                 routing_type=RoutingType.FALLBACK,
                 url=f"{self.envoy_url}/api/test",
                 expected_backend="backend-v1",
-                description="Route to default v1 backend when no rules match"
+                description="Route to default v1 backend when no rules match",
             ),
-
             # Combined Routing (first match wins)
             TestCase(
                 name="Combined: X-API-Version=v2 + X-Beta-Features=enabled",
                 routing_type=RoutingType.COMBINED,
                 url=f"{self.envoy_url}/api/test",
                 expected_backend="backend-v2",
-                headers={
-                    "X-API-Version": "v2",
-                    "X-Beta-Features": "enabled"
-                },
-                description="First matching rule (X-API-Version) should win"
+                headers={"X-API-Version": "v2", "X-Beta-Features": "enabled"},
+                description="First matching rule (X-API-Version) should win",
             ),
             TestCase(
                 name="Combined: Header + Query (header first)",
@@ -272,7 +265,7 @@ class EnvoyRoutingTester:
                 url=f"{self.envoy_url}/api/test?beta=true",
                 expected_backend="backend-v2",
                 headers={"X-API-Version": "v2"},
-                description="Header-based routing should take precedence over query"
+                description="Header-based routing should take precedence over query",
             ),
         ]
 
@@ -366,7 +359,11 @@ class EnvoyRoutingTester:
             response = requests.get(f"{self.admin_url}/stats", timeout=5)
             if response.status_code == 200:
                 # Filter for cluster health stats
-                stats = [line for line in response.text.split("\n") if "cluster" in line and "health" in line]
+                stats = [
+                    line
+                    for line in response.text.split("\n")
+                    if "cluster" in line and "health" in line
+                ]
                 print("Cluster Health Stats:")
                 for stat in stats[:10]:  # First 10 lines
                     print(f"   {stat}")

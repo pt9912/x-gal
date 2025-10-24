@@ -6,7 +6,8 @@ for JWT authentication and GeoIP-based routing in advanced routing scenarios.
 """
 
 from typing import List
-from ..config import JWTFilterConfig, GeoIPFilterConfig, JWTClaimMatchRule, GeoMatchRule
+
+from ..config import GeoIPFilterConfig, GeoMatchRule, JWTClaimMatchRule, JWTFilterConfig
 
 
 def generate_jwt_authn_filter(jwt_config: JWTFilterConfig, output: List[str]) -> None:
@@ -44,7 +45,9 @@ def generate_jwt_authn_filter(jwt_config: JWTFilterConfig, output: List[str]) ->
     output.append(f"                  payload_in_metadata: '{jwt_config.payload_in_metadata}'")
 
     if jwt_config.forward_payload_header:
-        output.append(f"                  forward_payload_header: '{jwt_config.forward_payload_header}'")
+        output.append(
+            f"                  forward_payload_header: '{jwt_config.forward_payload_header}'"
+        )
 
     # Rules: JWT is optional for all routes (but required for JWT claim-based routing)
     output.append("              rules:")
@@ -102,7 +105,7 @@ def generate_lua_filter_for_advanced_routing(
     jwt_rules: List[JWTClaimMatchRule],
     geo_rules: List[GeoMatchRule],
     jwt_config: JWTFilterConfig,
-    output: List[str]
+    output: List[str],
 ) -> None:
     """Generate Lua filter for JWT claim and GeoIP metadata processing.
 
@@ -129,7 +132,9 @@ def generate_lua_filter_for_advanced_routing(
         output.append("                    -- Extract JWT payload metadata")
         output.append("                    local metadata = request_handle:metadata()")
         output.append("                    if metadata ~= nil then")
-        output.append(f"                      local jwt_payload = metadata:get('{jwt_config.payload_in_metadata}')")
+        output.append(
+            f"                      local jwt_payload = metadata:get('{jwt_config.payload_in_metadata}')"
+        )
         output.append("                      if jwt_payload ~= nil then")
 
         # Extract specific claims mentioned in rules
@@ -137,13 +142,17 @@ def generate_lua_filter_for_advanced_routing(
         for claim_name in claim_names:
             output.append(f"                        -- Extract '{claim_name}' claim")
             output.append(f"                        if jwt_payload['{claim_name}'] ~= nil then")
-            output.append(f"                          request_handle:headers():add('X-JWT-{claim_name.title()}', tostring(jwt_payload['{claim_name}']))")
+            output.append(
+                f"                          request_handle:headers():add('X-JWT-{claim_name.title()}', tostring(jwt_payload['{claim_name}']))"
+            )
             output.append("                        end")
 
         # Common claims
         output.append("                        -- Extract common claims")
         output.append("                        if jwt_payload['sub'] ~= nil then")
-        output.append("                          request_handle:headers():add('X-JWT-Subject', jwt_payload['sub'])")
+        output.append(
+            "                          request_handle:headers():add('X-JWT-Subject', jwt_payload['sub'])"
+        )
         output.append("                        end")
 
         output.append("                      end")
@@ -153,13 +162,19 @@ def generate_lua_filter_for_advanced_routing(
     if geo_rules:
         output.append("")
         output.append("                    -- Extract GeoIP metadata from ext_authz")
-        output.append("                    local geo_metadata = request_handle:metadata():get('envoy.filters.http.ext_authz')")
+        output.append(
+            "                    local geo_metadata = request_handle:metadata():get('envoy.filters.http.ext_authz')"
+        )
         output.append("                    if geo_metadata ~= nil then")
         output.append("                      if geo_metadata['country'] ~= nil then")
-        output.append("                        request_handle:headers():add('X-Geo-Country', geo_metadata['country'])")
+        output.append(
+            "                        request_handle:headers():add('X-Geo-Country', geo_metadata['country'])"
+        )
         output.append("                      end")
         output.append("                      if geo_metadata['region'] ~= nil then")
-        output.append("                        request_handle:headers():add('X-Geo-Region', geo_metadata['region'])")
+        output.append(
+            "                        request_handle:headers():add('X-Geo-Region', geo_metadata['region'])"
+        )
         output.append("                      end")
         output.append("                    end")
 
@@ -168,7 +183,9 @@ def generate_lua_filter_for_advanced_routing(
     output.append("                    -- Log routing decision")
     output.append("                    local path = request_handle:headers():get(':path')")
     output.append("                    local method = request_handle:headers():get(':method')")
-    output.append("                    request_handle:logInfo(string.format('Advanced Routing: %s %s', method, path))")
+    output.append(
+        "                    request_handle:logInfo(string.format('Advanced Routing: %s %s', method, path))"
+    )
 
     output.append("                  end")
 
@@ -180,7 +197,9 @@ def generate_lua_filter_for_advanced_routing(
     output.append("                    if metadata ~= nil and metadata['envoy.lb'] ~= nil then")
     output.append("                      local routing_rule = metadata['envoy.lb']['routing_rule']")
     output.append("                      if routing_rule ~= nil then")
-    output.append("                        response_handle:headers():add('X-Routing-Rule', routing_rule)")
+    output.append(
+        "                        response_handle:headers():add('X-Routing-Rule', routing_rule)"
+    )
     output.append("                      end")
     output.append("                    end")
     output.append("                  end")
@@ -199,6 +218,7 @@ def generate_jwks_cluster(jwt_config: JWTFilterConfig, output: List[str]) -> Non
     # Extract host and port from JWKS URI
     # Format: http://host:port/path or https://host:port/path
     import urllib.parse
+
     parsed = urllib.parse.urlparse(jwt_config.jwks_uri)
     host = parsed.hostname or "jwks-service"
     port = parsed.port or (443 if parsed.scheme == "https" else 8080)
@@ -231,6 +251,7 @@ def generate_geoip_cluster(geoip_config: GeoIPFilterConfig, output: List[str]) -
 
     # Extract host and port from GeoIP service URI
     import urllib.parse
+
     parsed = urllib.parse.urlparse(geoip_config.geoip_service_uri)
     host = parsed.hostname or "geoip-service"
     port = parsed.port or 8080

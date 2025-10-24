@@ -5,9 +5,10 @@ Tests the configuration model, YAML parsing, and provider generation
 for advanced routing features.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 import yaml
-from unittest.mock import MagicMock, patch
 
 from gal.config import (
     AdvancedHeaderMatchRule,
@@ -118,14 +119,8 @@ class TestAdvancedRoutingConfig:
         # Valid config
         config = AdvancedRoutingConfig(
             enabled=True,
-            header_rules=[
-                AdvancedHeaderMatchRule(
-                    "X-Version", "exact", "v2", "v2_backend"
-                )
-            ],
-            jwt_claim_rules=[
-                JWTClaimMatchRule("role", "admin", "exact", "admin_backend")
-            ],
+            header_rules=[AdvancedHeaderMatchRule("X-Version", "exact", "v2", "v2_backend")],
+            jwt_claim_rules=[JWTClaimMatchRule("role", "admin", "exact", "admin_backend")],
             evaluation_strategy="first_match",
         )
         assert config.enabled is True
@@ -206,9 +201,8 @@ services:
 """
         # Save to temp file
         import tempfile
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(yaml_content)
             temp_path = f.name
 
@@ -259,6 +253,7 @@ services:
 
         finally:
             import os
+
             os.unlink(temp_path)
 
 

@@ -18,10 +18,11 @@ JWKS = {
             "n": "u6TiwTmAHx-oqnfjQ6aj0wgOlpyfrGU0IXmPE7yOo3LlKwuXUb7IFn6TNb7PZhJ7bCHMFKiqGCfKdrsee_bNRRmnLadmRFEVAdR8yx9rEspfAJXewzTlCdPtSXpp38QJjtRAHO4HR5Xlw9pZZVAI5pLuqQEZcpTiY00PR2EIPhJxpowoH9LPWK30iK8XYn6zgEy29Rp1dga6Ocb9GNaObeivRpTCTVsqg8OvNIhdnx0LCtuxiNzDq5W1BUcryAE64XTit8o0xz6wqSqF4CYvurQgna00XUt5Wri7MOob6dSLFZ4E3QrWdPKXU4bSji7kJ5T-3LWl6suc6Y5RMqpXUw",
             "e": "AQAB",
             "alg": "RS256",
-            "use": "sig"
+            "use": "sig",
         }
     ]
 }
+
 
 class JWKSHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -55,6 +56,7 @@ class JWKSHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         # Suppress default logging
         pass
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))

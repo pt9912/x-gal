@@ -1782,7 +1782,9 @@ class AdvancedHeaderMatchRule:
         """Validate header match rule."""
         valid_match_types = ["exact", "prefix", "regex", "contains"]
         if self.match_type not in valid_match_types:
-            raise ValueError(f"match_type must be one of {valid_match_types}, got {self.match_type}")
+            raise ValueError(
+                f"match_type must be one of {valid_match_types}, got {self.match_type}"
+            )
 
 
 @dataclass
@@ -1815,7 +1817,9 @@ class JWTClaimMatchRule:
         """Validate JWT claim match rule."""
         valid_match_types = ["exact", "contains", "regex"]
         if self.match_type not in valid_match_types:
-            raise ValueError(f"match_type must be one of {valid_match_types}, got {self.match_type}")
+            raise ValueError(
+                f"match_type must be one of {valid_match_types}, got {self.match_type}"
+            )
 
 
 @dataclass
@@ -1846,7 +1850,9 @@ class GeoMatchRule:
         """Validate geo match rule."""
         valid_match_types = ["country", "region", "continent"]
         if self.match_type not in valid_match_types:
-            raise ValueError(f"match_type must be one of {valid_match_types}, got {self.match_type}")
+            raise ValueError(
+                f"match_type must be one of {valid_match_types}, got {self.match_type}"
+            )
 
 
 @dataclass
@@ -1880,7 +1886,9 @@ class QueryParamMatchRule:
         """Validate query param match rule."""
         valid_match_types = ["exact", "exists", "regex"]
         if self.match_type not in valid_match_types:
-            raise ValueError(f"match_type must be one of {valid_match_types}, got {self.match_type}")
+            raise ValueError(
+                f"match_type must be one of {valid_match_types}, got {self.match_type}"
+            )
 
 
 @dataclass
@@ -2363,8 +2371,12 @@ class Config:
                             audience=jwt_filter_data.get("audience", ""),
                             jwks_uri=jwt_filter_data.get("jwks_uri", ""),
                             jwks_cluster=jwt_filter_data.get("jwks_cluster", "jwks_cluster"),
-                            payload_in_metadata=jwt_filter_data.get("payload_in_metadata", "jwt_payload"),
-                            forward_payload_header=jwt_filter_data.get("forward_payload_header", "X-JWT-Payload"),
+                            payload_in_metadata=jwt_filter_data.get(
+                                "payload_in_metadata", "jwt_payload"
+                            ),
+                            forward_payload_header=jwt_filter_data.get(
+                                "forward_payload_header", "X-JWT-Payload"
+                            ),
                         )
 
                     # Parse GeoIP filter config (optional)

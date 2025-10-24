@@ -4,10 +4,11 @@ gRPC-based GeoIP service for Envoy ext_authz filter.
 Implements the Envoy External Authorization gRPC protocol.
 """
 
-import os
 import json
 import logging
+import os
 from concurrent import futures
+
 import grpc
 
 # Hardcodierte IP-zu-Ländercode-Zuordnung für Testzwecke
@@ -22,8 +23,7 @@ GEOIP_MOCK = {
 }
 
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -32,12 +32,14 @@ logger = logging.getLogger(__name__)
 # In production, you would use the official .proto files from Envoy
 class CheckRequest:
     """Simplified CheckRequest for ext_authz"""
+
     def __init__(self, attributes):
         self.attributes = attributes
 
 
 class CheckResponse:
     """Simplified CheckResponse for ext_authz"""
+
     def __init__(self, status_code, headers=None, metadata=None):
         self.status_code = status_code
         self.headers = headers or {}
@@ -58,14 +60,18 @@ class AuthorizationServicer:
             client_ip = "unknown"
 
             # Try to get IP from X-Forwarded-For header
-            if hasattr(request, 'attributes') and hasattr(request.attributes, 'request'):
-                headers = getattr(request.attributes.request, 'http', {}).get('headers', {})
-                client_ip = headers.get('x-forwarded-for', headers.get('x-real-ip', 'unknown'))
+            if hasattr(request, "attributes") and hasattr(request.attributes, "request"):
+                headers = getattr(request.attributes.request, "http", {}).get("headers", {})
+                client_ip = headers.get("x-forwarded-for", headers.get("x-real-ip", "unknown"))
 
             # Fallback to source address
-            if client_ip == "unknown" and hasattr(request, 'attributes'):
-                source = getattr(request.attributes, 'source', {})
-                client_ip = getattr(source, 'address', {}).get('socketAddress', {}).get('address', 'unknown')
+            if client_ip == "unknown" and hasattr(request, "attributes"):
+                source = getattr(request.attributes, "source", {})
+                client_ip = (
+                    getattr(source, "address", {})
+                    .get("socketAddress", {})
+                    .get("address", "unknown")
+                )
 
             # Lookup country code
             country = GEOIP_MOCK.get(client_ip, "UNKNOWN")
@@ -75,37 +81,29 @@ class AuthorizationServicer:
             # Return OK response with country metadata
             # This metadata will be available in Envoy's dynamic metadata
             response_headers = [
-                {'key': 'x-geo-country', 'value': country},
-                {'key': 'x-geo-ip', 'value': client_ip}
+                {"key": "x-geo-country", "value": country},
+                {"key": "x-geo-ip", "value": client_ip},
             ]
 
             # Metadata for Envoy routing decisions
             metadata = {
-                'filter_metadata': {
-                    'envoy.filters.http.ext_authz': {
-                        'country': country,
-                        'ip': client_ip
-                    }
+                "filter_metadata": {
+                    "envoy.filters.http.ext_authz": {"country": country, "ip": client_ip}
                 }
             }
 
             # Create response (always allow, just add metadata)
             # In production, you might deny based on country/IP
             return {
-                'status': {'code': 0},  # 0 = OK
-                'ok_response': {
-                    'headers': response_headers
-                },
-                'dynamic_metadata': metadata
+                "status": {"code": 0},  # 0 = OK
+                "ok_response": {"headers": response_headers},
+                "dynamic_metadata": metadata,
             }
 
         except Exception as e:
             logger.error(f"Error in GeoIP lookup: {e}", exc_info=True)
             # Return OK even on error (fail-open)
-            return {
-                'status': {'code': 0},
-                'ok_response': {}
-            }
+            return {"status": {"code": 0}, "ok_response": {}}
 
 
 def serve():
@@ -124,7 +122,7 @@ def serve():
     #     AuthorizationServicer(), server
     # )
 
-    server.add_insecure_port(f'[::]:{port}')
+    server.add_insecure_port(f"[::]:{port}")
     server.start()
 
     logger.info(f"GeoIP gRPC service listening on port {port}")
@@ -140,6 +138,7 @@ if __name__ == "__main__":
     # For testing without gRPC dependencies, fall back to HTTP
     try:
         import grpc
+
         serve()
     except ImportError:
         logger.warning("grpcio not installed, falling back to HTTP service")
@@ -165,8 +164,15 @@ if __name__ == "__main__":
 
                     try:
                         request_data = json.loads(request_body) if request_body else {}
-                        headers = request_data.get("attributes", {}).get("request", {}).get("http", {}).get("headers", {})
-                        client_ip = headers.get("x-forwarded-for", headers.get("x-real-ip", "unknown"))
+                        headers = (
+                            request_data.get("attributes", {})
+                            .get("request", {})
+                            .get("http", {})
+                            .get("headers", {})
+                        )
+                        client_ip = headers.get(
+                            "x-forwarded-for", headers.get("x-real-ip", "unknown")
+                        )
                         country = GEOIP_MOCK.get(client_ip, "UNKNOWN")
 
                         logger.info(f"GeoIP HTTP Lookup: IP={client_ip} -> Country={country}")
@@ -182,17 +188,17 @@ if __name__ == "__main__":
                             "ok_response": {
                                 "headers": [
                                     {"key": "x-geo-country", "value": country},
-                                    {"key": "x-geo-ip", "value": client_ip}
+                                    {"key": "x-geo-ip", "value": client_ip},
                                 ]
                             },
                             "dynamic_metadata": {
                                 "filter_metadata": {
                                     "envoy.filters.http.ext_authz": {
                                         "country": country,
-                                        "ip": client_ip
+                                        "ip": client_ip,
                                     }
                                 }
-                            }
+                            },
                         }
                         self.wfile.write(json.dumps(response).encode())
                     except json.JSONDecodeError:

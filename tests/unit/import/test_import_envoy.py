@@ -495,12 +495,12 @@ static_resources:
 
         jwt_filter = route.advanced_routing.jwt_filter
         assert jwt_filter.enabled is True
-        assert jwt_filter.issuer == 'https://auth.example.com'
-        assert jwt_filter.audience == 'api.example.com'
-        assert jwt_filter.jwks_uri == 'http://jwks-service:8080/.well-known/jwks.json'
-        assert jwt_filter.jwks_cluster == 'jwks_cluster'
-        assert jwt_filter.payload_in_metadata == 'jwt_payload'
-        assert jwt_filter.forward_payload_header == 'X-JWT-Payload'
+        assert jwt_filter.issuer == "https://auth.example.com"
+        assert jwt_filter.audience == "api.example.com"
+        assert jwt_filter.jwks_uri == "http://jwks-service:8080/.well-known/jwks.json"
+        assert jwt_filter.jwks_cluster == "jwks_cluster"
+        assert jwt_filter.payload_in_metadata == "jwt_payload"
+        assert jwt_filter.forward_payload_header == "X-JWT-Payload"
 
     def test_import_geoip_ext_authz_filter(self):
         """Test importing GeoIP External Authorization filter configuration."""
@@ -592,8 +592,8 @@ static_resources:
 
         geoip_filter = route.advanced_routing.geoip_filter
         assert geoip_filter.enabled is True
-        assert geoip_filter.geoip_service_uri == 'http://geoip-service:8080/check'
-        assert geoip_filter.geoip_cluster == 'geoip_cluster'
+        assert geoip_filter.geoip_service_uri == "http://geoip-service:8080/check"
+        assert geoip_filter.geoip_cluster == "geoip_cluster"
         assert geoip_filter.timeout_ms == 1500  # 1.5s = 1500ms
         assert geoip_filter.failure_mode_allow is True
 
@@ -709,15 +709,15 @@ static_resources:
         assert route.advanced_routing.jwt_filter is not None
         jwt = route.advanced_routing.jwt_filter
         assert jwt.enabled is True
-        assert jwt.issuer == 'https://test-issuer.com'
-        assert jwt.audience == 'test-audience'
-        assert jwt.payload_in_metadata == 'jwt_claims'
+        assert jwt.issuer == "https://test-issuer.com"
+        assert jwt.audience == "test-audience"
+        assert jwt.payload_in_metadata == "jwt_claims"
 
         # GeoIP filter
         assert route.advanced_routing.geoip_filter is not None
         geo = route.advanced_routing.geoip_filter
         assert geo.enabled is True
-        assert geo.geoip_service_uri == 'http://geoip:8080/lookup'
+        assert geo.geoip_service_uri == "http://geoip:8080/lookup"
         assert geo.timeout_ms == 800  # 0.8s = 800ms
         assert geo.failure_mode_allow is False
 
@@ -826,7 +826,7 @@ static_resources:
         config_1 = provider.parse(envoy_yaml_original)
 
         # Verify filters were parsed in first parse
-        api_service = next((s for s in config_1.services if 'api' in s.name.lower()), None)
+        api_service = next((s for s in config_1.services if "api" in s.name.lower()), None)
         assert api_service is not None
         assert len(api_service.routes) > 0
 
@@ -836,27 +836,27 @@ static_resources:
         assert route_1.advanced_routing.geoip_filter is not None
 
         jwt_1 = route_1.advanced_routing.jwt_filter
-        assert jwt_1.issuer == 'https://auth.roundtrip.com'
-        assert jwt_1.audience == 'roundtrip-api'
+        assert jwt_1.issuer == "https://auth.roundtrip.com"
+        assert jwt_1.audience == "roundtrip-api"
 
         geo_1 = route_1.advanced_routing.geoip_filter
-        assert geo_1.geoip_service_uri == 'http://geoip:8080/check'
+        assert geo_1.geoip_service_uri == "http://geoip:8080/check"
         assert geo_1.timeout_ms == 600  # 0.6s
 
         # Step 2: Generate Envoy YAML from parsed GAL
         envoy_yaml_2 = provider.generate(config_1)
 
         # Verify filters are in generated YAML
-        assert 'envoy.filters.http.jwt_authn' in envoy_yaml_2
-        assert 'envoy.filters.http.ext_authz' in envoy_yaml_2
-        assert 'https://auth.roundtrip.com' in envoy_yaml_2
-        assert 'http://geoip:8080/check' in envoy_yaml_2
+        assert "envoy.filters.http.jwt_authn" in envoy_yaml_2
+        assert "envoy.filters.http.ext_authz" in envoy_yaml_2
+        assert "https://auth.roundtrip.com" in envoy_yaml_2
+        assert "http://geoip:8080/check" in envoy_yaml_2
 
         # Step 3: Parse the re-generated YAML again
         config_2 = provider.parse(envoy_yaml_2)
 
         # Verify filters are still present after roundtrip
-        api_service_2 = next((s for s in config_2.services if 'api' in s.name.lower()), None)
+        api_service_2 = next((s for s in config_2.services if "api" in s.name.lower()), None)
         assert api_service_2 is not None
         assert len(api_service_2.routes) > 0
 

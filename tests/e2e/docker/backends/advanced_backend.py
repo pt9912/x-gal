@@ -141,7 +141,7 @@ class AdvancedBackendHandler(BaseHTTPRequestHandler):
             "version": BACKEND_VERSION,
             "type": BACKEND_TYPE,
             "region": BACKEND_REGION,
-            "message": format % args
+            "message": format % args,
         }
 
         # Structured JSON log for analysis

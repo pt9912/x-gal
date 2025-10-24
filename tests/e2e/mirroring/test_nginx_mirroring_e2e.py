@@ -34,7 +34,14 @@ class TestNginxRequestMirroringE2E:
     @pytest.fixture(scope="class")
     def docker_compose_file(self):
         """Path to Docker Compose file"""
-        return str(Path(__file__).parent / "docker" / "providers" / "nginx" / "mirroring" / "docker-compose.yml")
+        return str(
+            Path(__file__).parent
+            / "docker"
+            / "providers"
+            / "nginx"
+            / "mirroring"
+            / "docker-compose.yml"
+        )
 
     @pytest.fixture(scope="class")
     def nginx_mirroring_setup(self, docker_compose_file):

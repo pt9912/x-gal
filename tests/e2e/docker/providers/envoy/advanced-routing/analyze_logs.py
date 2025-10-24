@@ -6,8 +6,8 @@ Analyzes Docker Compose logs to verify correct routing behavior
 and troubleshoot issues.
 """
 
-import re
 import json
+import re
 import sys
 from collections import defaultdict
 from datetime import datetime
@@ -45,17 +45,11 @@ class LogAnalyzer:
 
                     # Look for errors
                     if "error" in line.lower() or "exception" in line.lower():
-                        self.errors.append({
-                            "service": current_service,
-                            "message": line.strip()
-                        })
+                        self.errors.append({"service": current_service, "message": line.strip()})
 
                     # Look for warnings
                     if "warning" in line.lower() or "warn" in line.lower():
-                        self.warnings.append({
-                            "service": current_service,
-                            "message": line.strip()
-                        })
+                        self.warnings.append({"service": current_service, "message": line.strip()})
 
         except FileNotFoundError:
             print(f"Log file {self.log_file} not found. Run tests first.")
@@ -71,30 +65,24 @@ class LogAnalyzer:
             cluster_match = re.search(r"cluster[:\s]+(\S+)", line, re.IGNORECASE)
             if cluster_match:
                 cluster = cluster_match.group(1)
-                self.routing_decisions["envoy"].append({
-                    "type": "cluster_selection",
-                    "cluster": cluster,
-                    "line": line.strip()
-                })
+                self.routing_decisions["envoy"].append(
+                    {"type": "cluster_selection", "cluster": cluster, "line": line.strip()}
+                )
 
         # Look for header matching
         if "header" in line.lower() and "match" in line.lower():
             header_match = re.search(r"header\s+(\S+)", line, re.IGNORECASE)
             if header_match:
-                self.routing_decisions["envoy"].append({
-                    "type": "header_match",
-                    "header": header_match.group(1),
-                    "line": line.strip()
-                })
+                self.routing_decisions["envoy"].append(
+                    {"type": "header_match", "header": header_match.group(1), "line": line.strip()}
+                )
 
         # Extract request IDs
         request_id_match = re.search(r"x-request-id[:\s]+([a-f0-9-]+)", line, re.IGNORECASE)
         if request_id_match:
-            self.request_flow.append({
-                "service": "envoy",
-                "request_id": request_id_match.group(1),
-                "line": line.strip()
-            })
+            self.request_flow.append(
+                {"service": "envoy", "request_id": request_id_match.group(1), "line": line.strip()}
+            )
 
     def _parse_backend_log(self, line, service):
         """Parse backend log line for request handling."""
@@ -103,28 +91,27 @@ class LogAnalyzer:
             # Extract method and path
             method_match = re.search(r"(GET|POST|PUT|DELETE)\s+request", line)
             if method_match:
-                self.routing_decisions[service].append({
-                    "type": "request_received",
-                    "method": method_match.group(1),
-                    "line": line.strip()
-                })
+                self.routing_decisions[service].append(
+                    {
+                        "type": "request_received",
+                        "method": method_match.group(1),
+                        "line": line.strip(),
+                    }
+                )
 
         # Look for backend identification
         if "backend" in line.lower() and ("starting" in line.lower() or "version" in line.lower()):
             backend_info = re.search(r"backend[:\s]+(\S+)", line, re.IGNORECASE)
             if backend_info:
-                self.routing_decisions[service].append({
-                    "type": "backend_info",
-                    "backend": backend_info.group(1),
-                    "line": line.strip()
-                })
+                self.routing_decisions[service].append(
+                    {"type": "backend_info", "backend": backend_info.group(1), "line": line.strip()}
+                )
 
         # Extract headers from backend logs
         if "x-api-version" in line.lower() or "user-agent" in line.lower():
-            self.routing_decisions[service].append({
-                "type": "header_received",
-                "line": line.strip()
-            })
+            self.routing_decisions[service].append(
+                {"type": "header_received", "line": line.strip()}
+            )
 
     def generate_report(self):
         """Generate analysis report."""
@@ -231,7 +218,9 @@ class LogAnalyzer:
         expected_rules = 5  # Number of routing rules we expect to work
         success_rate = (len(verifications) / expected_rules) * 100 if expected_rules > 0 else 0
 
-        print(f"\nSuccess Rate: {success_rate:.1f}% ({len(verifications)}/{expected_rules} rules verified)")
+        print(
+            f"\nSuccess Rate: {success_rate:.1f}% ({len(verifications)}/{expected_rules} rules verified)"
+        )
 
     def analyze_performance(self):
         """Analyze performance metrics from logs."""
@@ -246,7 +235,9 @@ class LogAnalyzer:
             with open(self.log_file, "r") as f:
                 for line in f:
                     # Look for response time patterns
-                    time_match = re.search(r"response_time[:\s]+(\d+\.?\d*)\s*ms", line, re.IGNORECASE)
+                    time_match = re.search(
+                        r"response_time[:\s]+(\d+\.?\d*)\s*ms", line, re.IGNORECASE
+                    )
                     if time_match:
                         response_times.append(float(time_match.group(1)))
 
@@ -280,12 +271,12 @@ class LogAnalyzer:
                 "services_analyzed": len(self.routing_decisions),
                 "total_routing_decisions": sum(len(v) for v in self.routing_decisions.values()),
                 "errors": len(self.errors),
-                "warnings": len(self.warnings)
+                "warnings": len(self.warnings),
             },
             "routing_decisions": dict(self.routing_decisions),
             "errors": self.errors,
             "warnings": self.warnings,
-            "request_flow": self.request_flow
+            "request_flow": self.request_flow,
         }
 
         with open(output_file, "w") as f:

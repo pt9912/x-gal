@@ -18,9 +18,9 @@ from ..config import (
     AdvancedRoutingConfig,
     AdvancedRoutingTarget,
     Config,
-    GlobalConfig,
-    GeoMatchRule,
     GeoIPFilterConfig,
+    GeoMatchRule,
+    GlobalConfig,
     GrpcTransformation,
     HealthCheckConfig,
     JWTClaimMatchRule,
@@ -39,11 +39,11 @@ from ..config import (
 from ..proto_manager import ProtoManager
 from ..provider import Provider
 from .envoy_advanced_routing_filters import (
-    generate_jwt_authn_filter,
-    generate_geoip_ext_authz_filter,
-    generate_lua_filter_for_advanced_routing,
-    generate_jwks_cluster,
     generate_geoip_cluster,
+    generate_geoip_ext_authz_filter,
+    generate_jwks_cluster,
+    generate_jwt_authn_filter,
+    generate_lua_filter_for_advanced_routing,
 )
 
 logger = logging.getLogger(__name__)
@@ -541,13 +541,17 @@ class EnvoyProvider(Provider):
                             jwt_filter_config = ar_config.jwt_filter
                         elif ar_config.jwt_claim_rules and not jwt_filter_config:
                             # Auto-enable JWT filter if JWT rules exist but no config provided
-                            logger.warning("JWT claim rules found but no jwt_filter config - skipping JWT filter")
+                            logger.warning(
+                                "JWT claim rules found but no jwt_filter config - skipping JWT filter"
+                            )
 
                         # GeoIP Filter - check both rules AND explicit config
                         if ar_config.geoip_filter and ar_config.geoip_filter.enabled:
                             geoip_filter_config = ar_config.geoip_filter
                         elif ar_config.geo_rules and not geoip_filter_config:
-                            logger.warning("Geo rules found but no geoip_filter config - skipping GeoIP filter")
+                            logger.warning(
+                                "Geo rules found but no geoip_filter config - skipping GeoIP filter"
+                            )
 
             # Generate JWT Authentication filter
             if jwt_filter_config and jwt_filter_config.enabled:
@@ -568,13 +572,15 @@ class EnvoyProvider(Provider):
                         all_geo_rules.extend(route.advanced_routing.geo_rules)
 
             # Generate Lua filter if rules exist OR if filters are explicitly configured
-            if ((all_jwt_rules or all_geo_rules) and jwt_filter_config) or (jwt_filter_config or geoip_filter_config):
+            if ((all_jwt_rules or all_geo_rules) and jwt_filter_config) or (
+                jwt_filter_config or geoip_filter_config
+            ):
                 # Use empty lists if no rules but filters are configured
                 generate_lua_filter_for_advanced_routing(
                     all_jwt_rules,
                     all_geo_rules,
                     jwt_filter_config or JWTFilterConfig(enabled=False),
-                    output
+                    output,
                 )
 
         # Add rate limiting filter if any route has rate limiting enabled
@@ -1287,7 +1293,9 @@ class EnvoyProvider(Provider):
         output.append(f"                address: {target.upstream.host}")
         output.append(f"                port_value: {target.upstream.port}")
 
-    def _generate_advanced_routing_routes(self, service: Service, route: Route, output: list) -> None:
+    def _generate_advanced_routing_routes(
+        self, service: Service, route: Route, output: list
+    ) -> None:
         """Generate Envoy advanced routing configuration.
 
         Creates sophisticated routing rules based on headers, JWT claims, geo-location,
@@ -1311,8 +1319,9 @@ class EnvoyProvider(Provider):
         # The filters will be applied by the http_filters, not by routing rules
         if not targets:
             # Check if we have JWT or GeoIP filters configured
-            has_filters = (config.jwt_filter and config.jwt_filter.enabled) or \
-                         (config.geoip_filter and config.geoip_filter.enabled)
+            has_filters = (config.jwt_filter and config.jwt_filter.enabled) or (
+                config.geoip_filter and config.geoip_filter.enabled
+            )
 
             if not has_filters:
                 logger.warning(f"No advanced routing targets defined for {service.name}")
@@ -1392,12 +1401,18 @@ class EnvoyProvider(Provider):
         if config.jwt_claim_rules:
             output.append("              # JWT claim-based routing requires Lua filter")
             for rule in config.jwt_claim_rules:
-                output.append(f"              # - {rule.claim_name}={rule.claim_value} -> {rule.target_name}")
+                output.append(
+                    f"              # - {rule.claim_name}={rule.claim_value} -> {rule.target_name}"
+                )
 
         if config.geo_rules:
-            output.append("              # Geo-based routing requires GeoIP database and Lua filter")
+            output.append(
+                "              # Geo-based routing requires GeoIP database and Lua filter"
+            )
             for rule in config.geo_rules:
-                output.append(f"              # - {rule.match_type}={rule.match_value} -> {rule.target_name}")
+                output.append(
+                    f"              # - {rule.match_type}={rule.match_value} -> {rule.target_name}"
+                )
 
         # Fallback route (default)
         fallback_cluster = f"{service.name}_cluster"
@@ -1410,10 +1425,14 @@ class EnvoyProvider(Provider):
         output.append("                route:")
         output.append(f"                  cluster: {fallback_cluster}")
 
-    def _generate_first_match_routes(self, service: Service, route: Route,
-                                      config: AdvancedRoutingConfig,
-                                      targets: List[AdvancedRoutingTarget],
-                                      output: list) -> None:
+    def _generate_first_match_routes(
+        self,
+        service: Service,
+        route: Route,
+        config: AdvancedRoutingConfig,
+        targets: List[AdvancedRoutingTarget],
+        output: list,
+    ) -> None:
         """Generate first-match routing rules for Envoy.
 
         Creates individual route entries for each rule with specific matchers.
@@ -1515,10 +1534,14 @@ class EnvoyProvider(Provider):
         output.append("                route:")
         output.append(f"                  cluster: {cluster_name}")
 
-    def _generate_all_match_routes(self, service: Service, route: Route,
-                                    config: AdvancedRoutingConfig,
-                                    targets: List[AdvancedRoutingTarget],
-                                    output: list) -> None:
+    def _generate_all_match_routes(
+        self,
+        service: Service,
+        route: Route,
+        config: AdvancedRoutingConfig,
+        targets: List[AdvancedRoutingTarget],
+        output: list,
+    ) -> None:
         """Generate all-match routing rules requiring multiple conditions.
 
         Uses Lua script to evaluate multiple conditions together.
@@ -1526,10 +1549,15 @@ class EnvoyProvider(Provider):
         # For all_match, we use Lua script to evaluate all conditions
         self._generate_lua_based_routing(service, route, config, targets, output, all_match=True)
 
-    def _generate_lua_based_routing(self, service: Service, route: Route,
-                                     config: AdvancedRoutingConfig,
-                                     targets: List[AdvancedRoutingTarget],
-                                     output: list, all_match: bool = False) -> None:
+    def _generate_lua_based_routing(
+        self,
+        service: Service,
+        route: Route,
+        config: AdvancedRoutingConfig,
+        targets: List[AdvancedRoutingTarget],
+        output: list,
+        all_match: bool = False,
+    ) -> None:
         """Generate Lua-based routing for JWT claims and geo-location.
 
         Creates Lua filter for complex routing logic that Envoy can't handle natively.
@@ -1547,9 +1575,9 @@ class EnvoyProvider(Provider):
         # Generate clusters for all advanced routing targets
         # These are added later in the clusters section
 
-    def _generate_advanced_routing_cluster(self, service: Service,
-                                            target: AdvancedRoutingTarget,
-                                            output: list) -> None:
+    def _generate_advanced_routing_cluster(
+        self, service: Service, target: AdvancedRoutingTarget, output: list
+    ) -> None:
         """Generate Envoy cluster for an advanced routing target.
 
         Creates a cluster configuration for a specific backend target.
@@ -2317,7 +2345,7 @@ class EnvoyProvider(Provider):
                                     jwt_claim_rules=[],
                                     geo_rules=[],
                                     jwt_filter=jwt_config,
-                                    geoip_filter=geoip_config
+                                    geoip_filter=geoip_config,
                                 )
                                 gal_route.advanced_routing = adv_routing
 
@@ -2325,7 +2353,9 @@ class EnvoyProvider(Provider):
 
                             logger.debug(f"Mapped route {path_prefix} → service {service.name}")
 
-    def _parse_http_filters(self, http_filters: List[dict]) -> Tuple[Optional[JWTFilterConfig], Optional[GeoIPFilterConfig]]:
+    def _parse_http_filters(
+        self, http_filters: List[dict]
+    ) -> Tuple[Optional[JWTFilterConfig], Optional[GeoIPFilterConfig]]:
         """Parse JWT and GeoIP filters from http_filters list.
 
         Args:
@@ -2338,17 +2368,21 @@ class EnvoyProvider(Provider):
         geoip_config = None
 
         for filter_dict in http_filters:
-            filter_name = filter_dict.get('name', '')
+            filter_name = filter_dict.get("name", "")
 
             # Parse JWT Authentication filter
-            if filter_name == 'envoy.filters.http.jwt_authn':
+            if filter_name == "envoy.filters.http.jwt_authn":
                 jwt_config = self._parse_jwt_filter(filter_dict)
-                logger.debug(f"Parsed JWT filter: issuer={jwt_config.issuer if jwt_config else 'none'}")
+                logger.debug(
+                    f"Parsed JWT filter: issuer={jwt_config.issuer if jwt_config else 'none'}"
+                )
 
             # Parse GeoIP External Authorization filter
-            elif filter_name == 'envoy.filters.http.ext_authz':
+            elif filter_name == "envoy.filters.http.ext_authz":
                 geoip_config = self._parse_geoip_filter(filter_dict)
-                logger.debug(f"Parsed GeoIP filter: service={geoip_config.geoip_service_uri if geoip_config else 'none'}")
+                logger.debug(
+                    f"Parsed GeoIP filter: service={geoip_config.geoip_service_uri if geoip_config else 'none'}"
+                )
 
         return jwt_config, geoip_config
 
@@ -2361,8 +2395,8 @@ class EnvoyProvider(Provider):
         Returns:
             JWTFilterConfig object or None
         """
-        typed_config = filter_dict.get('typed_config', {})
-        providers = typed_config.get('providers', {})
+        typed_config = filter_dict.get("typed_config", {})
+        providers = typed_config.get("providers", {})
 
         if not providers:
             return None
@@ -2372,19 +2406,19 @@ class EnvoyProvider(Provider):
         provider_config = providers[provider_name]
 
         # Extract configuration
-        issuer = provider_config.get('issuer', '')
-        audiences = provider_config.get('audiences', [])
-        audience = audiences[0] if audiences else ''
+        issuer = provider_config.get("issuer", "")
+        audiences = provider_config.get("audiences", [])
+        audience = audiences[0] if audiences else ""
 
         # Extract JWKS URI
-        remote_jwks = provider_config.get('remote_jwks', {})
-        http_uri = remote_jwks.get('http_uri', {})
-        jwks_uri = http_uri.get('uri', '')
-        jwks_cluster = http_uri.get('cluster', 'jwks_cluster')
+        remote_jwks = provider_config.get("remote_jwks", {})
+        http_uri = remote_jwks.get("http_uri", {})
+        jwks_uri = http_uri.get("uri", "")
+        jwks_cluster = http_uri.get("cluster", "jwks_cluster")
 
         # Extract metadata configuration
-        payload_in_metadata = provider_config.get('payload_in_metadata', 'jwt_payload')
-        forward_payload_header = provider_config.get('forward_payload_header', '')
+        payload_in_metadata = provider_config.get("payload_in_metadata", "jwt_payload")
+        forward_payload_header = provider_config.get("forward_payload_header", "")
 
         return JWTFilterConfig(
             enabled=True,
@@ -2393,7 +2427,7 @@ class EnvoyProvider(Provider):
             jwks_uri=jwks_uri,
             jwks_cluster=jwks_cluster,
             payload_in_metadata=payload_in_metadata,
-            forward_payload_header=forward_payload_header
+            forward_payload_header=forward_payload_header,
         )
 
     def _parse_geoip_filter(self, filter_dict: dict) -> Optional[GeoIPFilterConfig]:
@@ -2405,28 +2439,28 @@ class EnvoyProvider(Provider):
         Returns:
             GeoIPFilterConfig object or None
         """
-        typed_config = filter_dict.get('typed_config', {})
-        http_service = typed_config.get('http_service', {})
+        typed_config = filter_dict.get("typed_config", {})
+        http_service = typed_config.get("http_service", {})
 
         if not http_service:
             return None
 
         # Extract GeoIP service URI
-        server_uri = http_service.get('server_uri', {})
-        geoip_service_uri = server_uri.get('uri', '')
-        geoip_cluster = server_uri.get('cluster', 'geoip_service')
+        server_uri = http_service.get("server_uri", {})
+        geoip_service_uri = server_uri.get("uri", "")
+        geoip_cluster = server_uri.get("cluster", "geoip_service")
 
         # Extract timeout
-        timeout_str = server_uri.get('timeout', '0.5s')
-        timeout_ms = int(float(timeout_str.rstrip('s')) * 1000)
+        timeout_str = server_uri.get("timeout", "0.5s")
+        timeout_ms = int(float(timeout_str.rstrip("s")) * 1000)
 
         # Extract failure mode
-        failure_mode_allow = typed_config.get('failure_mode_allow', True)
+        failure_mode_allow = typed_config.get("failure_mode_allow", True)
 
         return GeoIPFilterConfig(
             enabled=True,
             geoip_service_uri=geoip_service_uri,
             geoip_cluster=geoip_cluster,
             timeout_ms=timeout_ms,
-            failure_mode_allow=failure_mode_allow
+            failure_mode_allow=failure_mode_allow,
         )

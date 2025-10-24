@@ -17,14 +17,15 @@ GEOIP_MOCK = {
     # Weitere IPs können hier hinzugefügt werden
 }
 
+
 class GeoIPHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         # Extrahiere die IP aus dem Pfad (z. B. /country/192.168.1.1)
-        path_parts = self.path.split('/')
+        path_parts = self.path.split("/")
         if len(path_parts) >= 3 and path_parts[1] == "country":
             client_ip = path_parts[2]
             country = GEOIP_MOCK.get(client_ip, "unknown")
-            
+
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("X-Geo-Country", country)
@@ -33,7 +34,7 @@ class GeoIPHandler(BaseHTTPRequestHandler):
             response = {
                 "country": country,
                 "message": f"GeoIP lookup for {client_ip}",
-                "path": self.path
+                "path": self.path,
             }
             self.wfile.write(json.dumps(response).encode())
         else:
@@ -60,10 +61,8 @@ class GeoIPHandler(BaseHTTPRequestHandler):
                     "status": {"code": 200},
                     "headers": {"x-geo-country": country},
                     "metadata_context": {
-                        "filter_metadata": {
-                            "envoy.filters.http.ext_authz": {"country": country}
-                        }
-                    }
+                        "filter_metadata": {"envoy.filters.http.ext_authz": {"country": country}}
+                    },
                 }
                 self.wfile.write(json.dumps(response).encode())
             except json.JSONDecodeError:
@@ -88,6 +87,7 @@ class GeoIPHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         # Suppress default logging
         pass
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
