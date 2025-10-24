@@ -155,3 +155,6 @@ Thumbs.db
 
 # claude
 settings.local.json
+
+# gemini
+GEMINI.md
