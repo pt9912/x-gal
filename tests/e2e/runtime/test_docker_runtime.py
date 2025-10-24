@@ -312,7 +312,12 @@ class TestKongTrafficSplitRuntime:
     def docker_compose_file(self):
         """Path to Docker Compose file"""
         return str(
-            Path(__file__).parent.parent / "docker" / "providers" / "kong" / "basic" / "docker-compose.yml"
+            Path(__file__).parent.parent
+            / "docker"
+            / "providers"
+            / "kong"
+            / "basic"
+            / "docker-compose.yml"
         )
 
     @pytest.fixture(scope="class")
