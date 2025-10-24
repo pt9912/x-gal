@@ -79,7 +79,30 @@ Führe immer alle E2E-Tests aus (Dauern über 5 Minuten):
 pytest tests/e2e/ -v --tb=short
 ```
 
-### Schritt 6 Git Status prüfen
+### Schritt 6: MkDocs Build
+Prüfe die Dokumentation auf fehlerhafte Links und Build-Probleme:
+```bash
+mkdocs build --strict
+```
+
+**Erwartetes Ergebnis:**
+- `INFO - Documentation built in X.XX seconds` → Perfekt, weiter
+- `WARNING - Doc file contains a link...` → **FEHLERHAFTE LINKS!** Behebe sie
+- `ERROR - ...` → **BUILD FEHLER!** Behebe ihn
+
+**Häufige Fehler:**
+- **Fehlerhafte Links**: Links zeigen auf nicht existierende Dateien
+  - Links außerhalb von `docs/` funktionieren nicht in MkDocs
+  - Lösung: GitHub-URLs verwenden oder Dateien nach `docs/` kopieren
+- **Fehlende Dateien**: Referenzierte Dateien existieren nicht
+- **Syntax-Fehler**: Markdown-Syntax-Fehler in .md Dateien
+
+**MkDocs Link-Regeln:**
+- ✅ Links innerhalb `docs/`: `[Text](../other-file.md)`
+- ✅ Externe URLs: `[Text](https://example.com)`
+- ❌ Links außerhalb `docs/`: `../../examples/file.yaml` (FEHLER!)
+
+### Schritt 7: Git Status prüfen
 Falls Dateien geändert wurden:
 ```bash
 git status
@@ -89,7 +112,7 @@ git commit --amend --no-edit
 git commit -m "style: Apply code formatting"
 ```
 
-### Schritt 7: Push erlauben
+### Schritt 8: Push erlauben
 ✅ **Alle Checks bestanden → PUSH ERLAUBT**
 
 ## Ausgabe-Format
@@ -157,9 +180,10 @@ pip install -e .[dev]
 2. **Bei Fehlern nicht pushen** - Behebe sie lokal zuerst
 3. **Geänderte Dateien committen** - Verwende `--amend` oder neuen Commit
 4. **Unit Tests optional ausführen** - Nur bei größeren Code-Änderungen nötig
-5. **Docker Tests IMMER ausführen bei Docker-Änderungen** - Verhindert Container-Fehler in CI/CD
-6. **Docker Compose Syntax validieren** - Nutze `docker compose config` vor dem Push
-7. **Container-Logs bei Fehlern prüfen** - Nicht blind auf GitHub Actions verlassen
+5. **MkDocs Build IMMER ausführen bei Dokumentations-Änderungen** - Verhindert fehlerhafte Links
+6. **Docker Tests IMMER ausführen bei Docker-Änderungen** - Verhindert Container-Fehler in CI/CD
+7. **Docker Compose Syntax validieren** - Nutze `docker compose config` vor dem Push
+8. **Container-Logs bei Fehlern prüfen** - Nicht blind auf GitHub Actions verlassen
 
 ## Integration in Workflow
 

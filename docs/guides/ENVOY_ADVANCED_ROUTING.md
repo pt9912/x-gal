@@ -400,5 +400,5 @@ clusters:
 ## 🔗 Weiterführende Dokumentation
 
 - [Envoy Route Matching](https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto)
-- [GAL Advanced Routing Configuration](../../examples/advanced-routing-example.yaml)
-- [E2E Test Best Practices](../../tests/docker/E2E_TEST_BEST_PRACTICES.md)
+- [Envoy Header Matching](https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#config-route-v3-headermatcher)
+- [Envoy Query Parameter Matching](https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#config-route-v3-queryparametermatcher)
