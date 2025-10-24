@@ -721,7 +721,6 @@ static_resources:
         assert geo.timeout_ms == 800  # 0.8s = 800ms
         assert geo.failure_mode_allow is False
 
-    @pytest.mark.skip(reason="Roundtrip test needs further investigation - routes not preserved in second generation")
     def test_import_and_regenerate_roundtrip(self):
         """Test that filters are preserved in parse → generate → parse roundtrip."""
         # Start with a complete Envoy YAML that has JWT/GeoIP filters

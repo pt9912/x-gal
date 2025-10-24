@@ -1307,8 +1307,22 @@ class EnvoyProvider(Provider):
         config = route.advanced_routing
         targets = route.advanced_routing_targets
 
+        # If we have JWT/GeoIP filters but no routing targets, we still need to generate a basic route
+        # The filters will be applied by the http_filters, not by routing rules
         if not targets:
-            logger.warning(f"No advanced routing targets defined for {service.name}")
+            # Check if we have JWT or GeoIP filters configured
+            has_filters = (config.jwt_filter and config.jwt_filter.enabled) or \
+                         (config.geoip_filter and config.geoip_filter.enabled)
+
+            if not has_filters:
+                logger.warning(f"No advanced routing targets defined for {service.name}")
+                return
+
+            # Generate a simple route that will use the filters but route to the main cluster
+            output.append("              - match:")
+            output.append(f"                  prefix: '{route.path_prefix}'")
+            output.append("                route:")
+            output.append(f"                  cluster: {service.name}_cluster")
             return
 
         # Build target map for quick lookup
