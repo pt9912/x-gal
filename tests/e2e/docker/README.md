@@ -2,6 +2,8 @@
 
 Docker Compose Setups für End-to-End Tests aller GAL Features und Provider.
 
+**Wichtig:** Alle Tests verwenden `docker compose` (Docker Compose V2 Plugin), nicht das legacy `docker-compose` Standalone-Binary. Docker Compose V2 ist seit Docker Engine 20.10 standardmäßig enthalten.
+
 ## 📁 Struktur
 
 ```
@@ -159,7 +161,7 @@ pytest tests/e2e/advanced_routing/test_envoy_advanced_routing.py -v -s
 ```bash
 # Envoy Advanced Routing
 cd tests/e2e/docker/providers/envoy/advanced-routing
-docker-compose up -d --build
+docker compose up -d --build
 
 # Test verschiedene Routing-Szenarien
 curl http://localhost:8080/api                           # → backend-v1 (default)
@@ -171,15 +173,15 @@ curl http://localhost:9901/clusters
 curl http://localhost:9901/stats
 
 # Cleanup
-docker-compose down -v
+docker compose down -v
 ```
 
 ## 🔍 Debugging
 
 ### Container Status
 ```bash
-docker-compose ps
-docker-compose logs -f [service]
+docker compose ps
+docker compose logs -f [service]
 ```
 
 ### Provider Admin Interfaces
@@ -200,7 +202,7 @@ Die E2E Tests speichern automatisch Logs bei Fehlern:
 ls test_logs_*.txt
 
 # Live Logs anschauen
-docker-compose logs -f [service]
+docker compose logs -f [service]
 ```
 
 ## 📈 Performance Benchmarks
@@ -295,10 +297,10 @@ docker ps -q | xargs docker stop
 ### Health Checks fehlgeschlagen
 ```bash
 # Container-Status prüfen
-docker-compose ps
+docker compose ps
 
 # Logs des problematischen Services
-docker-compose logs [service]
+docker compose logs [service]
 
 # Manueller Health Check
 docker exec [container] curl http://localhost:8080/health
@@ -307,7 +309,7 @@ docker exec [container] curl http://localhost:8080/health
 ### Test-Isolation Probleme
 - Nutze timestamp-basierte Log-Filterung
 - Verwende eindeutige Request-IDs
-- Stelle sicher, dass `docker-compose down -v` ausgeführt wird
+- Stelle sicher, dass `docker compose down -v` ausgeführt wird
 
 ## 🔄 CI/CD Integration
 

@@ -24,7 +24,7 @@ services:
   # Backend v1 (Default/Fallback)
   backend-v1:
     build:
-      context: ../../backends
+      context: ../../../backends
       dockerfile: Dockerfile
     container_name: backend-v1
     environment:
@@ -39,7 +39,7 @@ services:
   # Backend v2
   backend-v2:
     build:
-      context: ../../backends
+      context: ../../../backends
       dockerfile: Dockerfile
     container_name: backend-v2
     environment:
@@ -54,7 +54,7 @@ services:
   # Admin Backend
   backend-admin:
     build:
-      context: ../../backends
+      context: ../../../backends
       dockerfile: Dockerfile
     container_name: backend-admin
     environment:
@@ -69,7 +69,7 @@ services:
   # EU Backend
   backend-eu:
     build:
-      context: ../../backends
+      context: ../../../backends
       dockerfile: Dockerfile
     container_name: backend-eu
     environment:
@@ -84,7 +84,7 @@ services:
   # Beta Backend
   backend-beta:
     build:
-      context: ../../backends
+      context: ../../../backends
       dockerfile: Dockerfile
     container_name: backend-beta
     environment:
@@ -99,7 +99,7 @@ services:
   # Mobile Backend
   backend-mobile:
     build:
-      context: ../../backends
+      context: ../../../backends
       dockerfile: Dockerfile
     container_name: backend-mobile
     environment:

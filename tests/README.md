@@ -85,7 +85,7 @@ pytest tests/e2e/ -n 2
 - `@pytest.mark.fast` - Schnelle Tests (< 1 Sekunde)
 
 ### Environment Markers
-- `@pytest.mark.docker` - Benötigt Docker/Docker-Compose
+- `@pytest.mark.docker` - Benötigt Docker/Docker Compose
 - `@pytest.mark.integration` - Integration Tests
 
 ### Feature Markers
@@ -122,9 +122,13 @@ open htmlcov/index.html
 
 ### Docker Setup
 ```bash
-# Docker installieren
+# Docker installieren (Ubuntu/Debian)
 sudo apt-get update
-sudo apt-get install docker.io docker-compose
+sudo apt-get install docker.io
+
+# Docker Compose V2 (plugin) ist bereits in Docker integriert
+# Verifizieren:
+docker compose version
 
 # User zu docker Gruppe hinzufügen
 sudo usermod -aG docker $USER
@@ -132,6 +136,10 @@ sudo usermod -aG docker $USER
 # Logout/Login oder
 newgrp docker
 ```
+
+**Wichtig:** Die Tests verwenden `docker compose` (Docker Compose V2 Plugin),
+nicht das legacy `docker-compose` Standalone-Binary. Docker Compose V2 ist
+seit Docker Engine 20.10 standardmäßig enthalten.
 
 ### E2E Test Lifecycle
 

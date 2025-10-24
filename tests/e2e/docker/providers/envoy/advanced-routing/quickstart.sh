@@ -46,20 +46,20 @@ read -p "Press ENTER to continue or Ctrl+C to abort..."
 
 # Step 1: Clean up previous deployment
 echo -e "\n${BLUE}Step 1/5: Cleaning up previous deployment...${NC}"
-docker-compose -f docker-compose-improved.yml down -v 2>/dev/null || true
+docker compose -f docker-compose-improved.yml down -v 2>/dev/null || true
 echo -e "${GREEN}✓ Cleanup complete${NC}"
 
 # Step 2: Build images
 echo -e "\n${BLUE}Step 2/5: Building Docker images...${NC}"
-docker-compose -f docker-compose-improved.yml build --parallel
+docker compose -f docker-compose-improved.yml build --parallel
 echo -e "${GREEN}✓ Images built${NC}"
 
 # Step 3: Start services
 echo -e "\n${BLUE}Step 3/5: Starting services...${NC}"
-docker-compose -f docker-compose-improved.yml up -d
+docker compose -f docker-compose-improved.yml up -d
 
 echo -e "${YELLOW}Services started:${NC}"
-docker-compose -f docker-compose-improved.yml ps
+docker compose -f docker-compose-improved.yml ps
 
 # Step 4: Wait for services to be healthy
 echo -e "\n${BLUE}Step 4/5: Waiting for services to be healthy...${NC}"
@@ -90,7 +90,7 @@ echo ""
 if [ "$ALL_HEALTHY" = false ]; then
     echo -e "${RED}❌ Services did not become healthy within ${MAX_WAIT}s${NC}"
     echo -e "${YELLOW}Checking logs...${NC}"
-    docker-compose -f docker-compose-improved.yml logs --tail=20
+    docker compose -f docker-compose-improved.yml logs --tail=20
     exit 1
 fi
 
@@ -155,9 +155,9 @@ echo "  2. Test manually:"
 echo "     curl -H 'X-API-Version: v2' http://localhost:8080/api/test"
 echo "     curl http://localhost:8080/api/test?beta=true"
 echo "  3. View logs:"
-echo "     docker-compose -f docker-compose-improved.yml logs -f envoy"
+echo "     docker compose -f docker-compose-improved.yml logs -f envoy"
 echo "  4. Stop services:"
-echo "     docker-compose -f docker-compose-improved.yml down"
+echo "     docker compose -f docker-compose-improved.yml down"
 echo ""
 
 echo -e "${CYAN}📚 Documentation:${NC}"

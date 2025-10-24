@@ -2,6 +2,8 @@
 
 Docker Compose Setups für Envoy-basierte E2E Tests.
 
+**Hinweis:** Verwendet `docker compose` (V2 Plugin) statt legacy `docker-compose`.
+
 ## 📁 Struktur
 
 ```
@@ -76,7 +78,7 @@ curl http://localhost:9901/stats
 ### Logs
 ```bash
 cd tests/e2e/docker/providers/envoy/[feature]/
-docker-compose logs -f envoy
+docker compose logs -f envoy
 ```
 
 ## 📊 Metriken

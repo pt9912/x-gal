@@ -75,25 +75,25 @@ Diese verbesserte Implementierung zeigt **alle** Advanced Routing Features von E
 
 ## Unterschiede zur Original-Implementierung
 
-| Feature | Original (envoy.yaml) | Improved (envoy-improved.yaml) |
-|---------|----------------------|-------------------------------|
-| JWT Routing | ❌ Nur Kommentar | ✅ Vollständig implementiert |
-| GeoIP Routing | ❌ Nur Kommentar | ✅ Mit gRPC ext_authz |
-| JWT Validation | ❌ Keine | ✅ JWKS-basiert |
-| Claim Extraction | ❌ Keine | ✅ Lua Filter |
-| Metadata Routing | ❌ Keine | ✅ JWT + GeoIP metadata |
-| Debug Headers | ❌ Keine | ✅ X-Routing-Rule, X-JWT-Role, X-Geo-Country |
-| Services | 6 Backends | 8 Services (6 Backends + JWKS + GeoIP) |
+| Feature          | Original (envoy.yaml) | Improved (envoy-improved.yaml)              |
+| ---------------- | --------------------- | ------------------------------------------- |
+| JWT Routing      | ❌ Nur Kommentar       | ✅ Vollständig implementiert                 |
+| GeoIP Routing    | ❌ Nur Kommentar       | ✅ Mit gRPC ext_authz                        |
+| JWT Validation   | ❌ Keine               | ✅ JWKS-basiert                              |
+| Claim Extraction | ❌ Keine               | ✅ Lua Filter                                |
+| Metadata Routing | ❌ Keine               | ✅ JWT + GeoIP metadata                      |
+| Debug Headers    | ❌ Keine               | ✅ X-Routing-Rule, X-JWT-Role, X-Geo-Country |
+| Services         | 6 Backends            | 8 Services (6 Backends + JWKS + GeoIP)      |
 
 ## Setup & Start
 
 ### 1. Services starten
 ```bash
 # Verwende die verbesserte Konfiguration
-docker-compose -f docker-compose-improved.yml up -d
+docker compose -f docker-compose-improved.yml up -d
 
 # Logs anschauen
-docker-compose -f docker-compose-improved.yml logs -f envoy
+docker compose -f docker-compose-improved.yml logs -f envoy
 
 # Health Check
 curl http://localhost:9901/ready
@@ -287,13 +287,13 @@ time for i in {1..1000}; do curl -s http://localhost:8080/api/test > /dev/null; 
 
 ```bash
 # Services stoppen
-docker-compose -f docker-compose-improved.yml down
+docker compose -f docker-compose-improved.yml down
 
 # Mit Volumes löschen
-docker-compose -f docker-compose-improved.yml down -v
+docker compose -f docker-compose-improved.yml down -v
 
 # Images löschen
-docker-compose -f docker-compose-improved.yml down --rmi all
+docker compose -f docker-compose-improved.yml down --rmi all
 ```
 
 ## Nächste Schritte

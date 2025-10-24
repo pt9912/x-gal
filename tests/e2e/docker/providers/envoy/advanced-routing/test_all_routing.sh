@@ -63,7 +63,7 @@ echo -e "${BLUE}========================================${NC}\n"
 echo -e "${YELLOW}Checking Envoy availability...${NC}"
 if ! curl -sf "$ADMIN_URL/ready" > /dev/null; then
     echo -e "${RED}ERROR: Envoy is not running at $ADMIN_URL${NC}"
-    echo "Please start Envoy with: docker-compose -f docker-compose-improved.yml up -d"
+    echo "Please start Envoy with: docker compose -f docker-compose-improved.yml up -d"
     exit 1
 fi
 echo -e "${GREEN}✓ Envoy is running${NC}\n"

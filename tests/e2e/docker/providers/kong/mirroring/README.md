@@ -69,7 +69,7 @@ This Docker Compose environment tests **Request Mirroring** (Traffic Shadowing) 
 
 ```
 kong-mirroring/
-├── docker-compose.yml             # Container orchestration
+├── docker-compose.yml             # Container orchestration (mit `docker compose` V2)
 ├── kong-mirroring-nginx.yaml      # Kong declarative config (routes only)
 ├── nginx-template.conf            # Nginx mirror module configuration
 └── README.md                      # This file
@@ -77,7 +77,7 @@ kong-mirroring/
 
 ## 🔧 Configuration
 
-### 1. **docker-compose.yml**
+### 1. **docker-compose.yml** (verwendet mit `docker compose` V2)
 - 2 backend containers (primary, shadow)
 - 1 Kong Gateway container
 - Environment variable: `KONG_NGINX_PROXY_INCLUDE=/usr/local/kong/custom/nginx-template.conf`

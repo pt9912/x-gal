@@ -196,19 +196,19 @@ tests/e2e/docker/providers/envoy/advanced-routing/
 
 ## Feature-Vergleich
 
-| Feature | Original | Improved |
-|---------|----------|----------|
-| **Header Routing** | ✅ Funktioniert | ✅ Funktioniert |
-| **Query Routing** | ✅ Funktioniert | ✅ Funktioniert |
-| **JWT Routing** | ❌ Nur Kommentar | ✅ Vollständig implementiert |
-| **GeoIP Routing** | ❌ Nur Kommentar | ✅ Vollständig implementiert |
-| **JWT Validation** | ❌ Keine | ✅ JWKS-basiert |
-| **Claim Extraction** | ❌ Keine | ✅ Lua Filter |
-| **GeoIP Lookup** | ❌ Keine | ✅ gRPC ext_authz |
-| **Debug Headers** | ❌ Keine | ✅ X-Routing-Rule, X-JWT-*, X-Geo-* |
-| **Services** | 6 Backends | 8 Services (6 Backends + JWKS + GeoIP) |
-| **Tests** | ❌ Keine | ✅ Bash + Python Suites |
-| **Documentation** | ⚠️ Basic | ✅ Umfassend |
+| Feature              | Original        | Improved                               |
+| -------------------- | --------------- | -------------------------------------- |
+| **Header Routing**   | ✅ Funktioniert  | ✅ Funktioniert                         |
+| **Query Routing**    | ✅ Funktioniert  | ✅ Funktioniert                         |
+| **JWT Routing**      | ❌ Nur Kommentar | ✅ Vollständig implementiert            |
+| **GeoIP Routing**    | ❌ Nur Kommentar | ✅ Vollständig implementiert            |
+| **JWT Validation**   | ❌ Keine         | ✅ JWKS-basiert                         |
+| **Claim Extraction** | ❌ Keine         | ✅ Lua Filter                           |
+| **GeoIP Lookup**     | ❌ Keine         | ✅ gRPC ext_authz                       |
+| **Debug Headers**    | ❌ Keine         | ✅ X-Routing-Rule, X-JWT-*, X-Geo-*     |
+| **Services**         | 6 Backends      | 8 Services (6 Backends + JWKS + GeoIP) |
+| **Tests**            | ❌ Keine         | ✅ Bash + Python Suites                 |
+| **Documentation**    | ⚠️ Basic         | ✅ Umfassend                            |
 
 ## Architektur
 
@@ -440,14 +440,14 @@ curl -X POST http://localhost:8080/check -d '{
 ### Services starten nicht
 ```bash
 # Check Docker Compose Status
-docker-compose -f docker-compose-improved.yml ps
+docker compose -f docker-compose-improved.yml ps
 
 # Check Logs
-docker-compose -f docker-compose-improved.yml logs
+docker compose -f docker-compose-improved.yml logs
 
 # Rebuild
-docker-compose -f docker-compose-improved.yml build --no-cache
-docker-compose -f docker-compose-improved.yml up -d
+docker compose -f docker-compose-improved.yml build --no-cache
+docker compose -f docker-compose-improved.yml up -d
 ```
 
 ## Zusammenfassung

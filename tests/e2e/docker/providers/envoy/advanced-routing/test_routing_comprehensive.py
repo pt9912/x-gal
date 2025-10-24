@@ -121,7 +121,7 @@ class EnvoyRoutingTester:
         print("🔍 Checking Envoy availability...")
         if not self.check_envoy_ready():
             print("❌ ERROR: Envoy is not running!")
-            print("   Please start with: docker-compose -f docker-compose-improved.yml up -d")
+            print("   Please start with: docker compose -f docker-compose-improved.yml up -d")
             return 0, 0
 
         print("✅ Envoy is ready\n")

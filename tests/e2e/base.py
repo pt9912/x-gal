@@ -4,6 +4,9 @@ Base class for E2E tests with Docker Compose.
 This module provides a reusable base class for all E2E tests that require
 Docker Compose environments. It includes common setup, teardown, health checking,
 and logging functionality.
+
+Note: Uses 'docker compose' (Docker Compose V2 plugin) instead of the legacy
+      'docker-compose' standalone binary.
 """
 
 import subprocess
@@ -76,7 +79,7 @@ class BaseE2ETest:
         """Stop and remove any existing containers."""
         print("\n🧹 Cleaning up existing containers...")
         result = subprocess.run(
-            ["docker-compose", "-f", cls.COMPOSE_FILE, "down", "-v"],
+            ["docker", "compose", "-f", cls.COMPOSE_FILE, "down", "-v"],
             capture_output=True,
             text=True
         )
@@ -90,7 +93,7 @@ class BaseE2ETest:
         print(f"  Working directory: {os.getcwd()}")
 
         result = subprocess.run(
-            ["docker-compose", "-f", cls.COMPOSE_FILE, "up", "-d", "--build"],
+            ["docker", "compose", "-f", cls.COMPOSE_FILE, "up", "-d", "--build"],
             capture_output=True,
             text=True
         )
@@ -108,7 +111,7 @@ class BaseE2ETest:
         """Stop Docker Compose containers."""
         print("\n🛑 Stopping Docker Compose Environment...")
         subprocess.run(
-            ["docker-compose", "-f", cls.COMPOSE_FILE, "down", "-v"],
+            ["docker", "compose", "-f", cls.COMPOSE_FILE, "down", "-v"],
             capture_output=True
         )
         print("✅ Containers stopped")
@@ -119,11 +122,11 @@ class BaseE2ETest:
         print("\n⚠️ Emergency cleanup after setup failure...")
         try:
             subprocess.run(
-                ["docker-compose", "-f", cls.COMPOSE_FILE, "logs", "--tail=50"],
+                ["docker", "compose", "-f", cls.COMPOSE_FILE, "logs", "--tail=50"],
                 cwd=cls.test_dir
             )
             subprocess.run(
-                ["docker-compose", "-f", cls.COMPOSE_FILE, "down", "-v"],
+                ["docker", "compose", "-f", cls.COMPOSE_FILE, "down", "-v"],
                 cwd=cls.test_dir,
                 capture_output=True
             )
@@ -193,7 +196,7 @@ class BaseE2ETest:
         print(f"  ⏱️ Waiting... ({elapsed}s elapsed)")
 
         result = subprocess.run(
-            ["docker-compose", "-f", cls.COMPOSE_FILE, "ps", "--format", "table"],
+            ["docker", "compose", "-f", cls.COMPOSE_FILE, "ps", "--format", "table"],
             capture_output=True,
             text=True
         )
@@ -213,11 +216,11 @@ class BaseE2ETest:
         """Handle startup failure with detailed diagnostics."""
         print("\n❌ Services did not become ready in time!")
         print("\n📋 Container Status:")
-        subprocess.run(["docker-compose", "-f", cls.COMPOSE_FILE, "ps"])
+        subprocess.run(["docker", "compose", "-f", cls.COMPOSE_FILE, "ps"])
 
         print("\n📜 Recent Logs:")
         subprocess.run(
-            ["docker-compose", "-f", cls.COMPOSE_FILE, "logs", "--tail=30"]
+            ["docker", "compose", "-f", cls.COMPOSE_FILE, "logs", "--tail=30"]
         )
 
         raise TimeoutError("Services did not become ready in time")
@@ -231,7 +234,7 @@ class BaseE2ETest:
         print(f"\n💾 Saving logs to {log_file}...")
 
         logs_result = subprocess.run(
-            ["docker-compose", "-f", cls.COMPOSE_FILE, "logs", "--no-color"],
+            ["docker", "compose", "-f", cls.COMPOSE_FILE, "logs", "--no-color"],
             capture_output=True,
             text=True
         )
@@ -272,7 +275,7 @@ class BaseE2ETest:
 
     def get_logs_since_start(self, service, grep_pattern=None):
         """Get logs from a service since test start."""
-        cmd = ["docker-compose", "-f", self.COMPOSE_FILE, "logs", service]
+        cmd = ["docker", "compose", "-f", self.COMPOSE_FILE, "logs", service]
 
         if hasattr(self, 'test_start_time'):
             cmd.extend(["--since", self.test_start_time])
@@ -297,7 +300,7 @@ class BaseE2ETest:
             logs = self.get_logs_since_start(service)
         else:
             result = subprocess.run(
-                ["docker-compose", "-f", self.COMPOSE_FILE, "logs", service],
+                ["docker", "compose", "-f", self.COMPOSE_FILE, "logs", service],
                 cwd=self.test_dir,
                 capture_output=True,
                 text=True

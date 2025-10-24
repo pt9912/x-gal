@@ -44,7 +44,7 @@ Client Request
 
 ## Files
 
-- **`docker-compose.yml`** - Docker Compose configuration for 3 services:
+- **`docker-compose.yml`** - Docker Compose V2 configuration (verwendet mit `docker compose`):
   - `backend-primary` - Primary production backend
   - `backend-shadow` - Shadow backend (receives mirrored traffic)
   - `nginx` - Nginx proxy with mirroring enabled

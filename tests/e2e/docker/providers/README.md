@@ -2,6 +2,8 @@
 
 Docker Compose Setups für alle unterstützten API Gateway Provider.
 
+**Wichtig:** Alle Tests verwenden `docker compose` (Docker Compose V2 Plugin), nicht das legacy `docker-compose` Standalone-Binary.
+
 ## 📁 Struktur
 
 ```
@@ -119,7 +121,7 @@ pytest tests/e2e/advanced_routing/ -v -s
    ```
 
 2. **Docker Compose erstellen**:
-   - `docker-compose.yml`
+   - `docker-compose.yml` (wird mit `docker compose` ausgeführt)
    - `gal-config.yaml`
    - Provider-spezifische Config
 
@@ -138,12 +140,12 @@ pytest tests/e2e/advanced_routing/ -v -s
 
 1. **Container Status**:
    ```bash
-   docker-compose ps
+   docker compose ps
    ```
 
 2. **Logs**:
    ```bash
-   docker-compose logs -f [service]
+   docker compose logs -f [service]
    ```
 
 3. **Netzwerk**:
@@ -153,7 +155,7 @@ pytest tests/e2e/advanced_routing/ -v -s
 
 4. **Shell Access**:
    ```bash
-   docker-compose exec [service] sh
+   docker compose exec [service] sh
    ```
 
 ### Provider-spezifisch

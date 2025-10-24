@@ -68,7 +68,7 @@ flowchart TD
     Q1 -->|HTTPS + TLS| S2[Szenario 2: HTTPS]
     Q1 -->|Kubernetes| S3[Szenario 3: K8s Ingress]
 
-    S1 --> D1[Deploy: docker-compose up]
+    S1 --> D1[Deploy: docker compose up]
     S2 --> D2[Deploy: certbot + nginx]
     S3 --> D3[Deploy: kubectl apply -f]
 ```

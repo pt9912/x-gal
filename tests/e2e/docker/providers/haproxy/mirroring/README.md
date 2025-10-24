@@ -204,7 +204,7 @@ docker compose down -v
 
 ## Configuration Files
 
-### docker-compose.yml
+### docker-compose.yml (verwendet mit `docker compose` V2)
 - **backend-primary:** Primary production backend (port 8080)
 - **backend-shadow:** Shadow backend for mirroring (port 8080)
 - **haproxy:** HAProxy 2.9 (proxy port 10004, stats port 9999)
@@ -366,7 +366,7 @@ If ports are in use:
 sudo lsof -i :10004
 sudo lsof -i :9999
 
-# Change ports in docker-compose.yml
+# Change ports in docker-compose.yml (dann mit: docker compose up -d)
 ```
 
 ## References

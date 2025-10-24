@@ -258,7 +258,7 @@ Request mirroring is useful for:
 ## 📚 Related Files
 
 - `envoy-mirroring.yaml` - Envoy configuration with request_mirror_policies
-- `docker-compose.yml` - Docker Compose setup with 3 services
+- `docker-compose.yml` - Docker Compose setup (verwendet mit `docker compose` V2)
 - `mirroring-config.yaml` - GAL configuration for generating Envoy config
 - `../backends/primary.py` - Primary backend server
 - `../backends/shadow.py` - Shadow backend server

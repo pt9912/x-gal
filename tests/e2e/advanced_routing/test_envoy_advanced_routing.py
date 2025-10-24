@@ -299,9 +299,10 @@ class TestEnvoyAdvancedRouting(BaseE2ETest):
             logs = self.get_logs_since_start(backend)
 
             # Check that the backend received requests
+            # New log format: [2025-10-24 12:38:22.132] [backend-v1:v1] "GET /api HTTP/1.1" 200 -
             if backend == "backend-v1":
-                assert "Received request" in logs or "Starting backend" in logs
-                print(f"✓ {backend} logs show activity")
+                assert '"GET' in logs or '"POST' in logs or '200' in logs
+                print(f"✓ {backend} logs show activity ({logs.count('GET')} GET requests)")
 
     @pytest.mark.slow
     def test_routing_metrics(self):
