@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import importlib.util
 
 spec = importlib.util.spec_from_file_location(
-    "gal_cli", Path(__file__).parent.parent / "gal-cli.py"
+    "gal_cli", Path(__file__).parent.parent.parent.parent / "gal-cli.py"
 )
 gal_cli = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gal_cli)
