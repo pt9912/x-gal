@@ -25,8 +25,7 @@ class TestE2EBasicWorkflow:
     def config_file(self, tmp_path):
         """Create test configuration file"""
         config = tmp_path / "gateway-config.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 version: "1.0"
 provider: envoy
 
@@ -57,8 +56,7 @@ services:
       validation:
         required_fields:
           - email
-"""
-        )
+""")
         return str(config)
 
     def test_complete_workflow_envoy(self, config_file, tmp_path):
@@ -145,8 +143,7 @@ class TestE2EWithDeployment:
     def config_file(self, tmp_path):
         """Create test configuration"""
         config = tmp_path / "deploy-config.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 version: "1.0"
 provider: kong
 
@@ -163,8 +160,7 @@ services:
       port: 3000
     routes:
       - path_prefix: /api/v1
-"""
-        )
+""")
         return str(config)
 
     def test_load_generate_deploy_workflow(self, config_file, tmp_path):
@@ -237,8 +233,7 @@ class TestE2EMultiService:
     def multi_service_config(self, tmp_path):
         """Create config with multiple services"""
         config = tmp_path / "multi-service.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 version: "1.0"
 provider: envoy
 
@@ -284,8 +279,7 @@ services:
     routes:
       - path_prefix: /api/payments
         methods: [POST]
-"""
-        )
+""")
         return str(config)
 
     def test_multi_service_workflow(self, multi_service_config, tmp_path):
@@ -324,16 +318,14 @@ class TestE2EErrorHandling:
     def test_invalid_yaml_syntax(self, tmp_path):
         """Test error handling for invalid YAML"""
         config_file = tmp_path / "invalid.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: 1.0
 provider: envoy
 services:
   - name: test
     invalid_indent
       wrong: syntax
-"""
-        )
+""")
 
         manager = Manager()
         manager.register_provider(EnvoyProvider())
@@ -344,8 +336,7 @@ services:
     def test_missing_required_field(self, tmp_path):
         """Test error handling for missing required fields"""
         config_file = tmp_path / "missing-field.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: envoy
 
@@ -355,8 +346,7 @@ services:
     # Missing upstream
     routes:
       - path_prefix: /api
-"""
-        )
+""")
 
         manager = Manager()
         manager.register_provider(EnvoyProvider())
@@ -367,8 +357,7 @@ services:
     def test_validation_error_port_zero(self, tmp_path):
         """Test validation error for port 0"""
         config_file = tmp_path / "port-zero.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: envoy
 
@@ -385,8 +374,7 @@ services:
       port: 8080
     routes:
       - path_prefix: /api
-"""
-        )
+""")
 
         manager = Manager()
         manager.register_provider(EnvoyProvider())
@@ -399,8 +387,7 @@ services:
     def test_unknown_provider(self, tmp_path):
         """Test error handling for unknown provider"""
         config_file = tmp_path / "unknown-provider.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: unknown_gateway
 
@@ -413,8 +400,7 @@ services:
       port: 8080
     routes:
       - path_prefix: /api
-"""
-        )
+""")
 
         manager = Manager()
         manager.register_provider(EnvoyProvider())
@@ -432,8 +418,7 @@ class TestE2ERealWorldScenario:
     def ecommerce_config(self, tmp_path):
         """E-commerce platform configuration"""
         config = tmp_path / "ecommerce.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 version: "1.0"
 provider: apisix
 
@@ -513,8 +498,7 @@ services:
           - order_id
           - amount
           - payment_method
-"""
-        )
+""")
         return str(config)
 
     def test_ecommerce_complete_workflow(self, ecommerce_config, tmp_path):
@@ -603,8 +587,7 @@ class TestE2ETrafficSplitting:
     def traffic_split_config(self, tmp_path):
         """Create traffic splitting test configuration"""
         config = tmp_path / "traffic-split-config.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 version: "1.0"
 provider: envoy
 
@@ -637,8 +620,7 @@ services:
                 host: api-v1-canary
                 port: 8080
               description: "Canary deployment for testing"
-"""
-        )
+""")
         return str(config)
 
     def test_traffic_split_all_providers(self, traffic_split_config, tmp_path):
@@ -790,8 +772,7 @@ services:
     def test_traffic_split_weight_validation(self, tmp_path):
         """Test that invalid weights are rejected"""
         config = tmp_path / "invalid-weights.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 version: "1.0"
 provider: envoy
 
@@ -814,8 +795,7 @@ services:
             - name: canary
               weight: 60  # Invalid: 50 + 60 = 110 ≠ 100
               upstream: {host: api-canary, port: 8080}
-"""
-        )
+""")
 
         manager = Manager()
         manager.register_provider(EnvoyProvider())
@@ -827,8 +807,7 @@ services:
     def test_traffic_split_multi_target(self, tmp_path):
         """Test traffic splitting with 3+ targets"""
         config = tmp_path / "multi-target.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 version: "1.0"
 provider: envoy
 
@@ -854,8 +833,7 @@ services:
             - name: canary
               weight: 10
               upstream: {host: api-canary, port: 8080}
-"""
-        )
+""")
 
         manager = Manager()
         manager.register_provider(EnvoyProvider())

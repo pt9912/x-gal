@@ -56,12 +56,21 @@ class TestKongRequestMirroringE2E:
 
         # Build and start containers
         print("\n🐳 Starting Docker Compose environment for Kong Request Mirroring...")
-        subprocess.run(
-            ["docker", "compose", "up", "-d", "--build"],
-            cwd=compose_dir,
-            check=True,
-            capture_output=True,
-        )
+        try:
+            compose_up_result = subprocess.run(
+                ["docker", "compose", "up", "-d", "--build"],
+                cwd=compose_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            if compose_up_result.stdout:
+                print(compose_up_result.stdout)
+            if compose_up_result.stderr:
+                print(compose_up_result.stderr)
+        except Exception as e:
+            print(f"❌ Failed start docker compose: {e}")
+            pytest.fail(f"Kong docker compose up failed: {e}")
 
         # Wait for Kong to be ready
         print("⏳ Waiting for Kong to be healthy...")
@@ -79,7 +88,7 @@ class TestKongRequestMirroringE2E:
 
             try:
                 # Check Kong health endpoint
-                response = requests.get("http://localhost:10003/api/v3", timeout=2)
+                response = requests.get("http://localhost:12000/api/v3", timeout=2)
                 if response.status_code == 200:
                     print("✅ Kong is ready!")
                     break
@@ -114,7 +123,7 @@ class TestKongRequestMirroringE2E:
 
         for i in range(num_requests):
             try:
-                response = requests.get("http://localhost:10003/api/v1", timeout=5)
+                response = requests.get("http://localhost:12000/api/v1", timeout=5)
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
@@ -158,7 +167,7 @@ class TestKongRequestMirroringE2E:
 
         for i in range(num_requests):
             try:
-                response = requests.get("http://localhost:10003/api/v2", timeout=5)
+                response = requests.get("http://localhost:12000/api/v2", timeout=5)
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
@@ -196,7 +205,7 @@ class TestKongRequestMirroringE2E:
 
         for i in range(num_requests):
             try:
-                response = requests.get("http://localhost:10003/api/v3", timeout=5)
+                response = requests.get("http://localhost:12000/api/v3", timeout=5)
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
@@ -235,7 +244,7 @@ class TestKongRequestMirroringE2E:
         for i in range(num_requests):
             try:
                 payload = {"test": f"data_{i}", "index": i}
-                response = requests.post("http://localhost:10003/api/v4", json=payload, timeout=5)
+                response = requests.post("http://localhost:12000/api/v4", json=payload, timeout=5)
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
@@ -277,13 +286,13 @@ class TestKongRequestMirroringE2E:
 
         try:
             # Check Kong status
-            response = requests.get("http://localhost:8003/status", timeout=5)
+            response = requests.get("http://localhost:12001/status", timeout=5)
             assert response.status_code == 200
             status = response.json()
             print(f"✅ Kong is running (status: {status})")
 
             # Check services
-            response = requests.get("http://localhost:8003/services", timeout=5)
+            response = requests.get("http://localhost:12001/services", timeout=5)
             assert response.status_code == 200
             services = response.json()
             print(f"\n📊 Kong Services ({len(services.get('data', []))}):")
@@ -291,7 +300,7 @@ class TestKongRequestMirroringE2E:
                 print(f"  - {svc['name']}: {svc['protocol']}://{svc['host']}:{svc['port']}")
 
             # Check routes
-            response = requests.get("http://localhost:8003/routes", timeout=5)
+            response = requests.get("http://localhost:12001/routes", timeout=5)
             assert response.status_code == 200
             routes = response.json()
             print(f"\n📊 Kong Routes ({len(routes.get('data', []))}):")
@@ -299,7 +308,7 @@ class TestKongRequestMirroringE2E:
                 print(f"  - {route['name']}: {route.get('paths', [])} [{route.get('methods', [])}]")
 
             # Check plugins
-            response = requests.get("http://localhost:8003/plugins", timeout=5)
+            response = requests.get("http://localhost:12001/plugins", timeout=5)
             assert response.status_code == 200
             plugins = response.json()
             print(f"\n📊 Kong Plugins ({len(plugins.get('data', []))}):")
@@ -319,7 +328,7 @@ class TestKongRequestMirroringE2E:
 
         try:
             # Check that Kong routes are configured
-            response = requests.get("http://localhost:8003/routes", timeout=5)
+            response = requests.get("http://localhost:12001/routes", timeout=5)
             assert response.status_code == 200
             routes = response.json()
 
@@ -352,7 +361,7 @@ class TestKongRequestMirroringE2E:
 
         def make_request(i):
             try:
-                response = requests.get("http://localhost:10003/api/v1", timeout=5)
+                response = requests.get("http://localhost:12000/api/v1", timeout=5)
                 if response.status_code == 200:
                     return "success"
                 return "failed"

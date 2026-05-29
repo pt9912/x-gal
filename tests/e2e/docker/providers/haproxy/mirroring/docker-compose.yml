@@ -1,4 +1,4 @@
-version: '3.8'
+name: haproxy-mirroring
 
 services:
   # Backend - Primary (production traffic)
@@ -12,7 +12,13 @@ services:
     networks:
       - test-network-haproxy-mirroring
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8080')",
+        ]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -28,7 +34,13 @@ services:
     networks:
       - test-network-haproxy-mirroring
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8080')",
+        ]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -39,8 +51,8 @@ services:
     volumes:
       - ./haproxy-mirroring.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     ports:
-      - "10004:10000"  # Proxy port (unique for HAProxy tests)
-      - "9999:9999"    # Stats port
+      - "10004:10000" # Proxy port (unique for HAProxy tests)
+      - "9999:9999" # Stats port
     networks:
       - test-network-haproxy-mirroring
     depends_on:
@@ -49,7 +61,15 @@ services:
       backend-shadow:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:10000/health"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:10000/health",
+        ]
       interval: 5s
       timeout: 3s
       retries: 5

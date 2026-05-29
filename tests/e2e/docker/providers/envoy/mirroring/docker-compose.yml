@@ -1,4 +1,4 @@
-version: '3.8'
+name: envoy-mirroring
 
 services:
   # Backend - Primary (production traffic)
@@ -12,7 +12,13 @@ services:
     networks:
       - test-network-mirroring
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8080')",
+        ]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -28,7 +34,13 @@ services:
     networks:
       - test-network-mirroring
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8080')",
+        ]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -39,8 +51,8 @@ services:
     volumes:
       - ./envoy-mirroring.yaml:/etc/envoy/envoy.yaml:ro
     ports:
-      - "10001:10000"  # Proxy port (different from traffic-split tests)
-      - "9902:9901"    # Admin port (different from traffic-split tests)
+      - "10001:10000" # Proxy port (different from traffic-split tests)
+      - "9902:9901" # Admin port (different from traffic-split tests)
     networks:
       - test-network-mirroring
     depends_on:

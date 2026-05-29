@@ -75,8 +75,7 @@ class TestTimeoutRetryYAMLParsing:
     def test_parse_timeout_from_yaml(self, tmp_path):
         """Test parsing timeout configuration from YAML file."""
         config_file = tmp_path / "timeout-config.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: envoy
 
@@ -98,8 +97,7 @@ services:
           send: "60s"
           read: "120s"
           idle: "600s"
-"""
-        )
+""")
 
         config = Config.from_yaml(str(config_file))
 
@@ -117,8 +115,7 @@ services:
     def test_parse_retry_from_yaml(self, tmp_path):
         """Test parsing retry configuration from YAML file."""
         config_file = tmp_path / "retry-config.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: envoy
 
@@ -145,8 +142,7 @@ services:
             - connect_timeout
             - http_5xx
             - http_502
-"""
-        )
+""")
 
         config = Config.from_yaml(str(config_file))
 
@@ -169,8 +165,7 @@ services:
     def test_parse_timeout_and_retry_combined(self, tmp_path):
         """Test parsing both timeout and retry configuration."""
         config_file = tmp_path / "combined-config.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: envoy
 
@@ -197,8 +192,7 @@ services:
           retry_on:
             - connect_timeout
             - http_5xx
-"""
-        )
+""")
 
         config = Config.from_yaml(str(config_file))
 
@@ -220,8 +214,7 @@ services:
     def test_parse_without_timeout_retry(self, tmp_path):
         """Test parsing when timeout and retry are not specified."""
         config_file = tmp_path / "no-timeout-retry.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: envoy
 
@@ -238,8 +231,7 @@ services:
       port: 8080
     routes:
       - path_prefix: /api
-"""
-        )
+""")
 
         config = Config.from_yaml(str(config_file))
 
@@ -258,8 +250,7 @@ class TestEnvoyTimeoutRetry:
         from gal.providers.envoy import EnvoyProvider
 
         config_file = tmp_path / "envoy-timeout.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: envoy
 
@@ -282,8 +273,7 @@ services:
           send: "60s"
           read: "120s"
           idle: "600s"
-"""
-        )
+""")
 
         config = Config.from_yaml(str(config_file))
         provider = EnvoyProvider()
@@ -298,8 +288,7 @@ services:
         from gal.providers.envoy import EnvoyProvider
 
         config_file = tmp_path / "envoy-retry.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: envoy
 
@@ -323,8 +312,7 @@ services:
           retry_on:
             - connect_timeout
             - http_5xx
-"""
-        )
+""")
 
         config = Config.from_yaml(str(config_file))
         provider = EnvoyProvider()
@@ -340,8 +328,7 @@ services:
         from gal.providers.envoy import EnvoyProvider
 
         config_file = tmp_path / "envoy-combined.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: envoy
 
@@ -370,8 +357,7 @@ services:
             - connect_timeout
             - http_502
             - http_503
-"""
-        )
+""")
 
         config = Config.from_yaml(str(config_file))
         provider = EnvoyProvider()
@@ -398,8 +384,7 @@ class TestKongTimeoutRetry:
         from gal.providers.kong import KongProvider
 
         config_file = tmp_path / "kong-timeout.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: kong
 
@@ -420,8 +405,7 @@ services:
           connect: "10s"
           send: "60s"
           read: "120s"
-"""
-        )
+""")
 
         config = Config.from_yaml(str(config_file))
         provider = KongProvider()
@@ -437,8 +421,7 @@ services:
         from gal.providers.kong import KongProvider
 
         config_file = tmp_path / "kong-retry.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: kong
 
@@ -458,8 +441,7 @@ services:
         retry:
           enabled: true
           attempts: 5
-"""
-        )
+""")
 
         config = Config.from_yaml(str(config_file))
         provider = KongProvider()
@@ -476,8 +458,7 @@ class TestAPISIXTimeoutRetry:
         from gal.providers.apisix import APISIXProvider
 
         config_file = tmp_path / "apisix-timeout.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: apisix
 
@@ -498,8 +479,7 @@ services:
           connect: "10s"
           send: "60s"
           read: "120s"
-"""
-        )
+""")
 
         config = Config.from_yaml(str(config_file))
         provider = APISIXProvider()
@@ -516,8 +496,7 @@ services:
         from gal.providers.apisix import APISIXProvider
 
         config_file = tmp_path / "apisix-retry.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: apisix
 
@@ -540,8 +519,7 @@ services:
           retry_on:
             - http_502
             - http_503
-"""
-        )
+""")
 
         config = Config.from_yaml(str(config_file))
         provider = APISIXProvider()
@@ -559,8 +537,7 @@ class TestTraefikTimeoutRetry:
         from gal.providers.traefik import TraefikProvider
 
         config_file = tmp_path / "traefik-timeout.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: traefik
 
@@ -581,8 +558,7 @@ services:
           connect: "10s"
           read: "120s"
           idle: "600s"
-"""
-        )
+""")
 
         config = Config.from_yaml(str(config_file))
         provider = TraefikProvider()
@@ -599,8 +575,7 @@ services:
         from gal.providers.traefik import TraefikProvider
 
         config_file = tmp_path / "traefik-retry.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: traefik
 
@@ -621,8 +596,7 @@ services:
           enabled: true
           attempts: 5
           base_interval: "50ms"
-"""
-        )
+""")
 
         config = Config.from_yaml(str(config_file))
         provider = TraefikProvider()
@@ -641,8 +615,7 @@ class TestNginxTimeoutRetry:
         from gal.providers.nginx import NginxProvider
 
         config_file = tmp_path / "nginx-timeout.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: nginx
 
@@ -663,8 +636,7 @@ services:
           connect: "10s"
           send: "60s"
           read: "120s"
-"""
-        )
+""")
 
         config = Config.from_yaml(str(config_file))
         provider = NginxProvider()
@@ -679,8 +651,7 @@ services:
         from gal.providers.nginx import NginxProvider
 
         config_file = tmp_path / "nginx-retry.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: nginx
 
@@ -704,8 +675,7 @@ services:
           retry_on:
             - connect_timeout
             - http_502
-"""
-        )
+""")
 
         config = Config.from_yaml(str(config_file))
         provider = NginxProvider()
@@ -725,8 +695,7 @@ class TestHAProxyTimeoutRetry:
         from gal.providers.haproxy import HAProxyProvider
 
         config_file = tmp_path / "haproxy-timeout.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: haproxy
 
@@ -747,8 +716,7 @@ services:
           connect: "10s"
           read: "120s"
           idle: "600s"
-"""
-        )
+""")
 
         config = Config.from_yaml(str(config_file))
         provider = HAProxyProvider()
@@ -763,8 +731,7 @@ services:
         from gal.providers.haproxy import HAProxyProvider
 
         config_file = tmp_path / "haproxy-retry.yaml"
-        config_file.write_text(
-            """
+        config_file.write_text("""
 version: "1.0"
 provider: haproxy
 
@@ -787,8 +754,7 @@ services:
           retry_on:
             - connect_timeout
             - http_503
-"""
-        )
+""")
 
         config = Config.from_yaml(str(config_file))
         provider = HAProxyProvider()

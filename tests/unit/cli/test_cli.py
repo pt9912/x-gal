@@ -38,8 +38,7 @@ class TestCLIGenerate:
     def config_file(self, tmp_path):
         """Create temporary config file"""
         config = tmp_path / "test-config.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 version: "1.0"
 provider: envoy
 
@@ -59,8 +58,7 @@ services:
     routes:
       - path_prefix: /api
         methods: [GET, POST]
-"""
-        )
+""")
         return str(config)
 
     def test_generate_to_stdout(self, runner, config_file):
@@ -141,8 +139,7 @@ class TestCLIValidate:
     def valid_config_file(self, tmp_path):
         """Create valid config file"""
         config = tmp_path / "valid-config.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 version: "1.0"
 provider: kong
 
@@ -159,16 +156,14 @@ services:
       port: 3000
     routes:
       - path_prefix: /api/v1
-"""
-        )
+""")
         return str(config)
 
     @pytest.fixture
     def invalid_config_file(self, tmp_path):
         """Create invalid config file"""
         config = tmp_path / "invalid-config.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 version: "1.0"
 provider: envoy
 
@@ -177,8 +172,7 @@ global:
   port: 0
 
 services: []
-"""
-        )
+""")
         return str(config)
 
     def test_validate_success(self, runner, valid_config_file):
@@ -221,8 +215,7 @@ class TestCLIGenerateAll:
     def config_file(self, tmp_path):
         """Create config file"""
         config = tmp_path / "config.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 version: "1.0"
 provider: envoy
 
@@ -235,8 +228,7 @@ services:
       port: 8080
     routes:
       - path_prefix: /api
-"""
-        )
+""")
         return str(config)
 
     def test_generate_all_default_dir(self, runner, config_file, tmp_path):
@@ -326,8 +318,7 @@ class TestCLIInfo:
     def detailed_config_file(self, tmp_path):
         """Create config with transformations"""
         config = tmp_path / "detailed-config.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 version: "1.0"
 provider: apisix
 
@@ -364,8 +355,7 @@ plugins:
     enabled: true
     config:
       key: secret
-"""
-        )
+""")
         return str(config)
 
     def test_info_displays_configuration(self, runner, detailed_config_file):

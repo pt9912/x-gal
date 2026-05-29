@@ -6,6 +6,7 @@ Used for testing request mirroring - this is the main production backend.
 
 import json
 import os
+import signal
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -15,6 +16,7 @@ class PrimaryHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         PrimaryHandler.request_count += 1
+
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("X-Backend-Name", "primary")
@@ -58,15 +60,21 @@ class PrimaryHandler(BaseHTTPRequestHandler):
         self.do_GET()
 
     def log_message(self, format, *args):
-        # Log to stdout for debugging with timestamp for uniqueness
         import datetime
 
         ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
         print(f"[PRIMARY-{ts}] {format % args}")
 
 
+def handle_shutdown(signum, frame):
+    print("Received shutdown signal, stopping server...")
+    server.server_close()
+    exit(0)
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     server = HTTPServer(("0.0.0.0", port), PrimaryHandler)
+    signal.signal(signal.SIGTERM, handle_shutdown)
     print(f"Primary backend listening on port {port}")
     server.serve_forever()

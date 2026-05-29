@@ -1,6 +1,8 @@
 # HAProxy Request Mirroring with SPOE (Stream Processing Offload Engine)
 # Production-ready example with native HAProxy mirroring via spoa-mirror
 
+name: haproxy-mirroring-spoe
+
 services:
   # HAProxy with SPOE filter for request mirroring
   haproxy:

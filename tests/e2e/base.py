@@ -28,6 +28,7 @@ class BaseE2ETest:
     SERVICE_PORT = 8080
     HEALTH_ENDPOINT = "/health"
     ADMIN_PORT = None  # Optional admin interface port
+    MAIN_CONTAINER_NAME = None  # If set, health check uses `docker inspect` instead of HTTP probe
     WAIT_TIMEOUT = 60
 
     @classmethod
@@ -39,6 +40,7 @@ class BaseE2ETest:
 
         try:
             cls.cleanup_existing()
+            cls.pre_setup()
             cls.start_containers()
             cls.wait_for_services()
             cls.save_start_time()
@@ -158,7 +160,32 @@ class BaseE2ETest:
         return False
 
     @classmethod
-    def check_health(cls):
+    def check_container_health(cls):
+        """Check if all services are healthy via docker inspect."""
+        result = subprocess.run(
+            [
+                "docker",
+                "inspect",
+                "--format",
+                "{{json .State.Health.Status}}",
+                cls.MAIN_CONTAINER_NAME,
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            return False
+
+        status = result.stdout.strip().strip('"')
+        if status != "healthy":
+            return False
+
+        print("  📊 Container Status: healthy")
+        return cls.check_additional_services()
+
+    @classmethod
+    def check_service_health(cls):
         """Check if all services are healthy."""
         try:
             # Check main service
@@ -179,6 +206,13 @@ class BaseE2ETest:
 
         except requests.exceptions.RequestException:
             return False
+
+    @classmethod
+    def check_health(cls):
+        """Check if all services are healthy."""
+        if cls.MAIN_CONTAINER_NAME:
+            return cls.check_container_health()
+        return cls.check_service_health()
 
     @classmethod
     def check_additional_services(cls):
@@ -255,6 +289,11 @@ class BaseE2ETest:
         print(f"🕐 Test start time: {cls.test_start_time} UTC")
 
     @classmethod
+    def pre_setup(cls):
+        """Override for additional setup before containers are starting."""
+        pass
+
+    @classmethod
     def post_setup(cls):
         """Override for additional setup after containers are ready."""
         pass
@@ -266,12 +305,12 @@ class BaseE2ETest:
 
     # Helper methods for tests
 
-    def get_logs_since_start(self, service, grep_pattern=None):
-        """Get logs from a service since test start."""
+    def get_logs_since(self, service, grep_pattern=None, since=None):
+        """Get logs from a service since."""
         cmd = ["docker", "compose", "-f", self.COMPOSE_FILE, "logs", service]
 
-        if hasattr(self, "test_start_time"):
-            cmd.extend(["--since", self.test_start_time])
+        if since:
+            cmd.extend(["--since", since])
 
         result = subprocess.run(
             cmd,
@@ -286,6 +325,12 @@ class BaseE2ETest:
             logs = "\n".join(line for line in logs.split("\n") if grep_pattern in line)
 
         return logs
+
+    def get_logs_since_start(self, service, grep_pattern=None):
+        """Get logs from a service since test start."""
+        if hasattr(self, "test_start_time"):
+            return self.get_logs_since(service, grep_pattern, self.test_start_time)
+        return self.get_logs_since(service, grep_pattern)
 
     def count_log_occurrences(self, service, pattern, since_start=True):
         """Count occurrences of a pattern in service logs."""

@@ -1,28 +1,30 @@
 # Dockerfile for SPOE mirror agent
-# Simple Python-based SPOE agent for request mirroring
+# Python-based SPOE agent for request mirroring using the haproxyspoa library.
 
 FROM python:3.12-slim
 
-# Install netcat and net-tools for health checks
-RUN apt-get update && apt-get install -y \
-    netcat-openbsd \
-    net-tools \
-    procps \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        netcat-openbsd \
+        net-tools \
+        procps \
+        curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# Copy SPOE mirror script
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir haproxyspoa==0.0.1
+
 COPY spoa_mirror.py /usr/local/bin/spoa-mirror
 RUN chmod +x /usr/local/bin/spoa-mirror
 
-# Create non-root user
+# Run as non-root user
 RUN useradd -r -s /bin/false spoa
-
 USER spoa
 
-# Expose SPOE port
-EXPOSE 12345
+EXPOSE 12345 12346
 
-# Default command: Listen on port 12345, mirror to shadow-backend
-# -u flag for unbuffered output (important for Docker logs)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:12346/health || exit 1
+
 ENTRYPOINT ["python3", "-u", "/usr/local/bin/spoa-mirror"]
-CMD ["-p", "12345", "-u", "http://backend-shadow:8080"]
+CMD ["-p", "12345", "-e", "12346", "-u", "http://backend-shadow:8080"]

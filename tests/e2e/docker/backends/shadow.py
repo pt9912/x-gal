@@ -7,6 +7,7 @@ that receives mirrored requests for testing or debugging.
 
 import json
 import os
+import signal
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -16,8 +17,9 @@ class ShadowHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         ShadowHandler.request_count += 1
-        # Log for E2E test verification
-        print(f"Received request: GET {self.path}")
+
+        test_name = self.headers.get("X-Test-Name")
+        print(f"Received request: GET {self.path} - TestName: {test_name}")
 
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -39,8 +41,9 @@ class ShadowHandler(BaseHTTPRequestHandler):
         body = self.rfile.read(content_length).decode() if content_length > 0 else ""
 
         ShadowHandler.request_count += 1
-        # Log for E2E test verification
-        print(f"Received request: POST {self.path}")
+
+        test_name = self.headers.get("X-Test-Name")
+        print(f"Received request: POST {self.path} - TestName: {test_name}")
 
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -65,15 +68,21 @@ class ShadowHandler(BaseHTTPRequestHandler):
         self.do_GET()
 
     def log_message(self, format, *args):
-        # Log to stdout for debugging with timestamp for uniqueness
         import datetime
 
         ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
         print(f"[SHADOW-{ts}] {format % args}")
 
 
+def handle_shutdown(signum, frame):
+    print("Received shutdown signal, stopping server...")
+    server.server_close()
+    exit(0)
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     server = HTTPServer(("0.0.0.0", port), ShadowHandler)
+    signal.signal(signal.SIGTERM, handle_shutdown)
     print(f"Shadow backend listening on port {port}")
     server.serve_forever()

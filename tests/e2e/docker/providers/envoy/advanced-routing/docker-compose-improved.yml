@@ -1,4 +1,4 @@
-version: '3.8'
+name: envoy-advanced-routing-improved
 
 services:
   # Envoy Gateway with Advanced Routing
@@ -7,7 +7,7 @@ services:
     container_name: envoy-advanced-routing
     ports:
       - "8080:8080"
-      - "9901:9901"  # Admin interface
+      - "9901:9901" # Admin interface
     volumes:
       - ./envoy-improved.yaml:/etc/envoy/envoy.yaml:ro
     command: ["envoy", "-c", "/etc/envoy/envoy.yaml", "-l", "info"]

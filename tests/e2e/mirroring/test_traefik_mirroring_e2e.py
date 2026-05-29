@@ -78,7 +78,7 @@ class TestTraefikRequestMirroringE2E:
                 print(f"  Waiting... ({i}s) - Container status check")
 
             try:
-                response = requests.get("http://localhost:9903/ping", timeout=2)
+                response = requests.get("http://localhost:13001/ping", timeout=2)
                 if response.status_code == 200:
                     print("✅ Traefik is ready!")
                     break
@@ -113,7 +113,7 @@ class TestTraefikRequestMirroringE2E:
 
         for i in range(num_requests):
             try:
-                response = requests.get("http://localhost:10003/api/v1", timeout=5)
+                response = requests.get("http://localhost:13000/api/v1", timeout=5)
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
@@ -153,7 +153,7 @@ class TestTraefikRequestMirroringE2E:
 
         for i in range(num_requests):
             try:
-                response = requests.get("http://localhost:10003/api/v2", timeout=5)
+                response = requests.get("http://localhost:13000/api/v2", timeout=5)
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
@@ -193,7 +193,7 @@ class TestTraefikRequestMirroringE2E:
 
         for i in range(num_requests):
             try:
-                response = requests.get("http://localhost:10003/api/v3", timeout=5)
+                response = requests.get("http://localhost:13000/api/v3", timeout=5)
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
@@ -232,7 +232,7 @@ class TestTraefikRequestMirroringE2E:
         for i in range(num_requests):
             try:
                 payload = {"test": f"data_{i}", "index": i}
-                response = requests.post("http://localhost:10003/api/v1", json=payload, timeout=5)
+                response = requests.post("http://localhost:13000/api/v1", json=payload, timeout=5)
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
@@ -274,7 +274,7 @@ class TestTraefikRequestMirroringE2E:
 
         try:
             # Traefik v2.10 dashboard API
-            response = requests.get("http://localhost:9903/api/http/services", timeout=5)
+            response = requests.get("http://localhost:13001/api/http/services", timeout=5)
 
             if response.status_code == 200:
                 services = response.json()
@@ -305,7 +305,7 @@ class TestTraefikRequestMirroringE2E:
         # Send some requests first
         for i in range(10):
             try:
-                requests.get("http://localhost:10003/api/v1", timeout=5)
+                requests.get("http://localhost:13000/api/v1", timeout=5)
             except Exception:
                 pass
 
@@ -313,7 +313,7 @@ class TestTraefikRequestMirroringE2E:
 
         try:
             # Check if metrics endpoint is available
-            response = requests.get("http://localhost:9903/api/overview", timeout=5)
+            response = requests.get("http://localhost:13001/api/overview", timeout=5)
 
             if response.status_code == 200:
                 overview = response.json()

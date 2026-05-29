@@ -51,12 +51,21 @@ class TestAPISIXRequestMirroringE2E:
 
         # Build and start containers
         print("\n🐳 Starting Docker Compose environment for APISIX Request Mirroring...")
-        subprocess.run(
-            ["docker", "compose", "up", "-d", "--build"],
-            cwd=compose_dir,
-            check=True,
-            capture_output=True,
-        )
+        try:
+            compose_up_result = subprocess.run(
+                ["docker", "compose", "up", "-d", "--build"],
+                cwd=compose_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            if compose_up_result.stdout:
+                print(compose_up_result.stdout)
+            if compose_up_result.stderr:
+                print(compose_up_result.stderr)
+        except Exception as e:
+            print(f"❌ Failed start docker compose: {e}")
+            pytest.fail(f"APISIX docker compose up failed: {e}")
 
         # Wait for APISIX to be ready
         print("⏳ Waiting for APISIX to be healthy...")
@@ -75,7 +84,7 @@ class TestAPISIXRequestMirroringE2E:
             try:
                 # Check Admin API instead of /health (which doesn't exist until routes are configured)
                 response = requests.get(
-                    "http://localhost:9182/apisix/admin/routes",
+                    "http://localhost:11001/apisix/admin/routes",
                     headers={"X-API-KEY": "edd1c9f034335f136f87ad84b625c8f1"},
                     timeout=2,
                 )
@@ -118,7 +127,7 @@ class TestAPISIXRequestMirroringE2E:
                 apisix_config = json.load(f)
 
             # Deploy to APISIX Admin API
-            admin_url = "http://localhost:9182"
+            admin_url = "http://localhost:11001"
             api_key = "edd1c9f034335f136f87ad84b625c8f1"
             headers = {"X-API-KEY": api_key, "Content-Type": "application/json"}
 
@@ -203,7 +212,7 @@ class TestAPISIXRequestMirroringE2E:
 
         for i in range(num_requests):
             try:
-                response = requests.get("http://localhost:10003/api/v1/test", timeout=5)
+                response = requests.get("http://localhost:11000/api/v1/test", timeout=5)
 
                 # Enhanced logging for debugging
                 if i < 3:  # Log first 3 requests in detail
@@ -248,7 +257,7 @@ class TestAPISIXRequestMirroringE2E:
 
         # Check APISIX Admin API for proxy-mirror plugin stats
         try:
-            admin_url = "http://localhost:9182"
+            admin_url = "http://localhost:11001"
             api_key = "edd1c9f034335f136f87ad84b625c8f1"
             headers = {"X-API-KEY": api_key}
 
@@ -281,7 +290,7 @@ class TestAPISIXRequestMirroringE2E:
 
         for i in range(num_requests):
             try:
-                response = requests.get("http://localhost:10003/api/v2/test", timeout=5)
+                response = requests.get("http://localhost:11000/api/v2/test", timeout=5)
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
@@ -322,7 +331,7 @@ class TestAPISIXRequestMirroringE2E:
 
         for i in range(num_requests):
             try:
-                response = requests.get("http://localhost:10003/api/v3/test", timeout=5)
+                response = requests.get("http://localhost:11000/api/v3/test", timeout=5)
 
                 if response.status_code == 200:
                     backend = response.headers.get("X-Backend-Name")
@@ -362,7 +371,7 @@ class TestAPISIXRequestMirroringE2E:
             try:
                 payload = {"test": f"data_{i}", "index": i}
                 response = requests.post(
-                    "http://localhost:10003/api/v1/test", json=payload, timeout=5
+                    "http://localhost:11000/api/v1/test", json=payload, timeout=5
                 )
 
                 if response.status_code == 200:
@@ -404,7 +413,7 @@ class TestAPISIXRequestMirroringE2E:
         print("\n🏥 Testing APISIX Admin API Health...")
 
         try:
-            admin_url = "http://localhost:9182"
+            admin_url = "http://localhost:11001"
             api_key = "edd1c9f034335f136f87ad84b625c8f1"
             headers = {"X-API-KEY": api_key}
 
@@ -435,7 +444,7 @@ class TestAPISIXRequestMirroringE2E:
         print("\n🏥 Testing APISIX Upstream Health...")
 
         try:
-            admin_url = "http://localhost:9182"
+            admin_url = "http://localhost:11001"
             api_key = "edd1c9f034335f136f87ad84b625c8f1"
             headers = {"X-API-KEY": api_key}
 
@@ -476,7 +485,7 @@ class TestAPISIXRequestMirroringE2E:
 
         def make_request(i):
             try:
-                response = requests.get("http://localhost:10003/api/v1/test", timeout=5)
+                response = requests.get("http://localhost:11000/api/v1/test", timeout=5)
                 if response.status_code == 200:
                     return "success"
                 return "failed"
@@ -502,7 +511,7 @@ class TestAPISIXRequestMirroringE2E:
         print("\n🔍 Verifying APISIX proxy-mirror Plugin Configuration...")
 
         try:
-            admin_url = "http://localhost:9182"
+            admin_url = "http://localhost:11001"
             api_key = "edd1c9f034335f136f87ad84b625c8f1"
             headers = {"X-API-KEY": api_key}
 

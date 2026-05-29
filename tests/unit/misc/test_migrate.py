@@ -34,8 +34,7 @@ class TestMigrateBasic:
     def kong_config(self, tmp_path):
         """Create Kong config file"""
         config = tmp_path / "kong.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 _format_version: "3.0"
 services:
   - name: api_service
@@ -48,16 +47,14 @@ services:
       - name: rate-limiting
         config:
           minute: 100
-"""
-        )
+""")
         return str(config)
 
     @pytest.fixture
     def envoy_config(self, tmp_path):
         """Create Envoy config file"""
         config = tmp_path / "envoy.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 static_resources:
   listeners:
     - name: main_listener
@@ -78,16 +75,14 @@ static_resources:
                     socket_address:
                       address: backend
                       port_value: 8080
-"""
-        )
+""")
         return str(config)
 
     @pytest.fixture
     def traefik_config(self, tmp_path):
         """Create Traefik config file"""
         config = tmp_path / "traefik.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 http:
   routers:
     api_router:
@@ -98,8 +93,7 @@ http:
       loadBalancer:
         servers:
           - url: http://backend:8080
-"""
-        )
+""")
         return str(config)
 
     def test_migrate_kong_to_envoy(self, runner, kong_config, tmp_path):
@@ -287,8 +281,7 @@ class TestMigrateFileGeneration:
     def kong_config(self, tmp_path):
         """Create Kong config with multiple services"""
         config = tmp_path / "kong.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 _format_version: "3.0"
 services:
   - name: api_service
@@ -303,8 +296,7 @@ services:
       - name: web_route
         paths:
           - /web
-"""
-        )
+""")
         return str(config)
 
     def test_gal_config_format(self, runner, kong_config, tmp_path):
@@ -518,8 +510,7 @@ class TestMigrateCompatibility:
     def kong_config_with_features(self, tmp_path):
         """Create Kong config with various features"""
         config = tmp_path / "kong-features.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 _format_version: "3.0"
 services:
   - name: api_service
@@ -534,8 +525,7 @@ services:
           minute: 100
       - name: basic-auth
       - name: cors
-"""
-        )
+""")
         return str(config)
 
     def test_migrate_shows_compatibility_score(self, runner, kong_config_with_features, tmp_path):
@@ -742,14 +732,12 @@ class TestMigrateEdgeCases:
     def test_migrate_same_source_and_target(self, runner, tmp_path):
         """Test migration with same source and target provider"""
         config = tmp_path / "kong.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 _format_version: "3.0"
 services:
   - name: test_service
     url: http://test:8080
-"""
-        )
+""")
         output_dir = tmp_path / "migration"
 
         result = runner.invoke(
@@ -782,14 +770,12 @@ class TestMigrateAllProviders:
     @pytest.fixture
     def minimal_kong_config(self, tmp_path):
         config = tmp_path / "kong.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 _format_version: "3.0"
 services:
   - name: test
     url: http://backend:8080
-"""
-        )
+""")
         return str(config)
 
     def test_migrate_kong_to_all_providers(self, runner, minimal_kong_config, tmp_path):
@@ -830,14 +816,12 @@ class TestMigrateYesFlag:
     @pytest.fixture
     def kong_config(self, tmp_path):
         config = tmp_path / "kong.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 _format_version: "3.0"
 services:
   - name: test
     url: http://backend:8080
-"""
-        )
+""")
         return str(config)
 
     def test_migrate_with_yes_flag(self, runner, kong_config, tmp_path):
@@ -898,8 +882,7 @@ class TestMigrateReportContent:
     def complex_kong_config(self, tmp_path):
         """Create complex Kong config with multiple features"""
         config = tmp_path / "kong-complex.yaml"
-        config.write_text(
-            """
+        config.write_text("""
 _format_version: "3.0"
 services:
   - name: api_service
@@ -922,8 +905,7 @@ services:
       - name: web_route
         paths:
           - /web
-"""
-        )
+""")
         return str(config)
 
     def test_report_contains_all_sections(self, runner, complex_kong_config, tmp_path):

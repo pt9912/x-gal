@@ -1,3 +1,5 @@
+name: kong-mirroring
+
 services:
   # Backend - Primary (production traffic)
   backend-primary:
@@ -10,7 +12,13 @@ services:
     networks:
       - test-network-kong-mirroring
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8080')",
+        ]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -26,7 +34,13 @@ services:
     networks:
       - test-network-kong-mirroring
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8080')",
+        ]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -49,8 +63,8 @@ services:
       - ./kong-mirroring-nginx.yaml:/usr/local/kong/declarative/kong.yaml:ro
       - ./nginx-template.conf:/usr/local/kong/custom/nginx-template.conf:ro
     ports:
-      - "10003:8000"  # Proxy port (different from traffic-split tests)
-      - "8003:8001"   # Admin API port (different from traffic-split tests)
+      - "12000:8000" # Proxy port (different from traffic-split tests)
+      - "12001:8001" # Admin API port (different from traffic-split tests)
     networks:
       - test-network-kong-mirroring
     depends_on:

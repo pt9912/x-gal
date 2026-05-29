@@ -81,6 +81,7 @@ Client → HAProxy (Port 10005)
 
 ```bash
 cd tests/docker/haproxy-mirroring-spoe
+docker compose build --no-cache
 docker compose up -d
 ```
 
@@ -555,16 +556,16 @@ backend spoe-mirror
 
 ## 📚 Comparison with Other Providers
 
-| Feature | HAProxy (SPOE) | Envoy | Nginx | APISIX |
-|---------|----------------|-------|-------|--------|
-| **Native Mirroring** | ⚠️ Yes (SPOE, complex) | ✅ Yes (async) | ✅ Yes (mirror) | ✅ Yes (plugin) |
-| **Setup Complexity** | 🔴 High (SPOE agent) | 🟢 Low | 🟢 Low | 🟢 Low |
-| **Fire-and-Forget** | ✅ Yes (async SPOE) | ✅ Yes | ✅ Yes | ✅ Yes |
-| **Sample Percentage** | ✅ Yes (rand() ACL) | ✅ Yes (runtime_fraction) | ✅ Yes (split_clients) | ✅ Yes (sample_ratio) |
-| **Mirror Request Body** | ✅ Yes (http-buffer-request) | ✅ Yes | ✅ Yes | ✅ Yes |
-| **Mirror Headers** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes |
-| **Production Ready** | ✅ Yes (HAProxy 2.0+) | ✅ Yes | ✅ Yes | ✅ Yes |
-| **External Tools** | ⚠️ spoa-mirror required | ❌ None | ❌ None | ❌ None |
+| Feature                 | HAProxy (SPOE)              | Envoy                    | Nginx                 | APISIX               |
+| ----------------------- | --------------------------- | ------------------------ | --------------------- | -------------------- |
+| **Native Mirroring**    | ⚠️ Yes (SPOE, complex)       | ✅ Yes (async)            | ✅ Yes (mirror)        | ✅ Yes (plugin)       |
+| **Setup Complexity**    | 🔴 High (SPOE agent)         | 🟢 Low                    | 🟢 Low                 | 🟢 Low                |
+| **Fire-and-Forget**     | ✅ Yes (async SPOE)          | ✅ Yes                    | ✅ Yes                 | ✅ Yes                |
+| **Sample Percentage**   | ✅ Yes (rand() ACL)          | ✅ Yes (runtime_fraction) | ✅ Yes (split_clients) | ✅ Yes (sample_ratio) |
+| **Mirror Request Body** | ✅ Yes (http-buffer-request) | ✅ Yes                    | ✅ Yes                 | ✅ Yes                |
+| **Mirror Headers**      | ✅ Yes                       | ✅ Yes                    | ✅ Yes                 | ✅ Yes                |
+| **Production Ready**    | ✅ Yes (HAProxy 2.0+)        | ✅ Yes                    | ✅ Yes                 | ✅ Yes                |
+| **External Tools**      | ⚠️ spoa-mirror required      | ❌ None                   | ❌ None                | ❌ None               |
 
 **Recommendation:**
 - **HAProxy required?** Use SPOE + spoa-mirror (this example)

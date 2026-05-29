@@ -1,3 +1,5 @@
+name: traefik-mirroring
+
 services:
   # Backend - Primary (production traffic)
   backend-primary:
@@ -10,7 +12,13 @@ services:
     networks:
       - test-network-mirroring
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8080')",
+        ]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -26,7 +34,13 @@ services:
     networks:
       - test-network-mirroring
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8080')",
+        ]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -38,8 +52,8 @@ services:
       - ./traefik-static.yml:/etc/traefik/traefik.yml:ro
       - ./traefik-dynamic.yml:/etc/traefik/dynamic.yml:ro
     ports:
-      - "10003:8080"   # Proxy port (different from traffic-split tests)
-      - "9903:8081"    # Dashboard/API port
+      - "13000:8080" # Proxy port (different from traffic-split tests)
+      - "13001:8081" # Dashboard/API port
     networks:
       - test-network-mirroring
     depends_on:

@@ -1,3 +1,5 @@
+name: apisix-mirroring
+
 services:
   # Backend - Primary (production traffic)
   backend-primary:
@@ -10,7 +12,13 @@ services:
     networks:
       - test-network-apisix-mirroring
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8080')",
+        ]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -26,7 +34,13 @@ services:
     networks:
       - test-network-apisix-mirroring
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8080')",
+        ]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -52,8 +66,8 @@ services:
     volumes:
       - ./apisix-config.yaml:/usr/local/apisix/conf/config.yaml:ro
     ports:
-      - "10003:9080"  # Proxy port (different from Envoy/Nginx tests)
-      - "9182:9180"   # Admin API port (different from other tests)
+      - "11000:9080" # Proxy port (different from Envoy/Nginx tests)
+      - "11001:9180" # Admin API port (different from other tests)
     networks:
       - test-network-apisix-mirroring
     environment:
@@ -66,7 +80,15 @@ services:
       backend-shadow:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9180/apisix/admin/routes", "-H", "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:9180/apisix/admin/routes",
+          "-H",
+          "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1",
+        ]
       interval: 5s
       timeout: 3s
       retries: 15
